@@ -1,0 +1,28 @@
+permissions:
+    actions: read
+
+name: ESLint and Prettier
+on: push
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        permissions:
+            # required for all workflows
+            security-events: write
+            # only required for workflows in private repositories
+            actions: read
+            contents: read
+        steps:
+            - uses: actions/checkout@v4
+            - name: Install modules
+              run: npm install
+            - name: Run ESLint
+              run: npx eslint --color -c .eslintrc.json .
+            - name: Run prettier
+              run: npx prettier --check .
+            - name: SARIF
+              run: npx eslint -c .eslintrc.json -f @microsoft/eslint-formatter-sarif -o eslint.sarif . || true
+            - name: Upload SARIF file
+              uses: github/codeql-action/upload-sarif@v3
+              with:
+                  sarif_file: eslint.sarif

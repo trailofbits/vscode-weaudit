@@ -1,0 +1,19 @@
+.detailsDiv {
+    display: flex;
+    align-items: center;
+    padding-bottom: 1em;
+}
+
+.detailSpan {
+    padding-right: 0.5em;
+}
+
+vscode-dropdown,
+vscode-text-area,
+vscode-text-field {
+    width: 100%;
+}
+
+vscode-dropdown {
+    max-width: 250px;
+}

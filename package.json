@@ -1,0 +1,452 @@
+{
+    "name": "weaudit",
+    "displayName": "weAudit",
+    "description": "Bookmark findings and quickly navigate to areas of interest in the codebase",
+    "version": "1.0.0",
+    "publisher": "trailofbits",
+    "author": "Trail of Bits",
+    "categories": [],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/trailofbits/vscode-weaudit"
+    },
+    "keywords": [
+        "security",
+        "audit",
+        "code-review"
+    ],
+    "galleryBanner": {
+        "color": "#ffebdb",
+        "theme": "dark"
+    },
+    "icon": "media/icon.png",
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "activationEvents": [
+        "onStartupFinished",
+        "onView:weAudit"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "weAudit",
+                    "title": "weAudit",
+                    "icon": "media/tob.svg"
+                }
+            ]
+        },
+        "views": {
+            "weAudit": [
+                {
+                    "id": "codeMarker",
+                    "name": "List of Findings",
+                    "contextualTitle": "weAudit: "
+                },
+                {
+                    "type": "webview",
+                    "id": "findingDetails",
+                    "name": "Finding Details",
+                    "contextualTitle": "weAudit"
+                },
+                {
+                    "id": "resolvedFindings",
+                    "name": "Resolved Findings",
+                    "contextualTitle": "weAudit"
+                },
+                {
+                    "type": "webview",
+                    "id": "gitConfig",
+                    "name": "Repository Configuration",
+                    "visibility": "collapsed",
+                    "contextualTitle": "weAudit"
+                },
+                {
+                    "id": "savedFindings",
+                    "name": "weAudit Files",
+                    "contextualTitle": "weAudit"
+                }
+            ]
+        },
+        "commands": [
+            {
+                "command": "weAudit.openGithubIssue",
+                "title": "Open Github Issue",
+                "icon": "$(github)"
+            },
+            {
+                "command": "weAudit.copyEntryPermalink",
+                "title": "Copy Audit Permalink",
+                "icon": "$(link)"
+            },
+            {
+                "command": "weAudit.copySelectedCodePermalink",
+                "title": "weAudit: Copy Permalink (Audit Repository)"
+            },
+            {
+                "command": "weAudit.copySelectedCodeClientPermalink",
+                "title": "weAudit: Copy Permalink (Client Repository)"
+            },
+            {
+                "command": "weAudit.editClientRemote",
+                "title": "weAudit: Edit Repository URL (Client)"
+            },
+            {
+                "command": "weAudit.editAuditRemote",
+                "title": "weAudit: Edit Repository URL (Audit)"
+            },
+            {
+                "command": "weAudit.editGitHash",
+                "title": "weAudit: Edit Git Commit Hash"
+            },
+            {
+                "command": "weAudit.setupRepositories",
+                "title": "weAudit: Setup Audit and Client Repositories, and the Git Commit Hash"
+            },
+            {
+                "command": "weAudit.resolveFinding",
+                "title": "Resolve Finding",
+                "icon": "$(pass)"
+            },
+            {
+                "command": "weAudit.editEntry",
+                "title": "Edit Finding Title",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "weAudit.editLocationEntry",
+                "title": "Edit Location Label",
+                "icon": "$(edit)"
+            },
+            {
+                "command": "weAudit.findAndLoadConfigurationFiles",
+                "title": "Update Files",
+                "icon": "$(refresh)"
+            },
+            {
+                "command": "weAudit.restoreFinding",
+                "title": "Restore Finding",
+                "icon": "$(check)"
+            },
+            {
+                "command": "weAudit.deleteFinding",
+                "title": "Delete Finding",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "weAudit.deleteLocation",
+                "title": "Delete Location",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "weAudit.deleteResolvedFinding",
+                "title": "Delete Finding",
+                "icon": "$(trash)"
+            },
+            {
+                "command": "weAudit.deleteAllResolvedFinding",
+                "title": "Delete All Findings",
+                "icon": "$(clear-all)"
+            },
+            {
+                "command": "weAudit.restoreAllResolvedFindings",
+                "title": "Restore All Findings",
+                "icon": "$(check-all)"
+            },
+            {
+                "command": "weAudit.toggleTreeViewMode",
+                "title": "Toggle View Mode",
+                "icon": "$(sort-precedence)"
+            },
+            {
+                "command": "weAudit.toggleAudited",
+                "title": "weAudit: Mark File as Reviewed"
+            },
+            {
+                "command": "weAudit.addFinding",
+                "title": "weAudit: New Finding from Selection"
+            },
+            {
+                "command": "weAudit.addNote",
+                "title": "weAudit: New Note from Selection"
+            },
+            {
+                "command": "weAudit.editEntryUnderCursor",
+                "title": "weAudit: Edit Finding Under Cursor"
+            },
+            {
+                "command": "weAudit.deleteLocationUnderCursor",
+                "title": "weAudit: Delete Location Under Cursor"
+            },
+            {
+                "command": "weAudit.showMarkedFilesDayLog",
+                "title": "weAudit: Show Daily Log",
+                "icon": "$(output)"
+            },
+            {
+                "command": "weAudit.addRegionToAnEntry",
+                "title": "weAudit: Add Region to a Finding"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "weAudit.toggleAudited",
+                "key": "ctrl+alt+7",
+                "mac": "cmd+7"
+            },
+            {
+                "command": "weAudit.addFinding",
+                "key": "ctrl+alt+j",
+                "mac": "cmd+j"
+            },
+            {
+                "command": "weAudit.addNote",
+                "key": "ctrl+alt+k",
+                "mac": "cmd+k"
+            },
+            {
+                "command": "weAudit.editEntryUnderCursor",
+                "key": "ctrl+alt+6",
+                "mac": "cmd+6"
+            },
+            {
+                "command": "weAudit.deleteLocationUnderCursor",
+                "key": "ctrl+alt+5",
+                "mac": "cmd+5"
+            },
+            {
+                "command": "weAudit.copySelectedCodePermalink",
+                "key": "ctrl+alt+8",
+                "mac": "cmd+8"
+            },
+            {
+                "command": "weAudit.copySelectedCodeClientPermalink",
+                "key": "ctrl+alt+9",
+                "mac": "cmd+9"
+            }
+        ],
+        "menus": {
+            "commandPalette": [
+                {
+                    "command": "weAudit.editEntry",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.editLocationEntry",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.resolveFinding",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.openGithubIssue",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.copyEntryPermalink",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.findAndLoadConfigurationFiles",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.restoreFinding",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.deleteFinding",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.deleteLocation",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.deleteResolvedFinding",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.deleteAllResolvedFinding",
+                    "when": "false"
+                }
+            ],
+            "view/title": [
+                {
+                    "command": "weAudit.findAndLoadConfigurationFiles",
+                    "when": "view == savedFindings",
+                    "group": "navigation"
+                },
+                {
+                    "command": "weAudit.restoreAllResolvedFindings",
+                    "when": "view == resolvedFindings",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "weAudit.deleteAllResolvedFinding",
+                    "when": "view == resolvedFindings",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "weAudit.toggleTreeViewMode",
+                    "when": "view == codeMarker",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "weAudit.showMarkedFilesDayLog",
+                    "when": "view == codeMarker",
+                    "group": "navigation@0"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "weAudit.editEntry",
+                    "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "weAudit.copyEntryPermalink",
+                    "when": "view == codeMarker && viewItem != pathOrganizer",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "weAudit.openGithubIssue",
+                    "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
+                    "group": "inline@4"
+                },
+                {
+                    "command": "weAudit.resolveFinding",
+                    "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
+                    "group": "inline@5"
+                },
+                {
+                    "command": "weAudit.deleteFinding",
+                    "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
+                    "group": "inline@6"
+                },
+                {
+                    "command": "weAudit.deleteLocation",
+                    "when": "view == codeMarker && viewItem == additionalLocation",
+                    "group": "inline@6"
+                },
+                {
+                    "command": "weAudit.editLocationEntry",
+                    "when": "view == codeMarker && viewItem == additionalLocation",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "weAudit.restoreFinding",
+                    "when": "view == resolvedFindings",
+                    "group": "inline@1"
+                },
+                {
+                    "command": "weAudit.deleteResolvedFinding",
+                    "when": "view == resolvedFindings",
+                    "group": "inline@2"
+                }
+            ],
+            "editor/context": [
+                {
+                    "command": "weAudit.copySelectedCodePermalink",
+                    "group": "9_cutcopypaste@0"
+                },
+                {
+                    "command": "weAudit.copySelectedCodeClientPermalink",
+                    "group": "9_cutcopypaste@0"
+                }
+            ]
+        },
+        "configuration": [
+            {
+                "id": "general",
+                "title": "General Settings",
+                "order": 1,
+                "properties": {
+                    "weAudit.general.treeViewMode": {
+                        "type": "string",
+                        "default": "list",
+                        "enum": [
+                            "list",
+                            "byFile"
+                        ],
+                        "enumDescriptions": [
+                            "Group findings in a list",
+                            "Group findings by filename"
+                        ],
+                        "description": "The List of Findings display mode."
+                    },
+                    "weAudit.general.githubOrganizationName": {
+                        "type": "string",
+                        "default": "trailofbits",
+                        "description": "Defining the organization name for the audit repository enhances the heuristic to determine the correct git remote when creating permalinks."
+                    }
+                }
+            },
+            {
+                "id": "weaudit-colors",
+                "title": "Highlight colors",
+                "order": 2,
+                "properties": {
+                    "weAudit.auditedColor": {
+                        "type": "string",
+                        "default": "#00422355",
+                        "description": "Background color for files marked as reviewed (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
+                    },
+                    "weAudit.ownFindingColor": {
+                        "type": "string",
+                        "default": "#ee335555",
+                        "description": "Background color for your own findings (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
+                    },
+                    "weAudit.otherFindingColor": {
+                        "type": "string",
+                        "default": "#ee335555",
+                        "description": "Background color for other user's findings (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
+                    },
+                    "weAudit.ownNoteColor": {
+                        "type": "string",
+                        "default": "#145ceb55",
+                        "description": "Background color for your own notes (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
+                    },
+                    "weAudit.otherNoteColor": {
+                        "type": "string",
+                        "default": "#145ceb55",
+                        "description": "Background color for other user's notes (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
+                    }
+                }
+            }
+        ]
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run package",
+        "compile": "node ./esbuild.js",
+        "package": "NODE_ENV=production node ./esbuild.js",
+        "watch": "node ./esbuild.js --watch",
+        "lint": "eslint src --ext ts"
+    },
+    "devDependencies": {
+        "@microsoft/eslint-formatter-sarif": "^3.0.0",
+        "@types/asciichart": "^1.5.6",
+        "@types/glob": "^7.2.0",
+        "@types/mocha": "^9.1.1",
+        "@types/node": "16.x",
+        "@types/rimraf": "^2.0.5",
+        "@types/vscode": "^1.71.0",
+        "@types/vscode-webview": "^1.57.1",
+        "@typescript-eslint/eslint-plugin": "^5.30.0",
+        "@typescript-eslint/parser": "^5.30.0",
+        "@vscode/test-electron": "^2.1.5",
+        "esbuild": "^0.16.17",
+        "eslint": "^8.18.0",
+        "glob": "^8.0.3",
+        "mocha": "^10.0.0",
+        "prettier": "^3.2.5",
+        "typescript": "^4.8.4"
+    },
+    "dependencies": {
+        "@vscode/webview-ui-toolkit": "^1.4.0",
+        "asciichart": "^1.5.25"
+    }
+}
