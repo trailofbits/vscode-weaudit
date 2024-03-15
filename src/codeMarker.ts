@@ -1002,16 +1002,18 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         // Prompt the user to copy the issue body and open the empty issue page
-        vscode.window.showErrorMessage("The issue body is too long to open automatically in the URL", "Copy issue to clipboard and open browser window").then((action) => {
-            if (action === undefined) {
-                return;
-            }
-            vscode.env.clipboard.writeText(issueBodyText);
-            const pasteHere = encodeURIComponent("[Paste the issue body here]");
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore
-            vscode.env.openExternal(`${issueUrl}title=${title}&body=${pasteHere}`);
-        });
+        vscode.window
+            .showErrorMessage("The issue body is too long to open automatically in the URL", "Copy issue to clipboard and open browser window")
+            .then((action) => {
+                if (action === undefined) {
+                    return;
+                }
+                vscode.env.clipboard.writeText(issueBodyText);
+                const pasteHere = encodeURIComponent("[Paste the issue body here]");
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                vscode.env.openExternal(`${issueUrl}title=${title}&body=${pasteHere}`);
+            });
     }
 
     /**
