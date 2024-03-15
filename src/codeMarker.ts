@@ -93,7 +93,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.markedFilesDayLog = new Map<string, string[]>();
         this.loadDayLogFromFile();
 
-        this.treeViewMode = 1;
+        this.treeViewMode = TreeViewMode.List;
         this.loadTreeViewModeConfiguration();
 
         this.username = userInfo().username;
@@ -138,8 +138,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.deleteFinding(node);
         });
 
-        vscode.commands.registerCommand("weAudit.editEntry", (node: Entry) => {
-            this.editEntryDescription(node);
+        vscode.commands.registerCommand("weAudit.editEntryTitle", (node: Entry) => {
+            this.editEntryTitle(node);
         });
 
         vscode.commands.registerCommand("weAudit.editLocationEntry", (node: LocationEntry) => {
@@ -166,7 +166,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             const entry = this.getLocationUnderCursor();
             if (entry) {
                 const toEdit = isLocationEntry(entry) ? entry.parentEntry : entry;
-                this.editEntryDescription(toEdit);
+                this.editEntryTitle(toEdit);
             }
         });
 
@@ -206,9 +206,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.setupRepositories();
         });
 
-        vscode.commands.registerCommand("weAudit.openGithubIssue", (entry: Entry) => {
+        vscode.commands.registerCommand("weAudit.openGithubIssue", (entry: Entry | LocationEntry) => {
             // transform absolute paths to relative paths to the workspace path
-            for (const location of entry.locations) {
+            const actualEntry: Entry = isLocationEntry(entry) ? entry.parentEntry : entry;
+
+            for (const location of actualEntry.locations) {
                 try {
                     location.path = this.relativizePath(location.path);
                 } catch (error) {
@@ -216,7 +218,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     return;
                 }
             }
-            this.openGithubIssue(entry);
+            this.openGithubIssue(actualEntry);
         });
 
         vscode.commands.registerCommand("weAudit.loadSavedFindings", (filename: string, username: string) => {
@@ -453,6 +455,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 entry.label = value;
                 this.refreshTree();
                 this.refreshAndDecorateEntry(entry);
+                treeView.reveal(entry);
                 break;
             }
         }
@@ -717,7 +720,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Edit the label of a marked code region
      * @param entry The entry to edit
      */
-    async editEntryDescription(entry: Entry): Promise<void> {
+    async editEntryTitle(entry: Entry): Promise<void> {
         const entryTypeLabel = entry.entryType === EntryType.Finding ? "finding" : "note";
         const label = await vscode.window.showInputBox({
             title: `Edit ${entryTypeLabel} title`,
@@ -728,7 +731,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
         entry.label = label;
-
+        treeView.reveal(entry);
         this.refreshTree();
         this.decorate();
         this.updateSavedData(entry.author);
@@ -849,7 +852,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
         this.clientRemote = clientRemote;
         this.persistClientRemote();
-        vscode.commands.executeCommand("weAudit.setGitConfigView", this.clientRemote, this.gitRemote, this.gitSha);
     }
 
     /**
@@ -862,7 +864,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
         this.gitRemote = auditRemote;
         this.persistAuditRemote();
-        vscode.commands.executeCommand("weAudit.setGitConfigView", this.clientRemote, this.gitRemote, this.gitSha);
     }
 
     /**
@@ -875,7 +876,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
         this.gitSha = gitSha;
         this.persistGitHash();
-        vscode.commands.executeCommand("weAudit.setGitConfigView", this.clientRemote, this.gitRemote, this.gitSha);
     }
 
     /**
@@ -990,12 +990,28 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         const issueUrl = this.gitRemote + "/issues/new?";
         const issueUrlWithBody = `${issueUrl}title=${title}&body=${issueBody}`;
-        // hack to get around the double encoding of openExternal.
-        // We call it with a string even though it's expecting a Uri
-        // https://github.com/microsoft/vscode/issues/85930
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        vscode.env.openExternal(issueUrlWithBody);
+        // GitHub's URL max size is about 8000 characters
+        if (issueUrlWithBody.length < 8000) {
+            // hack to get around the double encoding of openExternal.
+            // We call it with a string even though it's expecting a Uri
+            // https://github.com/microsoft/vscode/issues/85930
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            vscode.env.openExternal(issueUrlWithBody);
+            return;
+        }
+
+        // Prompt the user to copy the issue body and open the empty issue page
+        vscode.window.showErrorMessage("The issue body is too long to open automatically in the URL", "Copy issue to clipboard and open browser window").then((action) => {
+            if (action === undefined) {
+                return;
+            }
+            vscode.env.clipboard.writeText(issueBodyText);
+            const pasteHere = encodeURIComponent("[Paste the issue body here]");
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            vscode.env.openExternal(`${issueUrl}title=${title}&body=${pasteHere}`);
+        });
     }
 
     /**
@@ -1320,8 +1336,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // if we found an entry, edit the description
         if (intersectedIdx !== -1) {
             const entry = this.treeEntries[intersectedIdx];
-            // editEntryDescription calls updateSavedData so we don't need to call it here
-            this.editEntryDescription(entry);
+            // editEntryTitle calls updateSavedData so we don't need to call it here
+            this.editEntryTitle(entry);
         } else {
             // otherwise, add it to the tree entries
             // create title depending on the entry type
@@ -1567,6 +1583,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Saves the client's remote repository to the current user's file
      */
     persistClientRemote(): void {
+        vscode.commands.executeCommand("weAudit.setGitConfigView", this.clientRemote, this.gitRemote, this.gitSha);
         const vscodeFolder = path.join(this.workspacePath, ".vscode");
         // create .vscode folder if it doesn't exist
         if (!fs.existsSync(vscodeFolder)) {
@@ -1592,6 +1609,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Saves the audit remote repository to the current user's file
      */
     persistAuditRemote(): void {
+        vscode.commands.executeCommand("weAudit.setGitConfigView", this.clientRemote, this.gitRemote, this.gitSha);
         const vscodeFolder = path.join(this.workspacePath, ".vscode");
         // create .vscode folder if it doesn't exist
         if (!fs.existsSync(vscodeFolder)) {
@@ -1617,6 +1635,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Saves the relevant git hash to the current user's file
      */
     persistGitHash(): void {
+        vscode.commands.executeCommand("weAudit.setGitConfigView", this.clientRemote, this.gitRemote, this.gitSha);
         const vscodeFolder = path.join(this.workspacePath, ".vscode");
         // create .vscode folder if it doesn't exist
         if (!fs.existsSync(vscodeFolder)) {
@@ -2191,10 +2210,18 @@ export class AuditMarker {
     /**
      * Reveal the entry under the cursor, in the treeView.
      */
-    private revealEntryUnderCursor(): void {
+    private async revealEntryUnderCursor(): Promise<void> {
         const entry = treeDataProvider.getLocationUnderCursor();
         if (entry !== undefined) {
-            treeView.reveal(entry);
+            try {
+                await treeView.reveal(entry);
+            } catch (error) {
+                const typedError = error as Error;
+                if (typedError.message.startsWith("TreeError")) {
+                    return;
+                }
+                throw error;
+            }
         }
     }
 
