@@ -55,7 +55,7 @@ The highlighted color can be customized in the [settings](#settings).
 
 You can fill detailed information about a finding by clicking on it in the _List of Findings_ view in the sidebar. The respective _Finding Details_ panel will open, where you can fill the information.
 
-![Finding Details](media/readme/gifs/finding_details.gif)
+![Finding Details](media/readme/finding_details.png)
 
 ### Github Issues
 

@@ -111,7 +111,7 @@
                 "icon": "$(pass)"
             },
             {
-                "command": "weAudit.editEntry",
+                "command": "weAudit.editEntryTitle",
                 "title": "Edit Finding Title",
                 "icon": "$(edit)"
             },
@@ -230,7 +230,7 @@
         "menus": {
             "commandPalette": [
                 {
-                    "command": "weAudit.editEntry",
+                    "command": "weAudit.editEntryTitle",
                     "when": "false"
                 },
                 {
@@ -303,7 +303,7 @@
             ],
             "view/item/context": [
                 {
-                    "command": "weAudit.editEntry",
+                    "command": "weAudit.editEntryTitle",
                     "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
                     "group": "inline@1"
                 },
