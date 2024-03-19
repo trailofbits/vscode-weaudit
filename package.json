@@ -103,7 +103,8 @@
             },
             {
                 "command": "weAudit.setupRepositories",
-                "title": "weAudit: Setup Audit and Client Repositories, and the Git Commit Hash"
+                "title": "weAudit: Setup Audit and Client Repositories, and the Git Commit Hash",
+                "icon": "$(settings-gear)"
             },
             {
                 "command": "weAudit.resolveFinding",
@@ -298,6 +299,11 @@
                 {
                     "command": "weAudit.showMarkedFilesDayLog",
                     "when": "view == codeMarker",
+                    "group": "navigation@0"
+                },
+                {
+                    "command": "weAudit.setupRepositories",
+                    "when": "view == gitConfig",
                     "group": "navigation@0"
                 }
             ],
