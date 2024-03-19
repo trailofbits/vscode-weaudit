@@ -512,6 +512,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 this.loadSavedDataFromFile(path.join(vscodeFolder, file), true, true, parsedPath.name);
             }
         });
+        vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
     }
 
     /**

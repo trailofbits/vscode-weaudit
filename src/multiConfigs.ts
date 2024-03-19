@@ -15,7 +15,7 @@ let darkEyePath: vscode.Uri;
 export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<ConfigurationEntry> {
     private configurationEntries: ConfigurationEntry[];
     private workspacePath: string;
-    private currentUsernames: string[];
+    private activeUsernames: string[];
     private username: string;
 
     private _onDidChangeTreeDataEmitter = new vscode.EventEmitter<ConfigurationEntry | undefined | void>();
@@ -31,12 +31,12 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         this.configurationEntries = [];
         this.findAndLoadConfigurationFiles();
 
-        this.currentUsernames = [];
+        this.activeUsernames = [];
         this.username = userInfo().username;
 
         // register a command that refreshes the tree
         vscode.commands.registerCommand("weAudit.refreshSavedFindings", (usernames: string[]) => {
-            this.currentUsernames = usernames;
+            this.activeUsernames = usernames;
             this.refresh();
         });
 
@@ -59,8 +59,8 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
                 const parsedPath = path.parse(file);
                 const entry = { path: path.join(vscodeFolder, file), username: parsedPath.name };
                 this.configurationEntries.push(entry);
-                if (parsedPath.name === this.username && this.currentUsernames.length === 0) {
-                    this.currentUsernames.push(this.username);
+                if (parsedPath.name === this.username && this.activeUsernames.length === 0) {
+                    this.activeUsernames.push(this.username);
                 }
             }
         });
@@ -90,7 +90,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         treeItem.description = path.basename(element.path);
         treeItem.tooltip = element.username + "'s findings";
 
-        if (this.currentUsernames.includes(element.username)) {
+        if (this.activeUsernames.includes(element.username)) {
             treeItem.iconPath = { light: lightEyePath, dark: darkEyePath };
         }
 
