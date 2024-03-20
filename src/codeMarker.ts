@@ -2309,6 +2309,75 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 let treeView: vscode.TreeView<TreeEntry>;
 let treeDataProvider: CodeMarker;
 
+class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntry> {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    private MIME_TYPE = "application/vnd.code.tree.codemarker";
+    private LOCATION_MIME_TYPE = "application/vnd.code.tree.codemarker.locationentry";
+    private ENTRY_MIME_TYPE = "application/vnd.code.tree.codemarker.entry";
+
+    dropMimeTypes = [this.MIME_TYPE, this.LOCATION_MIME_TYPE];
+    dragMimeTypes = [];
+
+    handleDrag(source: readonly TreeEntry[], dataTransfer: vscode.DataTransfer, token: vscode.CancellationToken): void | Thenable<void> {
+        if (source.length === 0 || source.length > 1) {
+            return;
+        }
+        const entry = source[0];
+        if (isPathOrganizerEntry(entry)) {
+            return;
+        }
+        if (isLocationEntry(entry)) {
+            dataTransfer.set(this.LOCATION_MIME_TYPE, new vscode.DataTransferItem(entry));
+        } else if (isEntry(entry)) {
+            dataTransfer.set(this.ENTRY_MIME_TYPE, new vscode.DataTransferItem(entry));
+        }
+    }
+
+    handleDrop(target: TreeEntry | undefined, dataTransfer: vscode.DataTransfer, token: vscode.CancellationToken): void | Thenable<void> {
+        if (target === undefined) {
+            return;
+        }
+        let data = dataTransfer.get(this.LOCATION_MIME_TYPE);
+        if (data !== undefined) {
+            const locationEntry = data.value as LocationEntry;
+            if (isPathOrganizerEntry(target)) {
+                return;
+            }
+            // remove from previous parent
+            locationEntry.parentEntry.locations = locationEntry.parentEntry.locations.filter((loc) => loc !== locationEntry.location);
+            if (isEntry(target)) {
+                // push at the end
+                target.locations.push(locationEntry.location);
+                locationEntry.parentEntry = target;
+            } else if (isLocationEntry(target)) {
+                // find target index to insert after
+                const targetIndex = target.parentEntry.locations.indexOf(target.location);
+                target.parentEntry.locations.splice(targetIndex + 1, 0, locationEntry.location);
+            }
+            treeDataProvider.refreshTree();
+            treeDataProvider.decorate();
+        }
+        data = dataTransfer.get(this.ENTRY_MIME_TYPE);
+        if (data !== undefined) {
+            const entry = data.value as Entry;
+            if (isPathOrganizerEntry(target)) {
+                return;
+            }
+            if (isLocationEntry(target)) {
+                target = target.parentEntry;
+            }
+            if (isEntry(target)) {
+                for (const loc of entry.locations) {
+                    target.locations.push(loc);
+                }
+                treeDataProvider.deleteFinding(entry);
+                treeDataProvider.refreshTree();
+                treeDataProvider.decorate();
+            }
+        }
+    }
+}
+
 export class AuditMarker {
     private previousVisibleTextEditors: string[] = [];
     private decorationManager: DecorationManager;
@@ -2317,7 +2386,7 @@ export class AuditMarker {
         this.decorationManager = new DecorationManager(context);
 
         treeDataProvider = new CodeMarker(context, this.decorationManager);
-        treeView = vscode.window.createTreeView("codeMarker", { treeDataProvider });
+        treeView = vscode.window.createTreeView("codeMarker", { treeDataProvider, dragAndDropController: new DragAndDropController() });
         context.subscriptions.push(treeView);
 
         vscode.window.onDidChangeTextEditorSelection(this.checkSelectionEventAndRevealEntryUnderCursor, this);
