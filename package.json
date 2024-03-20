@@ -15,6 +15,7 @@
         "audit",
         "code-review"
     ],
+    "license": "SEE LICENSE IN LICENSE",
     "galleryBanner": {
         "color": "#ffebdb",
         "theme": "light"
