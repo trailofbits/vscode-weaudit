@@ -20,6 +20,7 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Audited Files**](#audited-files) - Mark an entire file as reviewed.
 -   [**Detailed Findings**](#detailed-findings) - Fill detailed information about a finding.
 -   [**Github Issues**](#github-issues) - Create formatted Github issues with the Detailed Findings information.
+-   [**Multi-region Findings**](#multi-region-findings) - Group multiple locations under a single finding.
 -   [**Resolve and Restore**](#resolve-and-restore) - Resolved findings will not be highlighted in the editor but are still visible in the sidebar.
 -   [**Copy Permalinks**](#copy-permalinks) - Copy Github permalinks to findings, or to a selected code region.
 -   [**Daily Log**](#daily-log) - View a daily log of all the marked files and LOC per day.
@@ -63,6 +64,12 @@ You can create a Github issue with the detailed findings information by clicking
 
 ![Open Github Issue](media/readme/gifs/create_gh_issue.gif)
 
+### Multi-region Findings
+
+You can add multiple regions to a single finding or note. Once you select the code region to be added, call the `weAudit: Add Region to a Finding` and select the finding to add the region to from the quick pick menu. The regions will be highlighted in the editor, and the finding will be updated in the _List of Findings_ panel.
+
+![Add Region to a Finding](media/readme/gifs/multi_region_finding.gif)
+
 ### Resolve and Restore
 
 You can resolve a finding by clicking on the corresponding `Resolve` button in the _List of Findings_ panel. The finding will no longer be highlighted in the editor, but will still be visible in the _Resolved Findings_ panel. You can restore a resolved finding by clicking on the corresponding `Restore` button in the _Resolved Findings_ panel.
@@ -97,7 +104,9 @@ You can view findings in a list, or grouped by filename by clicking on the `View
 
 ### Multiple Users
 
-You can share the weAudit file with you co-auditors to share findings. In the `weAudit Files` panel, you can toggle to show or hide the findings from each user by clicking on the entries.
+You can share the weAudit file with you co-auditors to share findings. This file is located in the `.vscode` folder in your workspace named `$USERNAME.weaudit`.
+
+In the `weAudit Files` panel, you can toggle to show or hide the findings from each user by clicking on the entries.
 There are color settings for other user's findings and notes, and for your own findings and notes.
 
 ![Multiple Users](media/readme/multi_user.png)
