@@ -546,6 +546,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refreshTree();
     }
 
+    getTreeViewMode(): TreeViewMode {
+        return this.treeViewMode;
+    }
+
     /**
      * Toggles the tree view mode between linear and organized per file,
      * updates the configuration and
@@ -2310,18 +2314,25 @@ let treeView: vscode.TreeView<TreeEntry>;
 let treeDataProvider: CodeMarker;
 
 class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntry> {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+    /* eslint-disable @typescript-eslint/naming-convention */
     private MIME_TYPE = "application/vnd.code.tree.codemarker";
     private LOCATION_MIME_TYPE = "application/vnd.code.tree.codemarker.locationentry";
     private ENTRY_MIME_TYPE = "application/vnd.code.tree.codemarker.entry";
+    /* eslint-enable @typescript-eslint/naming-convention */
 
-    dropMimeTypes = [this.MIME_TYPE, this.LOCATION_MIME_TYPE];
-    dragMimeTypes = [];
+    dragMimeTypes = [this.LOCATION_MIME_TYPE, this.ENTRY_MIME_TYPE];
+    dropMimeTypes = [this.MIME_TYPE, this.LOCATION_MIME_TYPE, this.ENTRY_MIME_TYPE];
 
-    handleDrag(source: readonly TreeEntry[], dataTransfer: vscode.DataTransfer, token: vscode.CancellationToken): void | Thenable<void> {
+    handleDrag(source: readonly TreeEntry[], dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): void | Thenable<void> {
+        // drag and drop in the TreeViewMode.GroupByFile does not make sense unless we wanted to reorder the file list
+        if (treeDataProvider.getTreeViewMode() === TreeViewMode.GroupByFile) {
+            return;
+        }
+
         if (source.length === 0 || source.length > 1) {
             return;
         }
+
         const entry = source[0];
         if (isPathOrganizerEntry(entry)) {
             return;
@@ -2333,29 +2344,61 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
         }
     }
 
-    handleDrop(target: TreeEntry | undefined, dataTransfer: vscode.DataTransfer, token: vscode.CancellationToken): void | Thenable<void> {
+    handleDrop(target: TreeEntry | undefined, dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): void | Thenable<void> {
+        // drag and drop in the TreeViewMode.GroupByFile does not make sense unless we wanted to reorder the file list
+        if (treeDataProvider.getTreeViewMode() === TreeViewMode.GroupByFile) {
+            return;
+        }
+
         if (target === undefined) {
             return;
         }
+
         let data = dataTransfer.get(this.LOCATION_MIME_TYPE);
         if (data !== undefined) {
+            // A LocationEntry is being dragged
             const locationEntry = data.value as LocationEntry;
             if (isPathOrganizerEntry(target)) {
                 return;
             }
-            // remove from previous parent
-            locationEntry.parentEntry.locations = locationEntry.parentEntry.locations.filter((loc) => loc !== locationEntry.location);
+
+            // Target is an Entry (only one location)
             if (isEntry(target)) {
+                // remove from previous parent
+                locationEntry.parentEntry.locations = locationEntry.parentEntry.locations.filter((loc) => loc !== locationEntry.location);
+
                 // push at the end
                 target.locations.push(locationEntry.location);
                 locationEntry.parentEntry = target;
             } else if (isLocationEntry(target)) {
-                // find target index to insert after
+                // Target is a LocationEntry
+
+                // find the source before we remove it
+                const sourceIndex = locationEntry.parentEntry.locations.indexOf(locationEntry.location);
+
+                // remove from previous parent
+                locationEntry.parentEntry.locations = locationEntry.parentEntry.locations.filter((loc) => loc !== locationEntry.location);
+
+                // find target index
                 const targetIndex = target.parentEntry.locations.indexOf(target.location);
-                target.parentEntry.locations.splice(targetIndex + 1, 0, locationEntry.location);
+
+                // if the target is the same as the source, and the source is the next to the target,
+                // insert it before the target
+                if (locationEntry.parentEntry === target.parentEntry && sourceIndex >= targetIndex + 1) {
+                    target.parentEntry.locations.splice(targetIndex, 0, locationEntry.location);
+                } else {
+                    // otherwise, insert it after the target
+                    target.parentEntry.locations.splice(targetIndex + 1, 0, locationEntry.location);
+                }
             }
             treeDataProvider.refreshTree();
             treeDataProvider.decorate();
+            // if the target was an Entry (only one location), we need to expand the dropdown after adding an extra location
+            if (isEntry(target) && treeView.visible) {
+                treeView.reveal(target, { expand: 1, select: false });
+            }
+
+            return;
         }
         data = dataTransfer.get(this.ENTRY_MIME_TYPE);
         if (data !== undefined) {
@@ -2374,6 +2417,7 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                 treeDataProvider.refreshTree();
                 treeDataProvider.decorate();
             }
+            return;
         }
     }
 }
