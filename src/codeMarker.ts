@@ -1079,7 +1079,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
         }
 
-        const target = entry.locations.map((location) => location.path).join(", ");
+        // deduplicate the target paths
+        const locationSet: Set<string> = new Set();
+        for (const location of entry.locations) {
+            locationSet.add(location.path);
+        }
+
+        const target = Array.from(locationSet).join(", ");
         const permalinks = auditPermalinks.join("\n");
         const clientPermalinkString = clientPermalinks.join("\n");
 
