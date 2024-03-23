@@ -4,7 +4,7 @@
 
 WeAudit is an essential extension in the arsenal of any code auditor.
 
-With weAudit, you can bookmark regions of code to highlight issues, add notes, mark files as reviewed, and collaborate with your fellow auditors. Enhance your reporting workflow by writing the findings directly in VSCode, creating prefilled Github issues, and copying links. For the stats lovers, analyze your audit progress with the daily log, showing the number of files and LOC audited per day.
+With weAudit, you can bookmark regions of code to highlight issues, add notes, mark files as reviewed, and collaborate with your fellow auditors. Enhance your reporting workflow by writing the findings directly in VSCode, creating prefilled GitHub issues, and copying links. For the stats lovers, analyze your audit progress with the daily log, showing the number of files and LOC audited per day.
 
 ![Screenshot](media/readme/screenshot.png)
 
@@ -21,10 +21,10 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Findings and Notes**](#findings-and-notes) - Bookmark regions of code to identify findings or to add audit notes.
 -   [**Audited Files**](#audited-files) - Mark an entire file as reviewed.
 -   [**Detailed Findings**](#detailed-findings) - Fill detailed information about a finding.
--   [**Github Issues**](#github-issues) - Create formatted Github issues with the Detailed Findings information.
+-   [**GitHub/Gitlab Issues**](#github-issues) - Create formatted GitHub or Gitlab issues with the Detailed Findings information.
 -   [**Multi-region Findings**](#multi-region-findings) - Group multiple locations under a single finding.
 -   [**Resolve and Restore**](#resolve-and-restore) - Resolved findings will not be highlighted in the editor but are still visible in the sidebar.
--   [**Copy Permalinks**](#copy-permalinks) - Copy Github permalinks to findings, or to a selected code region.
+-   [**Copy Permalinks**](#copy-permalinks) - Copy GitHub permalinks to findings, or to a selected code region.
 -   [**Daily Log**](#daily-log) - View a daily log of all the marked files and LOC per day.
 -   [**View Mode**](#view-mode) - View findings in a list, or grouped by filename.
 -   [**Multiple Users**](#multiple-users) - Findings can be viewed from multiple different users.
@@ -63,11 +63,11 @@ You can fill detailed information about a finding by clicking on it in the _List
 
 ![Finding Details](media/readme/finding_details.png)
 
-### Github Issues
+### GitHub/Gitlab Issues
 
-You can create a Github issue with the detailed findings information by clicking on the corresponding `Open Github Issue` button in the _List of Findings_ panel. A browser window in will open prompting you to open the issue with the prefilled information from the _Finding Details_ panel.
+You can create a GitHub/Gitlab issue with the detailed findings information by clicking on the corresponding `Open Remote Issue` button in the _List of Findings_ panel. A browser window in will open prompting you to open the issue with the prefilled information from the _Finding Details_ panel.
 
-![Open Github Issue](media/readme/gifs/create_gh_issue.gif)
+![Open Remote Issue](media/readme/gifs/create_gh_issue.gif)
 
 ### Multi-region Findings
 

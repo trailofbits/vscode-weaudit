@@ -214,7 +214,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 try {
                     location.path = this.relativizePath(location.path);
                 } catch (error) {
-                    vscode.window.showErrorMessage(`Failed to open GitHub issue. The file ${location.path} is not in the workspace (${this.workspacePath}).`);
+                    vscode.window.showErrorMessage(`Failed to open remote issue. The file ${location.path} is not in the workspace (${this.workspacePath}).`);
                     return;
                 }
             }
@@ -1013,8 +1013,22 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         const encodedIssueBody = encodeURIComponent(issueBodyText);
 
-        const issueUrl = this.gitRemote + "/issues/new?";
-        const issueUrlWithBody = `${issueUrl}title=${title}&body=${encodedIssueBody}`;
+        const isGitHubRemote = this.gitRemote.startsWith("https://github.com/") || this.gitRemote.startsWith("github.com/");
+
+        let issueUrl: string;
+        let issueUrlWithBody: string;
+
+        if (isGitHubRemote) {
+            issueUrl = this.gitRemote + "/issues/new?";
+            issueUrlWithBody = `${issueUrl}title=${title}&body=${encodedIssueBody}`;
+        } else {
+            // If the remote is not GitHub, we assume it is GitLab
+            // gitlab url arguments spec
+            // https://docs.gitlab.com/ee/user/project/issues/create_issues.html#using-a-url-with-prefilled-values
+            issueUrl = this.gitRemote + "/-/issues/new?";
+            issueUrlWithBody = `${issueUrl}issue[title]=${title}&issue[description]=${encodedIssueBody}`;
+        }
+
         // GitHub's URL max size is about 8000 characters
         if (issueUrlWithBody.length < 8000) {
             // hack to get around the double encoding of openExternal.
@@ -1034,10 +1048,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     return;
                 }
                 vscode.env.clipboard.writeText(issueBodyText);
-                const pasteHere = encodeURIComponent("[Paste the issue body here]");
+                const pasteHereMessage = encodeURIComponent("[Paste the issue body here]");
                 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-ignore
-                vscode.env.openExternal(`${issueUrl}title=${title}&body=${pasteHere}`);
+                vscode.env.openExternal(`${issueUrl}title=${title}&body=${pasteHereMessage}`);
             });
     }
 

@@ -74,7 +74,7 @@
         "commands": [
             {
                 "command": "weAudit.openGithubIssue",
-                "title": "Open Github Issue",
+                "title": "Open Remote Issue",
                 "icon": "$(github)"
             },
             {
