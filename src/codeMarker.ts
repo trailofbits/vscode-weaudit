@@ -1542,6 +1542,22 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refresh(uri);
     }
 
+    addNewEntryFromLocationEntry(locationEntry: LocationEntry) {
+        const entry: Entry = {
+            label: locationEntry.location.label !== "" ? locationEntry.location.label : locationEntry.parentEntry.label,
+            entryType: locationEntry.parentEntry.entryType,
+            author: this.username,
+            locations: [locationEntry.location],
+            details: createDefaultEntryDetails(),
+        };
+        this.treeEntries.push(entry);
+        this.updateSavedData(this.username);
+
+        const uri = vscode.Uri.file(path.join(this.workspacePath, locationEntry.location.path));
+        this.decorateWithUri(uri);
+        this.refresh(uri);
+    }
+
     getActiveSelectionLocation(): Location {
         // the null assertion is never undefined because we check if the editor is undefined
         const editor = vscode.window.activeTextEditor!;
@@ -2344,20 +2360,29 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
         }
     }
 
-    handleDrop(target: TreeEntry | undefined, dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): void | Thenable<void> {
+    async handleDrop(target: TreeEntry | undefined, dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): Promise<void> {
         // drag and drop in the TreeViewMode.GroupByFile does not make sense unless we wanted to reorder the file list
         if (treeDataProvider.getTreeViewMode() === TreeViewMode.GroupByFile) {
             return;
         }
 
-        if (target === undefined) {
-            return;
-        }
-
         let data = dataTransfer.get(this.LOCATION_MIME_TYPE);
-        if (data !== undefined) {
+        if (data !== undefined && isLocationEntry(data.value)) {
             // A LocationEntry is being dragged
             const locationEntry = data.value as LocationEntry;
+
+            if (target === undefined) {
+                // dragged a location entry into the empty space
+                // create a new finding from it
+
+                // remove from previous parent
+                locationEntry.parentEntry.locations = locationEntry.parentEntry.locations.filter((loc) => loc !== locationEntry.location);
+
+                // create a new finding with it
+                treeDataProvider.addNewEntryFromLocationEntry(locationEntry);
+                return;
+            }
+
             if (isPathOrganizerEntry(target)) {
                 return;
             }
@@ -2401,18 +2426,81 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
             return;
         }
         data = dataTransfer.get(this.ENTRY_MIME_TYPE);
-        if (data !== undefined) {
+        if (data !== undefined && isEntry(data.value)) {
+            // An Entry is being dragged
             const entry = data.value as Entry;
+
+            // an undefined target means we dragged an Entry to the empty space
+            // that would move it to the bottom.
+            // We currently don't handle reordering of entries
+            if (target === undefined) {
+                return;
+            }
+
             if (isPathOrganizerEntry(target)) {
                 return;
             }
+
+            // if we drop it on a location,
+            // get its parent entry and continue to the next if statement
             if (isLocationEntry(target)) {
                 target = target.parentEntry;
             }
+
             if (isEntry(target)) {
-                for (const loc of entry.locations) {
-                    target.locations.push(loc);
+                // decide what to do if the source entry has details
+                // - join the details to the new one
+                // - discard the details but drag
+                // - discard the drag and drop action
+                if (entry.details.description !== "" || entry.details.exploit !== "") {
+                    const choice = await vscode.window
+                        .showWarningMessage(
+                            "The item being dragged contains detailed information. Do you want to...",
+                            "Join details",
+                            "Discard old details",
+                            "Cancel",
+                        )
+                        .then((choice) => {
+                            return choice;
+                        });
+
+                    // if the user discarded the dialog cancel handling the drag
+                    if (choice === undefined) {
+                        return;
+                    }
+
+                    switch (choice) {
+                        case "Join details":
+                            if (target.details.description !== "") {
+                                target.details.description += "\n";
+                            }
+                            target.details.description += entry.details.description;
+
+                            if (target.details.exploit !== "") {
+                                target.details.exploit += "\n";
+                            }
+                            target.details.exploit += entry.details.exploit;
+                            break;
+
+                        case "Discard old details":
+                            break;
+
+                        case "Cancel":
+                            return;
+                    }
                 }
+
+                // if the entry has a single location,
+                // add its title as the location label
+                if (entry.locations.length === 1) {
+                    entry.locations[0].label = entry.label;
+                    target.locations.push(entry.locations[0]);
+                } else {
+                    for (const loc of entry.locations) {
+                        target.locations.push(loc);
+                    }
+                }
+
                 treeDataProvider.deleteFinding(entry);
                 treeDataProvider.refreshTree();
                 treeDataProvider.decorate();
