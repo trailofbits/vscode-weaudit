@@ -78,7 +78,8 @@ export interface SerializedData {
     gitSha: string;
     treeEntries: Entry[];
     auditedFiles: AuditedFile[];
-    partialAuditedFiles: PartialAuditedFile[];
+    // older versions do not have partialAuditedFiles
+    partialAuditedFiles?: PartialAuditedFile[];
     resolvedEntries: Entry[];
 }
 
@@ -112,9 +113,11 @@ export function validateSerializedData(data: SerializedData): boolean {
             return false;
         }
     }
-    for (const partialAuditedFile of data.partialAuditedFiles) {
-        if (!validatePartialAuditedFile(partialAuditedFile)) {
-            return false;
+    if (data.partialAuditedFiles) {
+        for (const partialAuditedFile of data.partialAuditedFiles) {
+            if (!validatePartialAuditedFile(partialAuditedFile)) {
+                return false;
+            }
         }
     }
     return true;
