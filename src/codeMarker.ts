@@ -641,19 +641,27 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         const location = this.getActiveSelectionLocation();
+        const partialIndex = this.partialAuditedFiles.findIndex(
+            (file) => file.path === relativePath && file.location.startLine === location.startLine && file.location.endLine === location.endLine,
+        );
 
-        this.partialAuditedFiles.push({
-            path: relativePath,
-            author: this.username,
-            location: {
-                description: "Partially audited",
-                label: "Partial",
+        // this section is already marked. Remove it then
+        if (partialIndex > -1) {
+            this.partialAuditedFiles.splice(partialIndex, 1);
+        } else {
+            this.partialAuditedFiles.push({
                 path: relativePath,
-                startLine: location.startLine,
-                endLine: location.endLine,
-            },
-        });
-        this.mergePartialAudits();
+                author: this.username,
+                location: {
+                    description: "Partially audited",
+                    label: "Partial",
+                    path: relativePath,
+                    startLine: location.startLine,
+                    endLine: location.endLine,
+                },
+            });
+            this.mergePartialAudits();
+        }
 
         // update decorations
         this.decorateWithUri(uri);
