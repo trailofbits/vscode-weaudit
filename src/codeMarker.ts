@@ -1918,8 +1918,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         // check if editor is partially audited, and mark locations as such
-        let partialAuditedRanges = this.partialAuditedFiles.filter((entry) => entry.path === fname);
-        let partialAuditedDecorations = partialAuditedRanges.map((r) => new vscode.Range(r.location.startLine, 0, r.location.endLine, 0));
+        const partialAuditedRanges = this.partialAuditedFiles.filter((entry) => entry.path === fname);
+        const partialAuditedDecorations = partialAuditedRanges.map((r) => new vscode.Range(r.location.startLine, 0, r.location.endLine, 0));
         editor.setDecorations(this.decorationManager.auditedFileDecorationType, [...range, ...partialAuditedDecorations]);
     }
 
