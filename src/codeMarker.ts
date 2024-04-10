@@ -35,6 +35,8 @@ import {
     treeViewModeLabel,
     mergeTwoEntryArrays,
     mergeTwoAuditedFileArrays,
+    PartialAuditedFile,
+    mergeTwoPartialAuditedFileArrays,
 } from "./types";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
@@ -49,6 +51,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     // auditedFiles contains all files that have been audited
     private auditedFiles: AuditedFile[];
+    private partialAuditedFiles: PartialAuditedFile[];
     private workspacePath: string;
     private username: string;
     private currentlySelectedUsernames: string[];
@@ -81,6 +84,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.treeEntries = [];
         this.resolvedEntries = [];
         this.auditedFiles = [];
+        this.partialAuditedFiles = [];
         this.workspacePath = vscode.workspace.workspaceFolders![0].uri.fsPath;
         this.clientRemote = "";
         this.gitRemote = "";
@@ -116,6 +120,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         vscode.commands.registerCommand("weAudit.toggleAudited", () => {
             this.toggleAudited();
+        });
+
+        vscode.commands.registerCommand("weAudit.addPartialAudited", () => {
+            this.addPartialAudited();
         });
 
         vscode.commands.registerCommand("weAudit.toggleTreeViewMode", () => {
@@ -601,6 +609,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             relevantUsername = this.username;
             this.checkIfAllSiblingFilesAreAudited(uri);
         }
+
+        // clean out any partial audited file entries
+        this.cleanPartialAudits(uri);
+
         // update day log structure
         const isAdd = index === -1;
         this.updateDayLog(relativePath, isAdd);
@@ -608,6 +620,44 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // update decorations
         this.decorateWithUri(uri);
         this.updateSavedData(relevantUsername);
+        this.refresh(uri);
+    }
+
+    addPartialAudited(): void {
+        const editor = vscode.window.activeTextEditor;
+        if (editor === undefined) {
+            return;
+        }
+        const uri = editor.document.uri;
+        // get path relative to workspace
+        const relativePath = path.relative(this.workspacePath, uri.fsPath);
+
+        // check if file is already in list
+        const index = this.auditedFiles.findIndex((file) => file.path === relativePath);
+
+        // if file is already audited ignore
+        if (index > -1) {
+            return;
+        }
+
+        const location = this.getActiveSelectionLocation();
+
+        this.partialAuditedFiles.push({
+            path: relativePath,
+            author: this.username,
+            location: {
+                description: "Partially audited",
+                label: "Partial",
+                path: relativePath,
+                startLine: location.startLine,
+                endLine: location.endLine,
+            },
+        });
+        this.mergePartialAudits();
+
+        // update decorations
+        this.decorateWithUri(uri);
+        this.updateSavedData(this.username);
         this.refresh(uri);
     }
 
@@ -1507,6 +1557,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // filter entries of the affected user
         let filteredEntries = this.treeEntries.filter((entry) => entry.author === username);
         let filteredAuditedFiles = this.auditedFiles.filter((file) => file.author === username);
+        let filteredPartialAuditedEntries = this.partialAuditedFiles.filter((entry) => entry.author === username);
         let filteredResolvedEntries = this.resolvedEntries.filter((entry) => entry.author === username);
 
         // if we are not seeing the current user's findings, we can't simply overwrite the file
@@ -1516,6 +1567,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             if (previousEntries !== undefined) {
                 filteredEntries = mergeTwoEntryArrays(filteredEntries, previousEntries.treeEntries);
                 filteredAuditedFiles = mergeTwoAuditedFileArrays(filteredAuditedFiles, previousEntries.auditedFiles);
+                filteredPartialAuditedEntries = mergeTwoPartialAuditedFileArrays(filteredPartialAuditedEntries, previousEntries.partialAuditedFiles);
                 filteredResolvedEntries = mergeTwoEntryArrays(filteredResolvedEntries, previousEntries.resolvedEntries);
             }
         }
@@ -1528,6 +1580,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 gitSha: this.gitSha,
                 treeEntries: filteredEntries,
                 auditedFiles: filteredAuditedFiles,
+                partialAuditedFiles: filteredPartialAuditedEntries,
                 resolvedEntries: filteredResolvedEntries,
             },
             null,
@@ -1632,11 +1685,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 if (!this.currentlySelectedUsernames.includes(username)) {
                     this.treeEntries = this.treeEntries.filter((entry) => entry.author !== username);
                     this.auditedFiles = this.auditedFiles.filter((entry) => entry.author !== username);
+                    this.partialAuditedFiles = this.partialAuditedFiles.filter((entry) => entry.author !== username);
                     this.resolvedEntries = this.resolvedEntries.filter((entry) => entry.author !== username);
                 }
 
                 this.treeEntries = this.treeEntries.concat(parsedEntries.treeEntries);
                 this.auditedFiles = this.auditedFiles.concat(parsedEntries.auditedFiles);
+                this.partialAuditedFiles = this.partialAuditedFiles.concat(parsedEntries.partialAuditedFiles);
                 // handle older versions of the extension that don't have resolved entries
                 if (parsedEntries.resolvedEntries !== undefined) {
                     this.resolvedEntries = this.resolvedEntries.concat(parsedEntries.resolvedEntries);
@@ -1644,6 +1699,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             } else {
                 this.treeEntries = this.treeEntries.filter((entry) => entry.author !== username);
                 this.auditedFiles = this.auditedFiles.filter((entry) => entry.author !== username);
+                this.partialAuditedFiles = this.partialAuditedFiles.filter((entry) => entry.author !== username);
                 this.resolvedEntries = this.resolvedEntries.filter((entry) => entry.author !== username);
             }
         }
@@ -1851,7 +1907,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (audited !== undefined) {
             range = [new vscode.Range(0, 0, editor.document.lineCount, 0)];
         }
-        editor.setDecorations(this.decorationManager.auditedFileDecorationType, range);
+
+        // check if editor is partially audited, and mark locations as such
+        let partialAuditedRanges = this.partialAuditedFiles.filter((entry) => entry.path === fname);
+        let partialAuditedDecorations = partialAuditedRanges.map((r) => new vscode.Range(r.location.startLine, 0, r.location.endLine, 0));
+        editor.setDecorations(this.decorationManager.auditedFileDecorationType, [...range, ...partialAuditedDecorations]);
     }
 
     /**
@@ -2141,6 +2201,52 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const uri = vscode.Uri.file(path.join(this.workspacePath, path_));
         this.decorateWithUri(uri);
         this.refresh(uri);
+    }
+
+    private cleanPartialAudits(uriToRemove: vscode.Uri) {
+        const relative = path.relative(this.workspacePath, uriToRemove.fsPath);
+        const entries = this.partialAuditedFiles.filter((file) => file.path === relative);
+        for (const entry of entries) {
+            const index = this.partialAuditedFiles.indexOf(entry);
+            if (index > -1) {
+                this.partialAuditedFiles.splice(index, 1);
+            }
+        }
+    }
+
+    private mergePartialAudits(): void {
+        const cleanedEntries: PartialAuditedFile[] = [];
+        for (const entry of this.partialAuditedFiles) {
+            // check if the current location is already partially audited
+            const partIdx = cleanedEntries.findIndex(
+                (file) =>
+                    // checks if the start is within bounds but the end is not
+                    (file.location.startLine <= entry.location.startLine && file.location.endLine > entry.location.startLine) ||
+                    // checks if the end is within bounds but the start is not
+                    (file.location.startLine <= entry.location.endLine && file.location.endLine > entry.location.endLine) ||
+                    // checks if the location includes the entry
+                    (file.location.startLine > entry.location.startLine && file.location.endLine < entry.location.endLine),
+            );
+            // update entry if necessary
+            if (partIdx > -1) {
+                const foundLocation = this.partialAuditedFiles[partIdx].location;
+                if (foundLocation.endLine < entry.location.endLine) {
+                    foundLocation.endLine = entry.location.endLine;
+                }
+                if (foundLocation.startLine > entry.location.startLine) {
+                    foundLocation.startLine = entry.location.startLine;
+                }
+
+                this.partialAuditedFiles[partIdx].location = foundLocation;
+                continue;
+            }
+
+            if (partIdx === -1) {
+                cleanedEntries.push(entry);
+            }
+        }
+
+        this.partialAuditedFiles = cleanedEntries;
     }
 }
 
