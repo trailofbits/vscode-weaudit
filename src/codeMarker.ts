@@ -1575,7 +1575,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             if (previousEntries !== undefined) {
                 filteredEntries = mergeTwoEntryArrays(filteredEntries, previousEntries.treeEntries);
                 filteredAuditedFiles = mergeTwoAuditedFileArrays(filteredAuditedFiles, previousEntries.auditedFiles);
-                filteredPartialAuditedEntries = mergeTwoPartialAuditedFileArrays(filteredPartialAuditedEntries, previousEntries.partialAuditedFiles);
+                filteredPartialAuditedEntries = mergeTwoPartialAuditedFileArrays(filteredPartialAuditedEntries, previousEntries.partialAuditedFiles ?? []);
                 filteredResolvedEntries = mergeTwoEntryArrays(filteredResolvedEntries, previousEntries.resolvedEntries);
             }
         }
