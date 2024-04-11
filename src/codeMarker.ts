@@ -2234,11 +2234,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     // only merge entries for the same file
                     file.path === entry.path &&
                     // checks if the start is within bounds but the end is not
-                    ((file.location.startLine <= entry.location.startLine && file.location.endLine > entry.location.startLine) ||
+                    ((file.location.startLine <= entry.location.startLine && file.location.endLine >= entry.location.startLine) ||
                         // checks if the end is within bounds but the start is not
-                        (file.location.startLine <= entry.location.endLine && file.location.endLine > entry.location.endLine) ||
+                        (file.location.startLine <= entry.location.endLine && file.location.endLine >= entry.location.endLine) ||
                         // checks if the location includes the entry
-                        (file.location.startLine > entry.location.startLine && file.location.endLine < entry.location.endLine)),
+                        (file.location.startLine >= entry.location.startLine && file.location.endLine <= entry.location.endLine)),
             );
             // update entry if necessary
             if (partIdx > -1) {
