@@ -2225,20 +2225,24 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     private mergePartialAudits(): void {
         const cleanedEntries: PartialAuditedFile[] = [];
-        for (const entry of this.partialAuditedFiles) {
+        // sort first by path and startLine for the merge to work
+        const sortedEntries = this.partialAuditedFiles.sort((a, b) => a.path.localeCompare(b.path) || a.location.startLine - b.location.startLine);
+        for (const entry of sortedEntries) {
             // check if the current location is already partially audited
             const partIdx = cleanedEntries.findIndex(
                 (file) =>
+                    // only merge entries for the same file
+                    file.path === entry.path &&
                     // checks if the start is within bounds but the end is not
-                    (file.location.startLine <= entry.location.startLine && file.location.endLine > entry.location.startLine) ||
-                    // checks if the end is within bounds but the start is not
-                    (file.location.startLine <= entry.location.endLine && file.location.endLine > entry.location.endLine) ||
-                    // checks if the location includes the entry
-                    (file.location.startLine > entry.location.startLine && file.location.endLine < entry.location.endLine),
+                    ((file.location.startLine <= entry.location.startLine && file.location.endLine > entry.location.startLine) ||
+                        // checks if the end is within bounds but the start is not
+                        (file.location.startLine <= entry.location.endLine && file.location.endLine > entry.location.endLine) ||
+                        // checks if the location includes the entry
+                        (file.location.startLine > entry.location.startLine && file.location.endLine < entry.location.endLine)),
             );
             // update entry if necessary
             if (partIdx > -1) {
-                const foundLocation = this.partialAuditedFiles[partIdx].location;
+                const foundLocation = cleanedEntries[partIdx].location;
                 if (foundLocation.endLine < entry.location.endLine) {
                     foundLocation.endLine = entry.location.endLine;
                 }
@@ -2246,11 +2250,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     foundLocation.startLine = entry.location.startLine;
                 }
 
-                this.partialAuditedFiles[partIdx].location = foundLocation;
-                continue;
-            }
-
-            if (partIdx === -1) {
+                cleanedEntries[partIdx].location = foundLocation;
+            } else {
                 cleanedEntries.push(entry);
             }
         }
