@@ -641,25 +641,39 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         const location = this.getActiveSelectionLocation();
-        const partialIndex = this.partialAuditedFiles.findIndex(
+        const exactMatchIndex = this.partialAuditedFiles.findIndex(
             (file) => file.path === relativePath && file.location.startLine === location.startLine && file.location.endLine === location.endLine,
         );
 
         // this section is already marked. Remove it then
-        if (partialIndex > -1) {
-            this.partialAuditedFiles.splice(partialIndex, 1);
+        if (exactMatchIndex > -1) {
+            this.partialAuditedFiles.splice(exactMatchIndex, 1);
         } else {
-            this.partialAuditedFiles.push({
-                path: relativePath,
-                author: this.username,
-                location: {
-                    description: "Partially audited",
-                    label: "Partial",
+            // allows to remove sections from the begining or end
+            const partialMatchIndex = this.partialAuditedFiles.findIndex(
+                (file) => file.path === relativePath && (file.location.startLine === location.startLine || file.location.endLine === location.endLine),
+            );
+            if (partialMatchIndex > -1) {
+                const partialMatch = this.partialAuditedFiles[partialMatchIndex];
+                if (partialMatch.location.startLine === location.startLine) {
+                    partialMatch.location.startLine = location.endLine + 1;
+                }
+                if (partialMatch.location.endLine === location.endLine) {
+                    partialMatch.location.endLine = location.startLine - 1;
+                }
+            } else {
+                this.partialAuditedFiles.push({
                     path: relativePath,
-                    startLine: location.startLine,
-                    endLine: location.endLine,
-                },
-            });
+                    author: this.username,
+                    location: {
+                        description: "Partially audited",
+                        label: "Partial",
+                        path: relativePath,
+                        startLine: location.startLine,
+                        endLine: location.endLine,
+                    },
+                });
+            }
             this.mergePartialAudits();
         }
 
