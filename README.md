@@ -113,6 +113,11 @@ There are color settings for other user's findings and notes, and for your own f
 
 ![Multiple Users](media/readme/multi_user.png)
 
+### Hide Findings
+You can hide all findings associated with a specific user by clicking on that user's name on the  `weAudit Files` panel.
+
+![Hide Findings associated to a user](media/readme/gifs/hide_findings.gif)
+
 ### Settings
 
 #### Background colors
