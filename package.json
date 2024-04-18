@@ -357,6 +357,10 @@
             ],
             "editor/context": [
                 {
+                    "command": "weAudit.toggleAudited",
+                    "group": "1_modification@0"
+                },
+                {
                     "command": "weAudit.copySelectedCodePermalink",
                     "group": "9_cutcopypaste@0"
                 },
