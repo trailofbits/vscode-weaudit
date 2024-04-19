@@ -167,7 +167,7 @@
                 "title": "weAudit: Mark File as Reviewed"
             },
             {
-                "command": "weAudit.addPartialAudited",
+                "command": "weAudit.addpartiallyAudited",
                 "title": "weAudit: Mark Region as Reviewed"
             },
             {
@@ -212,7 +212,7 @@
                 "mac": "cmd+7"
             },
             {
-                "command": "weAudit.addPartialAudited",
+                "command": "weAudit.addpartiallyAudited",
                 "key": "ctrl+shift+7",
                 "mac": "cmd+shift+7"
             },

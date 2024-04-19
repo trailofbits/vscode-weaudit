@@ -78,8 +78,8 @@ export interface SerializedData {
     gitSha: string;
     treeEntries: Entry[];
     auditedFiles: AuditedFile[];
-    // older versions do not have partialAuditedFiles
-    partialAuditedFiles?: PartialAuditedFile[];
+    // older versions do not have partiallyAuditedFiles
+    partiallyAuditedFiles?: PartiallyAuditedFile[];
     resolvedEntries: Entry[];
 }
 
@@ -93,7 +93,7 @@ export function createDefaultSerializedData(): SerializedData {
         gitSha: "",
         treeEntries: [],
         auditedFiles: [],
-        partialAuditedFiles: [],
+        partiallyAuditedFiles: [],
         resolvedEntries: [],
     };
 }
@@ -113,9 +113,9 @@ export function validateSerializedData(data: SerializedData): boolean {
             return false;
         }
     }
-    if (data.partialAuditedFiles) {
-        for (const partialAuditedFile of data.partialAuditedFiles) {
-            if (!validatePartialAuditedFile(partialAuditedFile)) {
+    if (data.partiallyAuditedFiles) {
+        for (const partiallyAuditedFile of data.partiallyAuditedFiles) {
+            if (!validatepartiallyAuditedFile(partiallyAuditedFile)) {
                 return false;
             }
         }
@@ -153,8 +153,8 @@ function validateAuditedFile(auditedFile: AuditedFile): boolean {
     return auditedFile.path !== undefined && auditedFile.author !== undefined;
 }
 
-function validatePartialAuditedFile(partialAuditedFile: PartialAuditedFile): boolean {
-    return validateAuditedFile(partialAuditedFile) || validateLocation(partialAuditedFile.location);
+function validatepartiallyAuditedFile(partiallyAuditedFile: PartiallyAuditedFile): boolean {
+    return validateAuditedFile(partiallyAuditedFile) || validateLocation(partiallyAuditedFile.location);
 }
 
 function validateLocation(location: Location): boolean {
@@ -352,7 +352,7 @@ function auditedEquals(a: AuditedFile, b: AuditedFile): boolean {
  * @param b the second audited file
  * @returns true if the audited files are equal, false otherwise
  */
-function partialAuditedEquals(a: PartialAuditedFile, b: PartialAuditedFile): boolean {
+function partiallyAuditedEquals(a: PartiallyAuditedFile, b: PartiallyAuditedFile): boolean {
     return a.path === b.path && a.location.startLine === b.location.startLine && a.location.endLine === b.location.endLine;
 }
 
@@ -387,14 +387,14 @@ export function mergeTwoAuditedFileArrays(a: AuditedFile[], b: AuditedFile[]): A
  * @param b the second array
  * @returns the merged array
  */
-export function mergeTwoPartialAuditedFileArrays(a: PartialAuditedFile[], b: PartialAuditedFile[]): PartialAuditedFile[] {
+export function mergeTwoPartiallyAuditedFileArrays(a: PartiallyAuditedFile[], b: PartiallyAuditedFile[]): PartiallyAuditedFile[] {
     // merge two arrays of entries
     // without duplicates
-    const result: PartialAuditedFile[] = a;
+    const result: PartiallyAuditedFile[] = a;
     for (let i = 0; i < b.length; i++) {
         let found = false;
         for (let j = 0; j < a.length; j++) {
-            if (partialAuditedEquals(a[j], b[i])) {
+            if (partiallyAuditedEquals(a[j], b[i])) {
                 found = true;
                 break;
             }
@@ -411,7 +411,7 @@ export interface AuditedFile {
     author: string;
 }
 
-export interface PartialAuditedFile {
+export interface PartiallyAuditedFile {
     path: string;
     author: string;
     location: Location;
