@@ -680,7 +680,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // update decorations
         this.decorateWithUri(uri);
         this.updateSavedData(this.username);
-        this.refresh(uri);
     }
 
     /**
