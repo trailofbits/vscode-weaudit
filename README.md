@@ -130,13 +130,13 @@ Each background color is customizable via the VSCode settings page. Write as #RG
 
 #### Keybindings
 
-You can configure the keybindings to any of the extension's commands in the VSCode settings. The most common commands are:
+You can configure the keybindings to any of the extension's commands in the VSCode settings. The default shortcuts are:
 
--   `weAudit.addFinding`: Add Selected Code To Findings: `cmd + j`
--   `weAudit.addNote`: Add Selected Code To Notes: `cmd + k`
--   `weAudit.toggleAudited`: Mark Current File As Reviewed: `cmd + 7`
+-   `weAudit.addFinding`: Add Selected Code To Findings: `cmd + 3`
+-   `weAudit.addNote`: Add Selected Code To Notes: `cmd + 4`
 -   `weAudit.deleteLocationUnderCursor`: Delete Finding Under Cursor: `cmd + 5`
 -   `weAudit.editEntryUnderCursor`: Edit Finding Under Cursor: `cmd + 6`
+-   `weAudit.toggleAudited`: Mark Current File As Reviewed: `cmd + 7`
 -   Copy Permalink (for the Selected Code Region): `cmd + 8`
 
 ## WeAudit Concepts

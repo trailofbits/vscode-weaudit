@@ -200,13 +200,13 @@
             },
             {
                 "command": "weAudit.addFinding",
-                "key": "ctrl+alt+j",
-                "mac": "cmd+j"
+                "key": "ctrl+alt+3",
+                "mac": "cmd+3"
             },
             {
                 "command": "weAudit.addNote",
-                "key": "ctrl+alt+k",
-                "mac": "cmd+k"
+                "key": "ctrl+alt+4",
+                "mac": "cmd+4"
             },
             {
                 "command": "weAudit.editEntryUnderCursor",
