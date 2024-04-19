@@ -1588,7 +1588,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             if (previousEntries !== undefined) {
                 filteredEntries = mergeTwoEntryArrays(filteredEntries, previousEntries.treeEntries);
                 filteredAuditedFiles = mergeTwoAuditedFileArrays(filteredAuditedFiles, previousEntries.auditedFiles);
-                filteredPartiallyAuditedEntries = mergeTwoPartiallyAuditedFileArrays(filteredPartiallyAuditedEntries, previousEntries.partiallyAuditedFiles ?? []);
+                filteredPartiallyAuditedEntries = mergeTwoPartiallyAuditedFileArrays(
+                    filteredPartiallyAuditedEntries,
+                    previousEntries.partiallyAuditedFiles ?? [],
+                );
                 filteredResolvedEntries = mergeTwoEntryArrays(filteredResolvedEntries, previousEntries.resolvedEntries);
             }
         }
@@ -1933,7 +1936,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // check if editor is partially audited, and mark locations as such
         const partiallyAuditedRanges = this.partiallyAuditedFiles.filter((entry) => entry.path === fname);
         const partiallyAuditedDecorations = partiallyAuditedRanges.map((r) => new vscode.Range(r.location.startLine, 0, r.location.endLine, 0));
-        editor.setDecorations(this.decorationManager.auditedFileDecorationType, [...range, ...partiallyAuditedDecorations]);
+        editor.setDecorations(this.decorationManager.auditedFileDecorationType, range.concat(partiallyAuditedDecorations));
     }
 
     /**
