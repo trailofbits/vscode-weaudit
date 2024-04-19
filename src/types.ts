@@ -347,7 +347,7 @@ function auditedEquals(a: AuditedFile, b: AuditedFile): boolean {
 }
 
 /**
- * Checks if two partial audited files are equal.
+ * Checks if two partially audited files are equal.
  * @param a the first audited file
  * @param b the second audited file
  * @returns true if the audited files are equal, false otherwise
@@ -382,7 +382,7 @@ export function mergeTwoAuditedFileArrays(a: AuditedFile[], b: AuditedFile[]): A
 }
 
 /**
- * Merges two arrays of partial audited files, removing duplicates.
+ * Merges two arrays of partially audited files, removing duplicates.
  * @param a the first array
  * @param b the second array
  * @returns the merged array

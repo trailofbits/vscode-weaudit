@@ -610,7 +610,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.checkIfAllSiblingFilesAreAudited(uri);
         }
 
-        // clean out any partial audited file entries
+        // clean out any partially audited file entries
         this.cleanPartialAudits(uri);
 
         // update day log structure
@@ -1715,7 +1715,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
                 this.treeEntries = this.treeEntries.concat(parsedEntries.treeEntries);
                 this.auditedFiles = this.auditedFiles.concat(parsedEntries.auditedFiles);
-                // handle older versions of the extension that don't have partial audited entries
+                // handle older versions of the extension that don't have partially audited entries
                 this.partiallyAuditedFiles = this.partiallyAuditedFiles.concat(parsedEntries.partiallyAuditedFiles ?? []);
                 // handle older versions of the extension that don't have resolved entries
                 if (parsedEntries.resolvedEntries !== undefined) {
