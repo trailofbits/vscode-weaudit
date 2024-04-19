@@ -2230,13 +2230,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     private cleanPartialAudits(uriToRemove: vscode.Uri) {
         const relative = path.relative(this.workspacePath, uriToRemove.fsPath);
-        const entries = this.partiallyAuditedFiles.filter((file) => file.path === relative);
-        for (const entry of entries) {
-            const index = this.partiallyAuditedFiles.indexOf(entry);
-            if (index > -1) {
-                this.partiallyAuditedFiles.splice(index, 1);
-            }
-        }
+        this.partiallyAuditedFiles = this.partiallyAuditedFiles.filter((file) => file.path !== relative);
     }
 
     private mergePartialAudits(): void {
