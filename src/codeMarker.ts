@@ -649,29 +649,37 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (alreadyMarked > -1) {
             // Splits the existing entry into 2 and remove the location marked by the user
             const previousMarkedEntry = this.partiallyAuditedFiles[alreadyMarked];
-            const locationClone = { ...previousMarkedEntry };
 
-            // if either the end line or the start line is the same we don't need
-            // to split the entry but can just adjust the current one
-            let splitNeeded = true;
-            if (previousMarkedEntry.endLine == location.endLine) {
-                previousMarkedEntry.endLine = location.startLine - 1;
-                splitNeeded = false;
+            // same area has been selected so lets delete it
+            if (previousMarkedEntry.startLine === location.startLine && previousMarkedEntry.endLine === location.endLine) {
+                this.partiallyAuditedFiles.splice(alreadyMarked, 1);
+            } else {
+                // not the same area so we need to split the entry or change it
+
+                const locationClone = { ...previousMarkedEntry };
+
+                // if either the end line or the start line is the same we don't need
+                // to split the entry but can just adjust the current one
+                let splitNeeded = true;
+                if (previousMarkedEntry.endLine == location.endLine) {
+                    previousMarkedEntry.endLine = location.startLine - 1;
+                    splitNeeded = false;
+                }
+
+                if (previousMarkedEntry.startLine == location.startLine) {
+                    previousMarkedEntry.startLine = location.endLine + 1;
+                    splitNeeded = false;
+                }
+
+                if (splitNeeded) {
+                    previousMarkedEntry.endLine = location.startLine - 1;
+                    locationClone.startLine = location.endLine + 1;
+
+                    this.partiallyAuditedFiles.push(locationClone);
+                }
+
+                this.partiallyAuditedFiles[alreadyMarked] = previousMarkedEntry;
             }
-
-            if (previousMarkedEntry.startLine == location.startLine) {
-                previousMarkedEntry.startLine = location.endLine + 1;
-                splitNeeded = false;
-            }
-
-            if (splitNeeded) {
-                previousMarkedEntry.endLine = location.startLine - 1;
-                locationClone.startLine = location.endLine + 1;
-
-                this.partiallyAuditedFiles.push(locationClone);
-            }
-
-            this.partiallyAuditedFiles[alreadyMarked] = previousMarkedEntry;
         } else {
             this.partiallyAuditedFiles.push({
                 path: relativePath,
@@ -679,9 +687,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 startLine: location.startLine,
                 endLine: location.endLine,
             });
-            this.mergePartialAudits();
         }
 
+        this.mergePartialAudits();
         // update decorations
         this.decorateWithUri(uri);
         this.updateSavedData(this.username);
@@ -2253,7 +2261,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                         // checks if the end is within bounds but the start is not
                         (file.startLine <= entry.endLine && file.endLine >= entry.endLine) ||
                         // checks if the location includes the entry
-                        (file.startLine >= entry.startLine && file.endLine <= entry.endLine)),
+                        (file.startLine >= entry.startLine && file.endLine <= entry.endLine) ||
+                        // checks adjacent entries
+                        file.endLine === entry.startLine - 1),
             );
             // update entry if necessary
             if (partIdx > -1) {
