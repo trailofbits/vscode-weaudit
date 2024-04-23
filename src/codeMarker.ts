@@ -650,36 +650,40 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             // Splits the existing entry into 2 and remove the location marked by the user
             const previousMarkedEntry = this.partiallyAuditedFiles[alreadyMarked];
             const locationClone = { ...previousMarkedEntry, location: { ...previousMarkedEntry.location } };
-            previousMarkedEntry.location.endLine = location.startLine - 1;
-            locationClone.location.startLine = location.endLine + 1;
-            this.partiallyAuditedFiles[alreadyMarked] = previousMarkedEntry;
-            this.partiallyAuditedFiles.push(locationClone);
-        } else {
-            // allows to remove sections from the beginning or end
-            const partialMatchIndex = this.partiallyAuditedFiles.findIndex(
-                (file) => file.path === relativePath && (file.location.startLine === location.startLine || file.location.endLine === location.endLine),
-            );
-            if (partialMatchIndex > -1) {
-                const partialMatch = this.partiallyAuditedFiles[partialMatchIndex];
-                if (partialMatch.location.startLine === location.startLine) {
-                    partialMatch.location.startLine = location.endLine + 1;
-                }
-                if (partialMatch.location.endLine === location.endLine) {
-                    partialMatch.location.endLine = location.startLine - 1;
-                }
-            } else {
-                this.partiallyAuditedFiles.push({
-                    path: relativePath,
-                    author: this.username,
-                    location: {
-                        description: "Partially audited",
-                        label: "Partial",
-                        path: relativePath,
-                        startLine: location.startLine,
-                        endLine: location.endLine,
-                    },
-                });
+
+            // if either the end line or the start line is the same we don't need
+            // to split the entry but can just adjust the current one
+            let splitNeeded = true;
+            if (previousMarkedEntry.location.endLine == location.endLine) {
+                previousMarkedEntry.location.endLine = location.startLine - 1;
+                splitNeeded = false;
             }
+
+            if (previousMarkedEntry.location.startLine == location.startLine) {
+                previousMarkedEntry.location.startLine = location.endLine + 1;
+                splitNeeded = false;
+            }
+
+            if (splitNeeded) {
+                previousMarkedEntry.location.endLine = location.startLine - 1;
+                locationClone.location.startLine = location.endLine + 1;
+
+                this.partiallyAuditedFiles.push(locationClone);
+            }
+
+            this.partiallyAuditedFiles[alreadyMarked] = previousMarkedEntry;
+        } else {
+            this.partiallyAuditedFiles.push({
+                path: relativePath,
+                author: this.username,
+                location: {
+                    description: "Partially audited",
+                    label: "Partial",
+                    path: relativePath,
+                    startLine: location.startLine,
+                    endLine: location.endLine,
+                },
+            });
             this.mergePartialAudits();
         }
 
