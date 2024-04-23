@@ -641,13 +641,19 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         const location = this.getActiveSelectionLocation();
-        const exactMatchIndex = this.partiallyAuditedFiles.findIndex(
-            (file) => file.path === relativePath && file.location.startLine === location.startLine && file.location.endLine === location.endLine,
+        const alreadyMarked = this.partiallyAuditedFiles.findIndex(
+            (file) => file.path === relativePath && file.location.startLine <= location.startLine && file.location.endLine >= location.endLine,
         );
 
         // this section is already marked. Remove it then
-        if (exactMatchIndex > -1) {
-            this.partiallyAuditedFiles.splice(exactMatchIndex, 1);
+        if (alreadyMarked > -1) {
+            // Splits the existing entry into 2 and remove the location marked by the user
+            const previousMarkedEntry = this.partiallyAuditedFiles[alreadyMarked];
+            const locationClone = { ...previousMarkedEntry, location: { ...previousMarkedEntry.location } };
+            previousMarkedEntry.location.endLine = location.startLine - 1;
+            locationClone.location.startLine = location.endLine + 1;
+            this.partiallyAuditedFiles[alreadyMarked] = previousMarkedEntry;
+            this.partiallyAuditedFiles.push(locationClone);
         } else {
             // allows to remove sections from the beginning or end
             const partialMatchIndex = this.partiallyAuditedFiles.findIndex(
