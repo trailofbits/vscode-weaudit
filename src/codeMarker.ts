@@ -642,31 +642,31 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         const location = this.getActiveSelectionLocation();
         const alreadyMarked = this.partiallyAuditedFiles.findIndex(
-            (file) => file.path === relativePath && file.location.startLine <= location.startLine && file.location.endLine >= location.endLine,
+            (file) => file.path === relativePath && file.startLine <= location.startLine && file.endLine >= location.endLine,
         );
 
         // this section is already marked. Remove it then
         if (alreadyMarked > -1) {
             // Splits the existing entry into 2 and remove the location marked by the user
             const previousMarkedEntry = this.partiallyAuditedFiles[alreadyMarked];
-            const locationClone = { ...previousMarkedEntry, location: { ...previousMarkedEntry.location } };
+            const locationClone = { ...previousMarkedEntry };
 
             // if either the end line or the start line is the same we don't need
             // to split the entry but can just adjust the current one
             let splitNeeded = true;
-            if (previousMarkedEntry.location.endLine == location.endLine) {
-                previousMarkedEntry.location.endLine = location.startLine - 1;
+            if (previousMarkedEntry.endLine == location.endLine) {
+                previousMarkedEntry.endLine = location.startLine - 1;
                 splitNeeded = false;
             }
 
-            if (previousMarkedEntry.location.startLine == location.startLine) {
-                previousMarkedEntry.location.startLine = location.endLine + 1;
+            if (previousMarkedEntry.startLine == location.startLine) {
+                previousMarkedEntry.startLine = location.endLine + 1;
                 splitNeeded = false;
             }
 
             if (splitNeeded) {
-                previousMarkedEntry.location.endLine = location.startLine - 1;
-                locationClone.location.startLine = location.endLine + 1;
+                previousMarkedEntry.endLine = location.startLine - 1;
+                locationClone.startLine = location.endLine + 1;
 
                 this.partiallyAuditedFiles.push(locationClone);
             }
@@ -676,13 +676,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.partiallyAuditedFiles.push({
                 path: relativePath,
                 author: this.username,
-                location: {
-                    description: "Partially audited",
-                    label: "Partial",
-                    path: relativePath,
-                    startLine: location.startLine,
-                    endLine: location.endLine,
-                },
+                startLine: location.startLine,
+                endLine: location.endLine,
             });
             this.mergePartialAudits();
         }
@@ -1945,7 +1940,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // check if editor is partially audited, and mark locations as such
         const partiallyAuditedRanges = this.partiallyAuditedFiles.filter((entry) => entry.path === fname);
-        const partiallyAuditedDecorations = partiallyAuditedRanges.map((r) => new vscode.Range(r.location.startLine, 0, r.location.endLine, 0));
+        const partiallyAuditedDecorations = partiallyAuditedRanges.map((r) => new vscode.Range(r.startLine, 0, r.endLine, 0));
         editor.setDecorations(this.decorationManager.auditedFileDecorationType, range.concat(partiallyAuditedDecorations));
     }
 
@@ -2246,7 +2241,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     private mergePartialAudits(): void {
         const cleanedEntries: PartiallyAuditedFile[] = [];
         // sort first by path and startLine for the merge to work
-        const sortedEntries = this.partiallyAuditedFiles.sort((a, b) => a.path.localeCompare(b.path) || a.location.startLine - b.location.startLine);
+        const sortedEntries = this.partiallyAuditedFiles.sort((a, b) => a.path.localeCompare(b.path) || a.startLine - b.startLine);
         for (const entry of sortedEntries) {
             // check if the current location is already partially audited
             const partIdx = cleanedEntries.findIndex(
@@ -2254,23 +2249,23 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     // only merge entries for the same file
                     file.path === entry.path &&
                     // checks if the start is within bounds but the end is not
-                    ((file.location.startLine <= entry.location.startLine && file.location.endLine >= entry.location.startLine) ||
+                    ((file.startLine <= entry.startLine && file.endLine >= entry.startLine) ||
                         // checks if the end is within bounds but the start is not
-                        (file.location.startLine <= entry.location.endLine && file.location.endLine >= entry.location.endLine) ||
+                        (file.startLine <= entry.endLine && file.endLine >= entry.endLine) ||
                         // checks if the location includes the entry
-                        (file.location.startLine >= entry.location.startLine && file.location.endLine <= entry.location.endLine)),
+                        (file.startLine >= entry.startLine && file.endLine <= entry.endLine)),
             );
             // update entry if necessary
             if (partIdx > -1) {
-                const foundLocation = cleanedEntries[partIdx].location;
-                if (foundLocation.endLine < entry.location.endLine) {
-                    foundLocation.endLine = entry.location.endLine;
+                const foundLocation = cleanedEntries[partIdx];
+                if (foundLocation.endLine < entry.endLine) {
+                    foundLocation.endLine = entry.endLine;
                 }
-                if (foundLocation.startLine > entry.location.startLine) {
-                    foundLocation.startLine = entry.location.startLine;
+                if (foundLocation.startLine > entry.startLine) {
+                    foundLocation.startLine = entry.startLine;
                 }
 
-                cleanedEntries[partIdx].location = foundLocation;
+                cleanedEntries[partIdx] = foundLocation;
             } else {
                 cleanedEntries.push(entry);
             }

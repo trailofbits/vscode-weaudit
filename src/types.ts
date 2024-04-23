@@ -154,7 +154,7 @@ function validateAuditedFile(auditedFile: AuditedFile): boolean {
 }
 
 function validatepartiallyAuditedFile(partiallyAuditedFile: PartiallyAuditedFile): boolean {
-    return validateAuditedFile(partiallyAuditedFile) || validateLocation(partiallyAuditedFile.location);
+    return validateAuditedFile(partiallyAuditedFile) || partiallyAuditedFile.startLine !== undefined || partiallyAuditedFile.endLine !== undefined;
 }
 
 function validateLocation(location: Location): boolean {
@@ -414,7 +414,8 @@ export interface AuditedFile {
 export interface PartiallyAuditedFile {
     path: string;
     author: string;
-    location: Location;
+    startLine: number;
+    endLine: number;
 }
 
 export enum TreeViewMode {
