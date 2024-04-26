@@ -297,6 +297,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.deleteLocation(entry);
         });
 
+        vscode.commands.registerCommand("weAudit.showFindingsSearchBar", () => {
+            this.showFindingsSearchBar();
+        });
+
         // ======== PUBLIC INTERFACE ========
         vscode.commands.registerCommand("weAudit.getCodeToCopyFromLocation", (entry: Entry | LocationEntry) => {
             return this.getCodeToCopyFromLocation(entry);
@@ -305,6 +309,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.getSelectedClientCodeAndPermalink", () => {
             return this.getSelectedClientCodeAndPermalink();
         });
+    }
+
+    private async showFindingsSearchBar() {
+        await vscode.commands.executeCommand("codeMarker.focus");
+        // list.find opens the current view's search bar
+        // https://stackoverflow.com/questions/68208883/filtering-a-treeview
+        await vscode.commands.executeCommand("list.find");
     }
 
     private updateGitConfig(clientRemote: string, auditRemote: string, gitSha: string) {
