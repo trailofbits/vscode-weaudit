@@ -301,6 +301,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.showFindingsSearchBar();
         });
 
+        vscode.commands.registerCommand("weAudit.exportFindingsInMarkdown", () => {
+            this.exportFindingsInMarkdown();
+        });
+
         // ======== PUBLIC INTERFACE ========
         vscode.commands.registerCommand("weAudit.getCodeToCopyFromLocation", (entry: Entry | LocationEntry) => {
             return this.getCodeToCopyFromLocation(entry);
@@ -309,6 +313,28 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.getSelectedClientCodeAndPermalink", () => {
             return this.getSelectedClientCodeAndPermalink();
         });
+    }
+
+    private async exportFindingsInMarkdown() {
+        if (this.treeEntries.length === 0) {
+            vscode.window.showInformationMessage("No findings to export.");
+            return;
+        }
+
+        let markdown = "";
+        for (const entry of this.treeEntries) {
+            const entryMarkdown = await this.getEntryMarkdown(entry);
+            markdown += `---\n---\n---\n${entryMarkdown}\n\n`;
+        }
+
+        vscode.workspace
+            .openTextDocument({
+                language: "markdown",
+                content: markdown,
+            })
+            .then((doc) => {
+                vscode.window.showTextDocument(doc);
+            });
     }
 
     private async showFindingsSearchBar() {
@@ -954,54 +980,18 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param entry The entry to open an issue for
      */
     async openGithubIssue(entry: Entry): Promise<void> {
-        const clientPermalinks = [];
-        const auditPermalinks = [];
-        let locationDescriptions = "";
-
-        // Use .entries to iterate over entry.locations
-        for (const [i, location] of entry.locations.entries()) {
-            const clientRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Client, location);
-            const auditRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Audit, location);
-            if (auditRemoteAndPermalink === undefined) {
-                return;
-            }
-            const clientPermalink = clientRemoteAndPermalink === undefined ? "" : clientRemoteAndPermalink.permalink;
-            clientPermalinks.push(clientPermalink);
-            auditPermalinks.push(auditRemoteAndPermalink.permalink);
-
-            if (location.description !== "") {
-                locationDescriptions += `\n\n---\n`;
-                locationDescriptions += `#### Location ${i + 1} ${location.label}\n`;
-                locationDescriptions += `${location.description}\n\n`;
-                locationDescriptions += `${auditRemoteAndPermalink.permalink}`;
-            }
-        }
-
         // open github issue with the issue body with the finding text and permalink
         const title = encodeURIComponent(entry.label);
 
-        const target = entry.locations.map((location) => location.path).join(", ");
-        const permalinks = auditPermalinks.join("\n");
-        const clientPermalinkString = clientPermalinks.join("\n");
-
-        let issueBodyText = `### Title\n${entry.label}\n\n`;
-        issueBodyText += `### Severity\n${entry.details.severity}\n\n`;
-        issueBodyText += `### Difficulty\n${entry.details.difficulty}\n\n`;
-        issueBodyText += `### Type\n${entry.details.type}\n\n`;
-        issueBodyText += `### Target\n${target}\n\n`;
-        issueBodyText += `## Description\n${entry.details.description}${locationDescriptions}\n\n`;
-        issueBodyText += `## Exploit Scenario\n${entry.details.exploit}\n\n`;
-        issueBodyText += `## Recommendations\n${entry.details.recommendation}\n\n\n`;
-
-        issueBodyText += `Permalink:\n${permalinks}\n\n`;
-        if (clientPermalinkString !== "" && this.clientRemote !== this.gitRemote) {
-            issueBodyText += `Client PermaLink:\n${clientPermalinkString}\n`;
+        const issueBodyText = await this.getEntryMarkdown(entry);
+        if (issueBodyText === undefined) {
+            return;
         }
 
-        const issueBody = encodeURIComponent(issueBodyText);
+        const encodedIssueBody = encodeURIComponent(issueBodyText);
 
         const issueUrl = this.gitRemote + "/issues/new?";
-        const issueUrlWithBody = `${issueUrl}title=${title}&body=${issueBody}`;
+        const issueUrlWithBody = `${issueUrl}title=${title}&body=${encodedIssueBody}`;
         // GitHub's URL max size is about 8000 characters
         if (issueUrlWithBody.length < 8000) {
             // hack to get around the double encoding of openExternal.
@@ -1026,6 +1016,50 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 // @ts-ignore
                 vscode.env.openExternal(`${issueUrl}title=${title}&body=${pasteHere}`);
             });
+    }
+
+    private async getEntryMarkdown(entry: Entry): Promise<string | void> {
+        const clientPermalinks = [];
+        const auditPermalinks = [];
+        let locationDescriptions = "";
+
+        // Use .entries to iterate over entry.locations
+        for (const [i, location] of entry.locations.entries()) {
+            const clientRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Client, location);
+            const auditRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Audit, location);
+            if (auditRemoteAndPermalink === undefined) {
+                return;
+            }
+            const clientPermalink = clientRemoteAndPermalink === undefined ? "" : clientRemoteAndPermalink.permalink;
+            clientPermalinks.push(clientPermalink);
+            auditPermalinks.push(auditRemoteAndPermalink.permalink);
+
+            if (location.description !== "") {
+                locationDescriptions += `\n\n---\n`;
+                locationDescriptions += `#### Location ${i + 1} ${location.label}\n`;
+                locationDescriptions += `${location.description}\n\n`;
+                locationDescriptions += `${auditRemoteAndPermalink.permalink}`;
+            }
+        }
+
+        const target = entry.locations.map((location) => location.path).join(", ");
+        const permalinks = auditPermalinks.join("\n");
+        const clientPermalinkString = clientPermalinks.join("\n");
+
+        let issueBodyText = `### Title\n${entry.label}\n\n`;
+        issueBodyText += `### Severity\n${entry.details.severity}\n\n`;
+        issueBodyText += `### Difficulty\n${entry.details.difficulty}\n\n`;
+        issueBodyText += `### Type\n${entry.details.type}\n\n`;
+        issueBodyText += `### Target\n${target}\n\n`;
+        issueBodyText += `## Description\n${entry.details.description}${locationDescriptions}\n\n`;
+        issueBodyText += `## Exploit Scenario\n${entry.details.exploit}\n\n`;
+        issueBodyText += `## Recommendations\n${entry.details.recommendation}\n\n\n`;
+
+        issueBodyText += `Permalink:\n${permalinks}\n\n`;
+        if (clientPermalinkString !== "" && this.clientRemote !== this.gitRemote) {
+            issueBodyText += `Client PermaLink:\n${clientPermalinkString}\n`;
+        }
+        return issueBodyText;
     }
 
     /**

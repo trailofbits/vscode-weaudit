@@ -30,6 +30,7 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Multiple Users**](#multiple-users) - Findings can be viewed from multiple different users.
 -   [**Hide Findings**](#hide-findings) - Hide all findings associated with a specific user.
 -   [**Search & Filter Findings**](#search--filter-findings) - Search and filter the findings in the _List of Findings_ panel.
+-   [**Export Findings**](#export-findings) - Export findings to a markdown file.
 -   [**Settings**](#settings) - Customize colors.
 
 ---
@@ -124,6 +125,9 @@ You can hide all findings associated with a specific user by clicking on that us
 You can search for and filter the findings in the `List of Findings` panel by calling the `weAudit: Search and Filter Findings` command.
 
 ![Filter Findings](media/readme/gifs/filter_findings.gif)
+
+### Export Findings
+You can export the findings to a markdown file by calling the `weAudit: Export Findings as Markdown` command.
 
 ### Settings
 
