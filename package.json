@@ -190,6 +190,10 @@
             {
                 "command": "weAudit.addRegionToAnEntry",
                 "title": "weAudit: Add Region to a Finding"
+            },
+            {
+                "command": "weAudit.showFindingsSearchBar",
+                "title": "weAudit: Search and Filter Findings"
             }
         ],
         "keybindings": [
