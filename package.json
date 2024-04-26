@@ -194,6 +194,11 @@
             {
                 "command": "weAudit.showFindingsSearchBar",
                 "title": "weAudit: Search and Filter Findings"
+            },
+            {
+                "command": "weAudit.exportFindingsInMarkdown",
+                "title": "weAudit: Export Findings as Markdown",
+                "icon": "$(markdown)"
             }
         ],
         "keybindings": [
@@ -297,14 +302,19 @@
                     "group": "navigation@2"
                 },
                 {
-                    "command": "weAudit.toggleTreeViewMode",
-                    "when": "view == codeMarker",
-                    "group": "navigation@2"
-                },
-                {
                     "command": "weAudit.showMarkedFilesDayLog",
                     "when": "view == codeMarker",
                     "group": "navigation@0"
+                },
+                {
+                    "command": "weAudit.exportFindingsInMarkdown",
+                    "when": "view == codeMarker",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "weAudit.toggleTreeViewMode",
+                    "when": "view == codeMarker",
+                    "group": "navigation@2"
                 },
                 {
                     "command": "weAudit.setupRepositories",
