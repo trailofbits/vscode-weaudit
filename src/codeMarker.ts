@@ -315,15 +315,38 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         });
     }
 
-    private async exportFindingsInMarkdown() {
+    /**
+     * Exports the findings to a markdown file
+     * allowing the user to select which findings to export
+     */
+    private async exportFindingsInMarkdown(): Promise<void> {
         if (this.treeEntries.length === 0) {
             vscode.window.showInformationMessage("No findings to export.");
             return;
         }
 
+        const items = this.treeEntries.map((entry) => {
+            return {
+                label: entry.label,
+                entry: entry,
+                iconPath: entry.entryType === EntryType.Note ? new vscode.ThemeIcon("bookmark") : new vscode.ThemeIcon("bug"),
+                picked: true,
+            };
+        });
+
+        const selectedEntries = await vscode.window.showQuickPick(items, {
+            ignoreFocusOut: true,
+            title: "Select the findings to export to markdown",
+            canPickMany: true,
+        });
+
+        if (selectedEntries === undefined || selectedEntries.length === 0) {
+            return;
+        }
+
         let markdown = "";
-        for (const entry of this.treeEntries) {
-            const entryMarkdown = await this.getEntryMarkdown(entry);
+        for (const entry of selectedEntries) {
+            const entryMarkdown = await this.getEntryMarkdown(entry.entry);
             markdown += `---\n---\n---\n${entryMarkdown}\n\n`;
         }
 
