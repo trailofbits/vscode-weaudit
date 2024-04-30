@@ -353,7 +353,7 @@ function auditedEquals(a: AuditedFile, b: AuditedFile): boolean {
  * @returns true if the audited files are equal, false otherwise
  */
 function partiallyAuditedEquals(a: PartiallyAuditedFile, b: PartiallyAuditedFile): boolean {
-    return a.path === b.path && a.location.startLine === b.location.startLine && a.location.endLine === b.location.endLine;
+    return a.path === b.path && a.startLine === b.startLine && a.endLine === b.endLine;
 }
 
 /**

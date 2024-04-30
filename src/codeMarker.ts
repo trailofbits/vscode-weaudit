@@ -661,12 +661,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 // if either the end line or the start line is the same we don't need
                 // to split the entry but can just adjust the current one
                 let splitNeeded = true;
-                if (previousMarkedEntry.endLine == location.endLine) {
+                if (previousMarkedEntry.endLine === location.endLine) {
                     previousMarkedEntry.endLine = location.startLine - 1;
                     splitNeeded = false;
                 }
 
-                if (previousMarkedEntry.startLine == location.startLine) {
+                if (previousMarkedEntry.startLine === location.startLine) {
                     previousMarkedEntry.startLine = location.endLine + 1;
                     splitNeeded = false;
                 }
@@ -2241,7 +2241,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refresh(uri);
     }
 
-    private cleanPartialAudits(uriToRemove: vscode.Uri) {
+    private cleanPartialAudits(uriToRemove: vscode.Uri): void {
         const relative = path.relative(this.workspacePath, uriToRemove.fsPath);
         this.partiallyAuditedFiles = this.partiallyAuditedFiles.filter((file) => file.path !== relative);
     }
