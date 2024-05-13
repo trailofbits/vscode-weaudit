@@ -1030,7 +1030,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         // GitHub's URL max size is about 8000 characters
-        // TODO check gitlab max size to see if it allows 8000 as well
+        // Gitlab seems to allow more but we'll use the same limit for now
         if (issueUrlWithBody.length < 8000) {
             // hack to get around the double encoding of openExternal.
             // We call it with a string even though it's expecting a Uri
