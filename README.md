@@ -20,6 +20,7 @@ See the [Build and install](#build-and-install) section below for how to build a
 
 -   [**Findings and Notes**](#findings-and-notes) - Bookmark regions of code to identify findings or to add audit notes.
 -   [**Audited Files**](#audited-files) - Mark an entire file as reviewed.
+-   [**Partially Audited Files**](#partially-audited-files) - Mark a region of code as reviewed.
 -   [**Detailed Findings**](#detailed-findings) - Fill detailed information about a finding.
 -   [**Github Issues**](#github-issues) - Create formatted Github issues with the Detailed Findings information.
 -   [**Multi-region Findings**](#multi-region-findings) - Group multiple locations under a single finding.
@@ -54,6 +55,21 @@ The highlighted colors can be customized in the [settings](#settings).
 After reviewing a file, you can mark it as audited by calling the `weAudit: Mark File as Reviewed` command, or its respective keyboard shortcut. The whole file will be highlighted and annotated with a `✓` in the file tree, and in the file name above the editor.
 
 ![Mark File as Reviewed](media/readme/gifs/mark_audited.gif)
+
+The highlighted color can be customized in the [settings](#settings).
+
+### Partially Audited Files
+
+You can also partially mark a file as reviewed by selecting a region of code and calling the `weAudit: Mark Region as Reviewed` command. Partially reviewed regions can be merged together by calling the same command on a region containing.
+If called on a region:
+ - that matches an already audited region, the region will be unmarked.
+ - containing an already audited region, the region will be extended.
+ - contained in an already audited region, the region will be split into two regions.
+
+Once a file is marked as audited with the `weAudit: Mark File as Reviewed` command, all partial regions will be discarded.
+
+The following gif showcases all the scenarios described:
+![Mark Region as Reviewed](media/readme/gifs/mark_region_audited.gif)
 
 The highlighted color can be customized in the [settings](#settings).
 
@@ -148,7 +164,8 @@ You can configure the keybindings to any of the extension's commands in the VSCo
 -   `weAudit.deleteLocationUnderCursor`: Delete Finding Under Cursor: `cmd + 5`
 -   `weAudit.editEntryUnderCursor`: Edit Finding Under Cursor: `cmd + 6`
 -   `weAudit.toggleAudited`: Mark Current File As Reviewed: `cmd + 7`
--   Copy Permalink (for the Selected Code Region): `cmd + 8`
+-   `weAudit.addPartiallyAudited`: Mark Region As Reviewed: `cmd + shift + 7`
+-   `weAudit.copySelectedCodePermalink`: Copy Permalink (for the Selected Code Region): `cmd + 8`
 
 ## WeAudit Concepts
 
