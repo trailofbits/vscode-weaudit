@@ -78,6 +78,8 @@ export interface SerializedData {
     gitSha: string;
     treeEntries: Entry[];
     auditedFiles: AuditedFile[];
+    // older versions do not have partiallyAuditedFiles
+    partiallyAuditedFiles?: PartiallyAuditedFile[];
     resolvedEntries: Entry[];
 }
 
@@ -91,6 +93,7 @@ export function createDefaultSerializedData(): SerializedData {
         gitSha: "",
         treeEntries: [],
         auditedFiles: [],
+        partiallyAuditedFiles: [],
         resolvedEntries: [],
     };
 }
@@ -108,6 +111,13 @@ export function validateSerializedData(data: SerializedData): boolean {
     for (const auditedFile of data.auditedFiles) {
         if (!validateAuditedFile(auditedFile)) {
             return false;
+        }
+    }
+    if (data.partiallyAuditedFiles) {
+        for (const partiallyAuditedFile of data.partiallyAuditedFiles) {
+            if (!validatepartiallyAuditedFile(partiallyAuditedFile)) {
+                return false;
+            }
         }
     }
     return true;
@@ -141,6 +151,10 @@ function validateEntry(entry: Entry): boolean {
 
 function validateAuditedFile(auditedFile: AuditedFile): boolean {
     return auditedFile.path !== undefined && auditedFile.author !== undefined;
+}
+
+function validatepartiallyAuditedFile(partiallyAuditedFile: PartiallyAuditedFile): boolean {
+    return validateAuditedFile(partiallyAuditedFile) || partiallyAuditedFile.startLine !== undefined || partiallyAuditedFile.endLine !== undefined;
 }
 
 function validateLocation(location: Location): boolean {
@@ -333,6 +347,16 @@ function auditedEquals(a: AuditedFile, b: AuditedFile): boolean {
 }
 
 /**
+ * Checks if two partially audited files are equal.
+ * @param a the first audited file
+ * @param b the second audited file
+ * @returns true if the audited files are equal, false otherwise
+ */
+function partiallyAuditedEquals(a: PartiallyAuditedFile, b: PartiallyAuditedFile): boolean {
+    return a.path === b.path && a.startLine === b.startLine && a.endLine === b.endLine;
+}
+
+/**
  * Merges two arrays of audited files, removing duplicates.
  * @param a the first array
  * @param b the second array
@@ -357,9 +381,41 @@ export function mergeTwoAuditedFileArrays(a: AuditedFile[], b: AuditedFile[]): A
     return result;
 }
 
+/**
+ * Merges two arrays of partially audited files, removing duplicates.
+ * @param a the first array
+ * @param b the second array
+ * @returns the merged array
+ */
+export function mergeTwoPartiallyAuditedFileArrays(a: PartiallyAuditedFile[], b: PartiallyAuditedFile[]): PartiallyAuditedFile[] {
+    // merge two arrays of entries
+    // without duplicates
+    const result: PartiallyAuditedFile[] = a;
+    for (let i = 0; i < b.length; i++) {
+        let found = false;
+        for (let j = 0; j < a.length; j++) {
+            if (partiallyAuditedEquals(a[j], b[i])) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            result.push(b[i]);
+        }
+    }
+    return result;
+}
+
 export interface AuditedFile {
     path: string;
     author: string;
+}
+
+export interface PartiallyAuditedFile {
+    path: string;
+    author: string;
+    startLine: number;
+    endLine: number;
 }
 
 export enum TreeViewMode {
