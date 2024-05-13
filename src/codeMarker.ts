@@ -2387,16 +2387,25 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                 return;
             }
 
-            // Target is an Entry (only one location)
+            const authorSet: Set<string> = new Set();
+            authorSet.add(locationEntry.parentEntry.author);
+
+            // Target is an Entry (a finding with only one location, or the root element of a multi-location finding)
             if (isEntry(target)) {
+                // add the other author
+                authorSet.add(target.author);
+
                 // remove from previous parent
                 locationEntry.parentEntry.locations = locationEntry.parentEntry.locations.filter((loc) => loc !== locationEntry.location);
 
-                // push at the end
+                // push at the end of the locations of the target
                 target.locations.push(locationEntry.location);
                 locationEntry.parentEntry = target;
             } else if (isLocationEntry(target)) {
-                // Target is a LocationEntry
+                // Target is a LocationEntry (a location of a multi-location finding)
+
+                // add the other author
+                authorSet.add(target.parentEntry.author);
 
                 // find the source before we remove it
                 const sourceIndex = locationEntry.parentEntry.locations.indexOf(locationEntry.location);
@@ -2407,8 +2416,9 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                 // find target index
                 const targetIndex = target.parentEntry.locations.indexOf(target.location);
 
-                // if the target is the same as the source, and the source is the next to the target,
-                // insert it before the target
+                // if the entry is the same as the source, and the source is after the target,
+                // insert it before the target. Basically, it prepends to the target location if you dragged from below, and
+                // appends if you dragged from above.
                 if (locationEntry.parentEntry === target.parentEntry && sourceIndex >= targetIndex + 1) {
                     target.parentEntry.locations.splice(targetIndex, 0, locationEntry.location);
                 } else {
@@ -2418,6 +2428,11 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
             }
             treeDataProvider.refreshTree();
             treeDataProvider.decorate();
+
+            for (const author of authorSet) {
+                treeDataProvider.updateSavedData(author);
+            }
+
             // if the target was an Entry (only one location), we need to expand the dropdown after adding an extra location
             if (isEntry(target) && treeView.visible) {
                 treeView.reveal(target, { expand: 1, select: false });
@@ -2425,6 +2440,8 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
 
             return;
         }
+
+        // if the data is not a location, check if it is an entry
         data = dataTransfer.get(this.ENTRY_MIME_TYPE);
         if (data !== undefined && isEntry(data.value)) {
             // An Entry is being dragged
@@ -2432,7 +2449,7 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
 
             // an undefined target means we dragged an Entry to the empty space
             // that would move it to the bottom.
-            // We currently don't handle reordering of entries
+            // We currently don't support reordering the entries
             if (target === undefined) {
                 return;
             }
@@ -2490,6 +2507,11 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                     }
                 }
 
+                // add the authors
+                const authorSet: Set<string> = new Set();
+                authorSet.add(entry.author);
+                authorSet.add(target.author);
+
                 // if the entry has a single location,
                 // add its title as the location label
                 if (entry.locations.length === 1) {
@@ -2504,6 +2526,14 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                 treeDataProvider.deleteFinding(entry);
                 treeDataProvider.refreshTree();
                 treeDataProvider.decorate();
+
+                if (treeView.visible) {
+                    treeView.reveal(target, { expand: 1, select: false });
+                }
+
+                for (const author of authorSet) {
+                    treeDataProvider.updateSavedData(author);
+                }
             }
             return;
         }
