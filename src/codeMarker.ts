@@ -546,6 +546,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refreshTree();
     }
 
+    getTreeViewMode(): TreeViewMode {
+        return this.treeViewMode;
+    }
+
     /**
      * Toggles the tree view mode between linear and organized per file,
      * updates the configuration and
@@ -1538,6 +1542,22 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refresh(uri);
     }
 
+    addNewEntryFromLocationEntry(locationEntry: LocationEntry) {
+        const entry: Entry = {
+            label: locationEntry.location.label !== "" ? locationEntry.location.label : locationEntry.parentEntry.label,
+            entryType: locationEntry.parentEntry.entryType,
+            author: this.username,
+            locations: [locationEntry.location],
+            details: createDefaultEntryDetails(),
+        };
+        this.treeEntries.push(entry);
+        this.updateSavedData(this.username);
+
+        const uri = vscode.Uri.file(path.join(this.workspacePath, locationEntry.location.path));
+        this.decorateWithUri(uri);
+        this.refresh(uri);
+    }
+
     getActiveSelectionLocation(): Location {
         // the null assertion is never undefined because we check if the editor is undefined
         const editor = vscode.window.activeTextEditor!;
@@ -1944,9 +1964,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     noteDecoration.push(range);
                 }
                 // add the author information
-                const extraLabel = isOwnEntry ? "  (you)" : "  (" + treeItem.author + ")";
+                const extraLabel = isOwnEntry ? "(you)" : "(" + treeItem.author + ")";
+                const labelString =
+                    treeItem.label === location.label ? `${treeItem.label}  ${extraLabel}` : `${treeItem.label} ${location.label}  ${extraLabel}`;
 
-                labelDecorations.push(labelAfterFirstLineTextDecoration(location.startLine, treeItem.label + extraLabel));
+                labelDecorations.push(labelAfterFirstLineTextDecoration(location.startLine, labelString));
 
                 const afterLineRange = new vscode.Range(location.startLine, Number.MAX_SAFE_INTEGER, location.startLine, Number.MAX_SAFE_INTEGER);
                 labelDecorations.push(hoverOnLabel(afterLineRange, treeItem.label));
@@ -2309,6 +2331,264 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 let treeView: vscode.TreeView<TreeEntry>;
 let treeDataProvider: CodeMarker;
 
+class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntry> {
+    /* eslint-disable @typescript-eslint/naming-convention */
+    private MIME_TYPE = "application/vnd.code.tree.codemarker";
+    private LOCATION_MIME_TYPE = "application/vnd.code.tree.codemarker.locationentry";
+    private ENTRY_MIME_TYPE = "application/vnd.code.tree.codemarker.entry";
+    /* eslint-enable @typescript-eslint/naming-convention */
+
+    dragMimeTypes = [this.LOCATION_MIME_TYPE, this.ENTRY_MIME_TYPE];
+    dropMimeTypes = [this.MIME_TYPE, this.LOCATION_MIME_TYPE, this.ENTRY_MIME_TYPE];
+
+    handleDrag(source: readonly TreeEntry[], dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): void | Thenable<void> {
+        // drag and drop in the TreeViewMode.GroupByFile does not make sense unless we wanted to reorder the file list
+        if (treeDataProvider.getTreeViewMode() === TreeViewMode.GroupByFile) {
+            return;
+        }
+
+        if (source.length === 0 || source.length > 1) {
+            return;
+        }
+
+        const entry = source[0];
+        if (isPathOrganizerEntry(entry)) {
+            return;
+        }
+        if (isLocationEntry(entry)) {
+            dataTransfer.set(this.LOCATION_MIME_TYPE, new vscode.DataTransferItem(entry));
+        } else if (isEntry(entry)) {
+            dataTransfer.set(this.ENTRY_MIME_TYPE, new vscode.DataTransferItem(entry));
+        }
+    }
+
+    async handleDrop(target: TreeEntry | undefined, dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): Promise<void> {
+        // drag and drop in the TreeViewMode.GroupByFile does not make sense unless we wanted to reorder the file list
+        if (treeDataProvider.getTreeViewMode() === TreeViewMode.GroupByFile) {
+            return;
+        }
+
+        let data = dataTransfer.get(this.LOCATION_MIME_TYPE);
+        if (data !== undefined && isLocationEntry(data.value)) {
+            // A LocationEntry is being dragged
+            const locationEntry = data.value as LocationEntry;
+
+            if (target === undefined) {
+                // dragged a location entry into the empty space
+                // create a new finding from it
+
+                // remove from previous parent
+                locationEntry.parentEntry.locations = locationEntry.parentEntry.locations.filter((loc) => loc !== locationEntry.location);
+
+                // create a new finding with it
+                treeDataProvider.addNewEntryFromLocationEntry(locationEntry);
+
+                if (locationEntry.parentEntry.locations.length === 1) {
+                    const singleLabel = locationEntry.parentEntry.locations[0].label;
+                    if (singleLabel !== "" && !locationEntry.parentEntry.label.includes(singleLabel)) {
+                        // if we now only have 1 location, we add the label from the location into the finding
+                        locationEntry.parentEntry.label += ` ${singleLabel}`;
+                    }
+                }
+
+                return;
+            }
+
+            if (isPathOrganizerEntry(target)) {
+                return;
+            }
+
+            const authorSet: Set<string> = new Set();
+            authorSet.add(locationEntry.parentEntry.author);
+
+            // Target is an Entry (a finding with only one location, or the root element of a multi-location finding)
+            if (isEntry(target)) {
+                if (target === locationEntry.parentEntry) {
+                    return;
+                }
+
+                // add the other author
+                authorSet.add(target.author);
+
+                // remove from previous parent
+                locationEntry.parentEntry.locations = locationEntry.parentEntry.locations.filter((loc) => loc !== locationEntry.location);
+
+                if (locationEntry.parentEntry.locations.length === 1) {
+                    const singleLabel = locationEntry.parentEntry.locations[0].label;
+                    if (singleLabel !== "" && !locationEntry.parentEntry.label.includes(singleLabel)) {
+                        // if we now only have 1 location, we add the label from the location into the finding
+                        locationEntry.parentEntry.label += ` ${singleLabel}`;
+                    }
+                }
+
+                if (target.locations.length === 1 && target.locations[0].label === "") {
+                    target.locations[0].label = target.label;
+                }
+
+                // push at the end of the locations of the target
+                target.locations.push(locationEntry.location);
+                locationEntry.parentEntry = target;
+            } else if (isLocationEntry(target)) {
+                // Target is a LocationEntry (a location of a multi-location finding)
+
+                // do nothing if the target is the same as the source
+                if (target === locationEntry) {
+                    return;
+                }
+
+                // add the other author
+                authorSet.add(target.parentEntry.author);
+
+                // find the source before we remove it
+                const sourceIndex = locationEntry.parentEntry.locations.indexOf(locationEntry.location);
+
+                // remove from previous parent
+                locationEntry.parentEntry.locations = locationEntry.parentEntry.locations.filter((loc) => loc !== locationEntry.location);
+
+                // find target index
+                const targetIndex = target.parentEntry.locations.indexOf(target.location);
+
+                // if the entry is the same as the source, and the source is after the target,
+                // insert it before the target. Basically, it prepends to the target location if you dragged from below, and
+                // appends if you dragged from above.
+                if (locationEntry.parentEntry === target.parentEntry && sourceIndex >= targetIndex + 1) {
+                    target.parentEntry.locations.splice(targetIndex, 0, locationEntry.location);
+                } else {
+                    // otherwise, insert it after the target
+                    target.parentEntry.locations.splice(targetIndex + 1, 0, locationEntry.location);
+                }
+
+                if (locationEntry.parentEntry.locations.length === 1) {
+                    const singleLabel = locationEntry.parentEntry.locations[0].label;
+                    if (singleLabel !== "" && !locationEntry.parentEntry.label.includes(singleLabel)) {
+                        // if we now only have 1 location, we add the label from the location into the finding
+                        locationEntry.parentEntry.label += ` ${singleLabel}`;
+                    }
+                }
+            }
+            treeDataProvider.refreshTree();
+            treeDataProvider.decorate();
+
+            for (const author of authorSet) {
+                treeDataProvider.updateSavedData(author);
+            }
+
+            // if the target was an Entry (only one location), we need to expand the dropdown after adding an extra location
+            if (isEntry(target) && treeView.visible) {
+                treeView.reveal(target, { expand: 1, select: false });
+            }
+
+            return;
+        }
+
+        // if the data is not a location, check if it is an entry
+        data = dataTransfer.get(this.ENTRY_MIME_TYPE);
+        if (data !== undefined && isEntry(data.value)) {
+            // An Entry is being dragged
+            const entry = data.value as Entry;
+
+            // an undefined target means we dragged an Entry to the empty space
+            // that would move it to the bottom.
+            // We currently don't support reordering the entries
+            if (target === undefined) {
+                return;
+            }
+
+            if (isPathOrganizerEntry(target)) {
+                return;
+            }
+
+            // if we drop it on a location,
+            // get its parent entry and continue to the next if statement
+            if (isLocationEntry(target)) {
+                target = target.parentEntry;
+            }
+
+            if (isEntry(target)) {
+                // don't do anything if the target is the same as the source
+                if (target === entry) {
+                    return;
+                }
+
+                // decide what to do if the source entry has details
+                // - join the details to the new one
+                // - discard the details but drag
+                // - discard the drag and drop action
+                if (entry.details.description !== "" || entry.details.exploit !== "") {
+                    const choice = await vscode.window
+                        .showWarningMessage(
+                            "The item being dragged contains detailed information. Do you want to...",
+                            "Join details",
+                            "Discard old details",
+                            "Cancel",
+                        )
+                        .then((choice) => {
+                            return choice;
+                        });
+
+                    // if the user discarded the dialog cancel handling the drag
+                    if (choice === undefined) {
+                        return;
+                    }
+
+                    switch (choice) {
+                        case "Join details":
+                            if (target.details.description !== "") {
+                                target.details.description += "\n";
+                            }
+                            target.details.description += entry.details.description;
+
+                            if (target.details.exploit !== "") {
+                                target.details.exploit += "\n";
+                            }
+                            target.details.exploit += entry.details.exploit;
+                            break;
+
+                        case "Discard old details":
+                            break;
+
+                        case "Cancel":
+                            return;
+                    }
+                }
+
+                if (target.locations.length === 1 && target.locations[0].label === "") {
+                    target.locations[0].label = target.label;
+                }
+
+                // add the authors
+                const authorSet: Set<string> = new Set();
+                authorSet.add(entry.author);
+                authorSet.add(target.author);
+
+                // if the entry has a single location,
+                // add its title as the location label
+                if (entry.locations.length === 1) {
+                    entry.locations[0].label = entry.label;
+                    target.locations.push(entry.locations[0]);
+                } else {
+                    for (const loc of entry.locations) {
+                        target.locations.push(loc);
+                    }
+                }
+
+                treeDataProvider.deleteFinding(entry);
+                treeDataProvider.refreshTree();
+                treeDataProvider.decorate();
+
+                if (treeView.visible) {
+                    treeView.reveal(target, { expand: 1, select: false });
+                }
+
+                for (const author of authorSet) {
+                    treeDataProvider.updateSavedData(author);
+                }
+            }
+            return;
+        }
+    }
+}
+
 export class AuditMarker {
     private previousVisibleTextEditors: string[] = [];
     private decorationManager: DecorationManager;
@@ -2317,7 +2597,7 @@ export class AuditMarker {
         this.decorationManager = new DecorationManager(context);
 
         treeDataProvider = new CodeMarker(context, this.decorationManager);
-        treeView = vscode.window.createTreeView("codeMarker", { treeDataProvider });
+        treeView = vscode.window.createTreeView("codeMarker", { treeDataProvider, dragAndDropController: new DragAndDropController() });
         context.subscriptions.push(treeView);
 
         vscode.window.onDidChangeTextEditorSelection(this.checkSelectionEventAndRevealEntryUnderCursor, this);
