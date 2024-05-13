@@ -1964,9 +1964,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     noteDecoration.push(range);
                 }
                 // add the author information
-                const extraLabel = isOwnEntry ? "  (you)" : "  (" + treeItem.author + ")";
+                const extraLabel = isOwnEntry ? "(you)" : "(" + treeItem.author + ")";
+                const labelString =
+                    treeItem.label === location.label ? `${treeItem.label}  ${extraLabel}` : `${treeItem.label} ${location.label}  ${extraLabel}`;
 
-                labelDecorations.push(labelAfterFirstLineTextDecoration(location.startLine, treeItem.label + extraLabel));
+                labelDecorations.push(labelAfterFirstLineTextDecoration(location.startLine, labelString));
 
                 const afterLineRange = new vscode.Range(location.startLine, Number.MAX_SAFE_INTEGER, location.startLine, Number.MAX_SAFE_INTEGER);
                 labelDecorations.push(hoverOnLabel(afterLineRange, treeItem.label));
@@ -2380,6 +2382,15 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
 
                 // create a new finding with it
                 treeDataProvider.addNewEntryFromLocationEntry(locationEntry);
+
+                if (locationEntry.parentEntry.locations.length === 1) {
+                    const singleLabel = locationEntry.parentEntry.locations[0].label;
+                    if (singleLabel !== "" && !locationEntry.parentEntry.label.includes(singleLabel)) {
+                        // if we now only have 1 location, we add the label from the location into the finding
+                        locationEntry.parentEntry.label += ` ${singleLabel}`;
+                    }
+                }
+
                 return;
             }
 
@@ -2392,17 +2403,38 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
 
             // Target is an Entry (a finding with only one location, or the root element of a multi-location finding)
             if (isEntry(target)) {
+                if (target === locationEntry.parentEntry) {
+                    return;
+                }
+
                 // add the other author
                 authorSet.add(target.author);
 
                 // remove from previous parent
                 locationEntry.parentEntry.locations = locationEntry.parentEntry.locations.filter((loc) => loc !== locationEntry.location);
 
+                if (locationEntry.parentEntry.locations.length === 1) {
+                    const singleLabel = locationEntry.parentEntry.locations[0].label;
+                    if (singleLabel !== "" && !locationEntry.parentEntry.label.includes(singleLabel)) {
+                        // if we now only have 1 location, we add the label from the location into the finding
+                        locationEntry.parentEntry.label += ` ${singleLabel}`;
+                    }
+                }
+
+                if (target.locations.length === 1 && target.locations[0].label === "") {
+                    target.locations[0].label = target.label;
+                }
+
                 // push at the end of the locations of the target
                 target.locations.push(locationEntry.location);
                 locationEntry.parentEntry = target;
             } else if (isLocationEntry(target)) {
                 // Target is a LocationEntry (a location of a multi-location finding)
+
+                // do nothing if the target is the same as the source
+                if (target === locationEntry) {
+                    return;
+                }
 
                 // add the other author
                 authorSet.add(target.parentEntry.author);
@@ -2424,6 +2456,14 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                 } else {
                     // otherwise, insert it after the target
                     target.parentEntry.locations.splice(targetIndex + 1, 0, locationEntry.location);
+                }
+
+                if (locationEntry.parentEntry.locations.length === 1) {
+                    const singleLabel = locationEntry.parentEntry.locations[0].label;
+                    if (singleLabel !== "" && !locationEntry.parentEntry.label.includes(singleLabel)) {
+                        // if we now only have 1 location, we add the label from the location into the finding
+                        locationEntry.parentEntry.label += ` ${singleLabel}`;
+                    }
                 }
             }
             treeDataProvider.refreshTree();
@@ -2465,6 +2505,11 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
             }
 
             if (isEntry(target)) {
+                // don't do anything if the target is the same as the source
+                if (target === entry) {
+                    return;
+                }
+
                 // decide what to do if the source entry has details
                 // - join the details to the new one
                 // - discard the details but drag
@@ -2505,6 +2550,10 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                         case "Cancel":
                             return;
                     }
+                }
+
+                if (target.locations.length === 1 && target.locations[0].label === "") {
+                    target.locations[0].label = target.label;
                 }
 
                 // add the authors

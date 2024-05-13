@@ -32,6 +32,7 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Hide Findings**](#hide-findings) - Hide all findings associated with a specific user.
 -   [**Search & Filter Findings**](#search--filter-findings) - Search and filter the findings in the _List of Findings_ panel.
 -   [**Export Findings**](#export-findings) - Export findings to a markdown file.
+-   [**Drag & drop Findings and Locations**](#drag--drop-findings-and-locations) - Drag and drop findings and locations in the _List of Findings_ panel.
 -   [**Settings**](#settings) - Customize colors.
 
 ---
@@ -144,6 +145,15 @@ You can search for and filter the findings in the `List of Findings` panel by ca
 
 ### Export Findings
 You can export the findings to a markdown file by calling the `weAudit: Export Findings as Markdown` command.
+
+### Drag & Drop Findings and Locations
+You can drag and drop findings and locations in the _List of Findings_ panel to:
+- drag a location (from a multi location finding) into another finding;
+- drag a location (from a multi location finding) to create a separate finding;
+- drag a multi-location finding into another finding, moving all locations into it;
+- reorder locations within a single finding.
+
+![Drag & Drop Findings and Locations](media/readme/gifs/drag_drop.gif)
 
 ### Settings
 
