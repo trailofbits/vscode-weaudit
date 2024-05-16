@@ -122,6 +122,14 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.toggleAudited();
         });
 
+        vscode.commands.registerCommand("weAudit.toggleAuditedUri", (uri: vscode.Uri) => {
+            this.toggleAuditedUri(uri);
+        });
+
+        vscode.commands.registerCommand("weAudit.toggleAuditedFolder", (uri: vscode.Uri) => {
+            this.toggleAuditedFolder(uri);
+        });
+
         vscode.commands.registerCommand("weAudit.addPartiallyAudited", () => {
             this.addPartiallyAudited();
         });
@@ -595,7 +603,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (editor === undefined) {
             return;
         }
-        const uri = editor.document.uri;
+        this.toggleAuditedUri(editor.document.uri);
+    }
+
+    private toggleAuditedUri(uri: vscode.Uri): void {
         // get path relative to workspace
         const relativePath = path.relative(this.workspacePath, uri.fsPath);
 
@@ -697,6 +708,19 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // update decorations
         this.decorateWithUri(uri);
         this.updateSavedData(this.username);
+    }
+
+    private toggleAuditedFolder(uri: vscode.Uri): void {
+        // check if uri is a folder path
+        const folderPath = uri.fsPath;
+        if (!fs.lstatSync(folderPath).isDirectory()) {
+            return;
+        }
+
+        const files = fs.readdirSync(folderPath);
+        for (const file of files) {
+            this.toggleAuditedUri(vscode.Uri.file(path.join(folderPath, file)));
+        }
     }
 
     /**

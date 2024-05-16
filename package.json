@@ -167,6 +167,14 @@
                 "title": "weAudit: Mark File as Reviewed"
             },
             {
+                "command": "weAudit.toggleAuditedFolder",
+                "title": "weAudit: Mark Folder as Reviewed"
+            },
+            {
+                "command": "weAudit.toggleAuditedUri",
+                "title": "weAudit: Mark File as Reviewed"
+            },
+            {
                 "command": "weAudit.addPartiallyAudited",
                 "title": "weAudit: Mark Region as Reviewed"
             },
@@ -292,6 +300,26 @@
                 {
                     "command": "weAudit.deleteAllResolvedFinding",
                     "when": "false"
+                },
+                {
+                    "command": "weAudit.toggleAuditedUri",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.toggleAuditedFolder",
+                    "when": "false"
+                }
+            ],
+            "explorer/context": [
+                {
+                    "command": "weAudit.toggleAuditedFolder",
+                    "when": "explorerResourceIsFolder",
+                    "group": "weaudit@1"
+                },
+                {
+                    "command": "weAudit.toggleAuditedUri",
+                    "when": "!explorerResourceIsFolder",
+                    "group": "weaudit@1"
                 }
             ],
             "view/title": [
