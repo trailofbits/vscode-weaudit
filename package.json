@@ -509,6 +509,7 @@
     },
     "dependencies": {
         "@vscode/webview-ui-toolkit": "^1.4.0",
-        "asciichart": "^1.5.25"
+        "asciichart": "^1.5.25",
+        "minimatch": "^9.0.4"
     }
 }

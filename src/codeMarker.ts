@@ -41,6 +41,7 @@ import {
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
+const WEAUDIT_IGNORE_FILENAME = ".weauditignore";
 
 export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     // treeEntries contains the currently active entries: findings and notes
@@ -97,6 +98,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.markedFilesDayLog = new Map<string, string[]>();
         this.loadDayLogFromFile();
 
+        this.loadWeAuditIgnoreFile();
+
         this.treeViewMode = TreeViewMode.List;
         this.loadTreeViewModeConfiguration();
 
@@ -117,6 +120,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         );
 
         this.decorate();
+
+        vscode.workspace.onDidSaveTextDocument((document) => {
+            if (path.basename(document.uri.fsPath) === WEAUDIT_IGNORE_FILENAME) {
+                this.loadWeAuditIgnoreFile();
+            }
+        });
 
         vscode.commands.registerCommand("weAudit.toggleAudited", () => {
             this.toggleAudited();
@@ -329,6 +338,20 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.getSelectedClientCodeAndPermalink", () => {
             return this.getSelectedClientCodeAndPermalink();
         });
+    }
+
+    private loadWeAuditIgnoreFile() {
+        const ignoreFilePath = path.join(this.workspacePath, WEAUDIT_IGNORE_FILENAME);
+        if (!fs.existsSync(ignoreFilePath)) {
+            return;
+        }
+
+        const ignoreFile = fs.readFileSync(ignoreFilePath, "utf8");
+        const ignorePatterns = ignoreFile
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0);
+        this.decorationManager.setIgnorePatterns(ignorePatterns);
     }
 
     /**
@@ -617,13 +640,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             // if it exists, remove it
             const auditedEntry = this.auditedFiles.splice(index, 1);
             relevantUsername = auditedEntry[0].author;
-            this.checkIfAllSiblingFilesAreAudited(uri);
         } else {
             // if it doesn't exist, add it
             this.auditedFiles.push({ path: relativePath, author: this.username });
             relevantUsername = this.username;
-            this.checkIfAllSiblingFilesAreAudited(uri);
         }
+        this.checkIfAllSiblingFilesAreAudited(uri);
 
         // clean out any partially audited file entries
         this.cleanPartialAudits(uri);
@@ -865,8 +887,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             // if any file is not audited, set allFilesAudited to false
             const relativePath = path.relative(this.workspacePath, path.join(folder, file));
             if (this.auditedFiles.findIndex((file) => file.path === relativePath) === -1) {
-                allFilesAudited = false;
-                break;
+                // also check if the file does not match any of the weauditignore patterns
+                if (!this.decorationManager.isIgnored(relativePath)) {
+                    allFilesAudited = false;
+                    break;
+                }
             }
         }
         const folderUri = vscode.Uri.file(folder);

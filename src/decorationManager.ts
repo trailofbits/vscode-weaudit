@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { Minimatch } from "minimatch";
 
 const SPACE = "\u00a0";
 const GUTTER_ICON_PATH = "media/tobwhite.svg";
@@ -15,8 +16,10 @@ export class DecorationManager {
     public ownNoteDecorationType;
     public otherNoteDecorationType;
     public auditedFileDecorationType;
+    private ignorePatterns: Minimatch[];
 
     constructor(context: vscode.ExtensionContext) {
+        this.ignorePatterns = [];
         this.gutterIconPath = vscode.Uri.file(context.asAbsolutePath(GUTTER_ICON_PATH));
 
         this.ownFindingDecorationType = this.loadOwnDecorationConfiguration();
@@ -24,6 +27,16 @@ export class DecorationManager {
         this.ownNoteDecorationType = this.loadOwnNoteDecorationConfiguration();
         this.otherNoteDecorationType = this.loadOtherNoteDecorationConfiguration();
         this.auditedFileDecorationType = this.loadAuditedDecorationConfiguration();
+    }
+
+    setIgnorePatterns(ignorePatterns: string[]) {
+        this.ignorePatterns = ignorePatterns.map((pattern) => new Minimatch(pattern, { dot: true, matchBase: true }));
+    }
+
+    isIgnored(relativePath: string): boolean {
+        return this.ignorePatterns.some((pattern) => {
+            return pattern.match(relativePath);
+        });
     }
 
     private createDecorationTypeWithString(color: string) {
