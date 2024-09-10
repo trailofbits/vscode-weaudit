@@ -103,9 +103,24 @@
                 "title": "weAudit: Edit Git Commit Hash"
             },
             {
-                "command": "weAudit.setupRepositories",
-                "title": "weAudit: Setup Audit and Client Repositories, and the Git Commit Hash",
-                "icon": "$(settings-gear)"
+                "command": "weAudit.setupRepositoriesCurrent",
+                "title": "weAudit: Setup git configurations for this workspace root",
+                "icon": "$(github)"
+            },
+            {
+                "command": "weAudit.setupRepositoriesAll",
+                "title": "weAudit: Setup git configurations for all workspace roots",
+                "icon": "$(github-inverted)"
+            },
+            {
+                "command": "weAudit.nextGitConfig",
+                "title": "weAudit: Show next workspace root",
+                "icon": "$(arrow-right)"
+            },
+            {
+                "command": "weAudit.prevGitConfig",
+                "title": "weAudit: Show previous workspace root",
+                "icon": "$(arrow-left)"
             },
             {
                 "command": "weAudit.resolveFinding",
@@ -326,7 +341,22 @@
                     "group": "navigation@2"
                 },
                 {
-                    "command": "weAudit.setupRepositories",
+                    "command": "weAudit.setupRepositoriesCurrent",
+                    "when": "view == gitConfig",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "weAudit.setupRepositoriesAll",
+                    "when": "view == gitConfig",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "weAudit.nextGitConfig",
+                    "when": "view == gitConfig",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "weAudit.prevGitConfig",
                     "when": "view == gitConfig",
                     "group": "navigation@0"
                 }

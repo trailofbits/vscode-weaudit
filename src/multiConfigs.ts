@@ -3,40 +3,58 @@ import * as path from "path";
 import * as fs from "fs";
 import { userInfo } from "os";
 import { SERIALIZED_FILE_EXTENSION } from "./codeMarker";
+import {
+    ConfigurationEntry,
+    WorkspaceRootEntry,
+    ConfigTreeEntry,
+    isConfigurationEntry,
+    isWorkspaceRootEntry,
+} from "./types";
 
-interface ConfigurationEntry {
-    path: string;
-    username: string;
-}
 
 let lightEyePath: vscode.Uri;
 let darkEyePath: vscode.Uri;
 
-export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<ConfigurationEntry> {
+export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<ConfigTreeEntry> {
     private configurationEntries: ConfigurationEntry[];
-    private workspacePath: string;
-    private activeUsernames: string[];
+    private rootEntries: WorkspaceRootEntry[];
+    private rootPaths: string[];
+    private activeConfigs: ConfigurationEntry[];
     private username: string;
 
-    private _onDidChangeTreeDataEmitter = new vscode.EventEmitter<ConfigurationEntry | undefined | void>();
+    private _onDidChangeTreeDataEmitter = new vscode.EventEmitter<ConfigTreeEntry | undefined | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeDataEmitter.event;
 
     refresh(): void {
         this._onDidChangeTreeDataEmitter.fire();
     }
 
-    constructor() {
-        this.workspacePath = vscode.workspace.workspaceFolders![0].uri.fsPath;
+    constructor(context: vscode.ExtensionContext) {
+        this.rootPaths = [];
+        this.getWorkspaceRootPaths();
 
         this.configurationEntries = [];
+        this.rootEntries = [];
+        this.activeConfigs =[];
         this.findAndLoadConfigurationFiles();
 
-        this.activeUsernames = [];
+        const listener = ((event: vscode.WorkspaceFoldersChangeEvent) => {
+            this.rootPaths = [];
+            this.getWorkspaceRootPaths();
+            this.configurationEntries = [];
+            this.findAndLoadConfigurationFiles()
+            this.refresh();
+        });
+
+        const disposable = vscode.workspace.onDidChangeWorkspaceFolders(listener);
+        context.subscriptions.push(disposable);
+
+        this.activeConfigs = [];
         this.username = userInfo().username;
 
         // register a command that refreshes the tree
-        vscode.commands.registerCommand("weAudit.refreshSavedFindings", (usernames: string[]) => {
-            this.activeUsernames = usernames;
+        vscode.commands.registerCommand("weAudit.refreshSavedFindings", (configs: ConfigurationEntry[]) => {
+            this.activeConfigs = configs;
             this.refresh();
         });
 
@@ -48,53 +66,90 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
     }
 
     findAndLoadConfigurationFiles() {
-        const vscodeFolder = path.join(this.workspacePath, ".vscode");
-        if (!fs.existsSync(vscodeFolder)) {
-            return;
-        }
-
         this.configurationEntries = [];
-        fs.readdirSync(vscodeFolder).forEach((file) => {
-            if (path.extname(file) === SERIALIZED_FILE_EXTENSION) {
-                const parsedPath = path.parse(file);
-                const entry = { path: path.join(vscodeFolder, file), username: parsedPath.name };
-                this.configurationEntries.push(entry);
-                if (parsedPath.name === this.username && this.activeUsernames.length === 0) {
-                    this.activeUsernames.push(this.username);
-                }
+        this.rootEntries = [];
+        for (const rootPath of this.rootPaths) {
+            const vscodeFolder = path.join(rootPath, ".vscode");
+            if (!fs.existsSync(vscodeFolder)) {
+                return;
             }
-        });
+
+            const rootDir = path.basename(rootPath);
+            const rootEntry = {label: rootDir} as WorkspaceRootEntry;
+            this.rootEntries.push(rootEntry);
+
+            fs.readdirSync(vscodeFolder).forEach((file) => {
+                if (path.extname(file) === SERIALIZED_FILE_EXTENSION) {
+                    const parsedPath = path.parse(file);
+                    const entry = { path: path.join(vscodeFolder, file), username: parsedPath.name, root: rootEntry };
+                    this.configurationEntries.push(entry);
+                    if (parsedPath.name === this.username && this.activeConfigs.length === 0) {
+                        this.activeConfigs.push(entry);
+                    }
+                }
+            });
+        }
     }
 
     // tree data provider
-    getChildren(element?: ConfigurationEntry): ConfigurationEntry[] {
-        if (element === undefined) {
-            return this.configurationEntries;
+    getChildren(element?: ConfigTreeEntry): ConfigTreeEntry[] {
+        if (this.rootPaths.length > 1) {
+            // For multiple roots, the tree root entries are the basenames of the workspace roots
+            if (element === undefined) {
+                return this.rootEntries;
+            } else if (isWorkspaceRootEntry(element)){
+                return this.configurationEntries.filter((entry)=>(entry.root.label === element.label));
+            }
+        } else {
+            // For a single root, the tree root entries are the configuration files
+            if (element === undefined) {
+                return this.configurationEntries;
+            }
         }
         return [];
     }
 
-    getParent(_element: ConfigurationEntry): undefined {
+    getParent(element: ConfigTreeEntry): ConfigTreeEntry | undefined {
+        if (this.rootPaths.length > 1 && isConfigurationEntry(element)){
+            // For multiple roots, the parent of a configuration file is its root entry
+            return element.root;
+        }
+        // Otherwise no parent
         return undefined;
     }
 
-    getTreeItem(element: ConfigurationEntry): vscode.TreeItem {
-        const label = element.username;
-        const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
+    getTreeItem(element: ConfigTreeEntry): vscode.TreeItem {
+        if (isWorkspaceRootEntry(element)) {
+            // Workspace root entries are collapsible but have no command
+            return new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.Expanded);;
+        } else {
+            const label = element.username;
+            const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
 
-        treeItem.command = {
-            command: "weAudit.loadSavedFindings",
-            title: "Load saved findings from file",
-            arguments: [element.path, element.username],
-        };
-        treeItem.description = path.basename(element.path);
-        treeItem.tooltip = element.username + "'s findings";
+            treeItem.command = {
+                command: "weAudit.loadSavedFindings",
+                title: "Load saved findings from file",
+                arguments: [element],
+            };
+            treeItem.description = path.basename(element.path);
+            treeItem.tooltip = element.username + "'s findings";
 
-        if (this.activeUsernames.includes(element.username)) {
-            treeItem.iconPath = { light: lightEyePath, dark: darkEyePath };
+            if (this.activeConfigs.includes(element)) {
+                treeItem.iconPath = { light: lightEyePath, dark: darkEyePath };
+            }
+
+            return treeItem;
         }
+    }
 
-        return treeItem;
+    getWorkspaceRootPaths() {
+        this.rootPaths = [];
+        if(vscode.workspace.workspaceFolders == undefined){
+            return;
+        }       
+        for(const folder of vscode.workspace.workspaceFolders) {
+            this.rootPaths.push(folder.uri.fsPath);
+        }
     }
 }
 
@@ -104,7 +159,7 @@ export class MultipleSavedFindings {
         lightEyePath = vscode.Uri.file(context.asAbsolutePath("media/eye.svg"));
         darkEyePath = vscode.Uri.file(context.asAbsolutePath("media/whiteeye.svg"));
 
-        const treeDataProvider = new MultipleSavedFindingsTree();
+        const treeDataProvider = new MultipleSavedFindingsTree(context);
 
         vscode.window.onDidChangeActiveColorTheme(() => treeDataProvider.refresh());
         const treeView = vscode.window.createTreeView("savedFindings", { treeDataProvider });
