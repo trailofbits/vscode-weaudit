@@ -450,7 +450,7 @@ class WARoot {
      * @returns A list of `uri`s to decorate and the relevant username. TODO
      */
     toggleAudited(uri: vscode.Uri, relativePath: string): [vscode.Uri[], string] {
-        let relevantUsername: string = "";
+        let relevantUsername = "";
 
         let urisToDecorate: vscode.Uri[] = [];
 
@@ -536,7 +536,7 @@ class WARoot {
      * @param uri The uri of the file that was audit-toggle
      */
     checkIfAllSiblingFilesAreAudited(uri: vscode.Uri) {
-        let urisToDecorate: vscode.Uri[] = [];
+        const urisToDecorate: vscode.Uri[] = [];
         // iterate over all the files in the same folder as the file that was audited
         const folder = path.dirname(uri.fsPath);
         const files = fs.readdirSync(folder);
@@ -964,8 +964,8 @@ class MultiRootManager {
      * @returns An array of current the current WARoot instances.
      */
     private setupRoots(): WARoot[] {
-        let roots: WARoot[] = [];
-        if (vscode.workspace.workspaceFolders == undefined) {
+        const roots: WARoot[] = [];
+        if (vscode.workspace.workspaceFolders === undefined) {
             return roots;
         }
         for (const folder of vscode.workspace.workspaceFolders) {
@@ -1173,15 +1173,15 @@ class MultiRootManager {
      * The paths are all extended to full.
      */
     getMarkedFilesDayLog(): Map<string, FullPath[]> {
-        let mergedMarkedFilesDayLog: Map<string, FullPath[]> = new Map<string, FullPath[]>();
+        const mergedMarkedFilesDayLog: Map<string, FullPath[]> = new Map<string, FullPath[]>();
         for (const root of this.roots) {
             root.markedFilesDayLog.forEach((value, key) => {
-                const current_value = mergedMarkedFilesDayLog.get(key);
-                const update_value = value.map((path) => ({ rootPath: root.rootPath, path: path }) as FullPath);
-                if (current_value === undefined) {
-                    mergedMarkedFilesDayLog.set(key, update_value);
+                const currentValue = mergedMarkedFilesDayLog.get(key);
+                const updateValue = value.map((path) => ({ rootPath: root.rootPath, path: path }) as FullPath);
+                if (currentValue === undefined) {
+                    mergedMarkedFilesDayLog.set(key, updateValue);
                 } else {
-                    mergedMarkedFilesDayLog.set(key, current_value.concat(update_value));
+                    mergedMarkedFilesDayLog.set(key, currentValue.concat(updateValue));
                 }
             });
         }
@@ -1476,7 +1476,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             // First check that all locations are inside one of the workspace roots:
             for (const result of results) {
                 for (const loc of result.locations) {
-                    const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                    const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
                     if (wsRoot === undefined) {
                         vscode.window.showErrorMessage(`Failed to load external findings. The file ${loc.path} is not in any workspace root.`);
                         return;
@@ -1484,7 +1484,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 }
             }
 
-            let fullResults = results.map(
+            const fullResults = results.map(
                 (entry) =>
                     ({
                         label: entry.label,
@@ -1639,19 +1639,19 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     /**
      * Transforms a relative or absolute path in a normalized path relative to the path of a workspace root.
      * @param _path the path to transform
-     * @param _root_path the root path to be used to relativize the target path
+     * @param _rootPath the root path to be used to relativize the target path
      * @returns the normalized path relative to the path of a workspace root
      * @throws an error if the path is not in the workspace
      */
-    private relativizePath(_path: string, _root_path: string): string {
+    private relativizePath(_path: string, _rootPath: string): string {
         _path = path.normalize(_path);
 
         if (path.isAbsolute(_path)) {
-            _path = path.relative(_root_path, _path);
+            _path = path.relative(_rootPath, _path);
         }
 
         if (_path.startsWith("..")) {
-            throw new Error(`The file ${_path} is not in the workspace (${_root_path}).`);
+            throw new Error(`The file ${_path} is not in the workspace (${_rootPath}).`);
         }
 
         return _path;
@@ -2686,7 +2686,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         // For backwards compatibility, we need to add the rootpath to the locations here
-        let rootPath = wsRoot.rootPath;
+        const rootPath = wsRoot.rootPath;
         const fullParsedEntries = {
             clientRemote: parsedEntries.clientRemote,
             gitRemote: parsedEntries.gitRemote,
@@ -2755,7 +2755,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     );
                 }
 
-                let newTreeEntries = fullParsedEntries.treeEntries;
+                const newTreeEntries = fullParsedEntries.treeEntries;
 
                 this.treeEntries = this.treeEntries.concat(newTreeEntries);
                 wsRoot.concatAudited(fullParsedEntries.auditedFiles);
@@ -3262,8 +3262,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
     }
 
-    refreshAndDecorateFromPath(path_: string, root_path: string): void {
-        const uri = vscode.Uri.file(path.join(root_path, path_));
+    refreshAndDecorateFromPath(path_: string, rootPath: string): void {
+        const uri = vscode.Uri.file(path.join(rootPath, path_));
         this.decorateWithUri(uri);
         this.refresh(uri);
     }

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 
-import { Entry, FullEntry, EntryType } from "./types";
+import { FullEntry, EntryType } from "./types";
 
 export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
     private resolvedEntries: FullEntry[];

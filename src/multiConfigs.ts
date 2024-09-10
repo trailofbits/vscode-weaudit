@@ -31,7 +31,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         this.activeConfigs = [];
         this.findAndLoadConfigurationFiles();
 
-        const listener = (event: vscode.WorkspaceFoldersChangeEvent) => {
+        const listener = (_event: vscode.WorkspaceFoldersChangeEvent) => {
             this.rootPaths = [];
             this.getWorkspaceRootPaths();
             this.configurationEntries = [];
@@ -137,7 +137,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
 
     getWorkspaceRootPaths() {
         this.rootPaths = [];
-        if (vscode.workspace.workspaceFolders == undefined) {
+        if (vscode.workspace.workspaceFolders === undefined) {
             return;
         }
         for (const folder of vscode.workspace.workspaceFolders) {

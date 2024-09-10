@@ -30,6 +30,7 @@ function main() {
     // handle the message inside the webview
     window.addEventListener("message", (event) => {
         const message = event.data;
+        let rootList;
 
         switch (message.command) {
             case "update-repository-config":
@@ -40,7 +41,7 @@ function main() {
                 break;
 
             case "set-workspace-roots":
-                const rootList = document.getElementById("workspace-root-list-dropdown");
+                rootList = document.getElementById("workspace-root-list-dropdown");
                 if (rootList === null) {
                     break;
                 }

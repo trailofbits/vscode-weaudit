@@ -6,7 +6,7 @@ import { getUri } from "../utilities/getUri";
 import { WebviewMessage, UpdateRepositoryMessage, SetWorkspaceRootsMessage } from "../webview/webviewMessageTypes";
 
 export function activateGitConfigWebview(context: vscode.ExtensionContext) {
-    const provider = new GitConfigProvider(context.extensionUri, context);
+    const provider = new GitConfigProvider(context.extensionUri);
 
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(GitConfigProvider.viewType, provider));
 }
@@ -19,10 +19,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
 
     private _view?: vscode.WebviewView;
 
-    constructor(
-        private readonly _extensionUri: vscode.Uri,
-        context: vscode.ExtensionContext,
-    ) {
+    constructor(private readonly _extensionUri: vscode.Uri) {
         this.currentRootPath = "";
         this.dirToPathMap = new Map<string, string>();
 
