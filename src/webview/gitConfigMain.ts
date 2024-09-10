@@ -38,10 +38,10 @@ function main() {
                 auditURL.value = message.auditURL;
                 commitHash.value = message.commitHash;
                 break;
-            
+
             case "set-workspace-roots":
                 const rootList = document.getElementById("workspace-root-list-dropdown");
-                if (rootList === null){
+                if (rootList === null) {
                     break;
                 }
                 // clear the list
@@ -80,7 +80,7 @@ function handleFieldChange(_e: Event): void {
 
 function handleDropdownChange(_e: Event): void {
     const rootDropdown = document.getElementById("workspace-root-list-dropdown") as Dropdown;
-    
+
     const message: ChooseWorkspaceRootMessage = {
         command: "choose-workspace-root",
         rootDir: rootDropdown.value,

@@ -3,14 +3,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { userInfo } from "os";
 import { SERIALIZED_FILE_EXTENSION } from "./codeMarker";
-import {
-    ConfigurationEntry,
-    WorkspaceRootEntry,
-    ConfigTreeEntry,
-    isConfigurationEntry,
-    isWorkspaceRootEntry,
-} from "./types";
-
+import { ConfigurationEntry, WorkspaceRootEntry, ConfigTreeEntry, isConfigurationEntry, isWorkspaceRootEntry, configEntryEquals } from "./types";
 
 let lightEyePath: vscode.Uri;
 let darkEyePath: vscode.Uri;
@@ -35,16 +28,16 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
 
         this.configurationEntries = [];
         this.rootEntries = [];
-        this.activeConfigs =[];
+        this.activeConfigs = [];
         this.findAndLoadConfigurationFiles();
 
-        const listener = ((event: vscode.WorkspaceFoldersChangeEvent) => {
+        const listener = (event: vscode.WorkspaceFoldersChangeEvent) => {
             this.rootPaths = [];
             this.getWorkspaceRootPaths();
             this.configurationEntries = [];
-            this.findAndLoadConfigurationFiles()
+            this.findAndLoadConfigurationFiles();
             this.refresh();
-        });
+        };
 
         const disposable = vscode.workspace.onDidChangeWorkspaceFolders(listener);
         context.subscriptions.push(disposable);
@@ -75,7 +68,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
             }
 
             const rootDir = path.basename(rootPath);
-            const rootEntry = {label: rootDir} as WorkspaceRootEntry;
+            const rootEntry = { label: rootDir } as WorkspaceRootEntry;
             this.rootEntries.push(rootEntry);
 
             fs.readdirSync(vscodeFolder).forEach((file) => {
@@ -83,9 +76,9 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
                     const parsedPath = path.parse(file);
                     const entry = { path: path.join(vscodeFolder, file), username: parsedPath.name, root: rootEntry };
                     this.configurationEntries.push(entry);
-                    if (parsedPath.name === this.username && this.activeConfigs.length === 0) {
-                        this.activeConfigs.push(entry);
-                    }
+                    // if (parsedPath.name === this.username && this.activeConfigs.length === 0) {
+                    //     this.activeConfigs.push(entry);
+                    // }
                 }
             });
         }
@@ -97,8 +90,8 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
             // For multiple roots, the tree root entries are the basenames of the workspace roots
             if (element === undefined) {
                 return this.rootEntries;
-            } else if (isWorkspaceRootEntry(element)){
-                return this.configurationEntries.filter((entry)=>(entry.root.label === element.label));
+            } else if (isWorkspaceRootEntry(element)) {
+                return this.configurationEntries.filter((entry) => entry.root.label === element.label);
             }
         } else {
             // For a single root, the tree root entries are the configuration files
@@ -110,7 +103,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
     }
 
     getParent(element: ConfigTreeEntry): ConfigTreeEntry | undefined {
-        if (this.rootPaths.length > 1 && isConfigurationEntry(element)){
+        if (this.rootPaths.length > 1 && isConfigurationEntry(element)) {
             // For multiple roots, the parent of a configuration file is its root entry
             return element.root;
         }
@@ -121,7 +114,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
     getTreeItem(element: ConfigTreeEntry): vscode.TreeItem {
         if (isWorkspaceRootEntry(element)) {
             // Workspace root entries are collapsible but have no command
-            return new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.Expanded);;
+            return new vscode.TreeItem(element.label, vscode.TreeItemCollapsibleState.Expanded);
         } else {
             const label = element.username;
             const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
@@ -134,7 +127,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
             treeItem.description = path.basename(element.path);
             treeItem.tooltip = element.username + "'s findings";
 
-            if (this.activeConfigs.includes(element)) {
+            if (this.activeConfigs.findIndex((entry) => configEntryEquals(entry, element)) !== -1) {
                 treeItem.iconPath = { light: lightEyePath, dark: darkEyePath };
             }
 
@@ -144,10 +137,10 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
 
     getWorkspaceRootPaths() {
         this.rootPaths = [];
-        if(vscode.workspace.workspaceFolders == undefined){
+        if (vscode.workspace.workspaceFolders == undefined) {
             return;
-        }       
-        for(const folder of vscode.workspace.workspaceFolders) {
+        }
+        for (const folder of vscode.workspace.workspaceFolders) {
             this.rootPaths.push(folder.uri.fsPath);
         }
     }

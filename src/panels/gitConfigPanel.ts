@@ -15,13 +15,16 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = "gitConfig";
     private _disposables: vscode.Disposable[] = [];
     private currentRootPath: string;
-    private dirToPathMap: Map<string,string>;
+    private dirToPathMap: Map<string, string>;
 
     private _view?: vscode.WebviewView;
 
-    constructor(private readonly _extensionUri: vscode.Uri, context: vscode.ExtensionContext) {
+    constructor(
+        private readonly _extensionUri: vscode.Uri,
+        context: vscode.ExtensionContext,
+    ) {
         this.currentRootPath = "";
-        this.dirToPathMap = new Map<string,string>;
+        this.dirToPathMap = new Map<string, string>();
 
         vscode.commands.registerCommand("weAudit.setGitConfigView", (rootPath: string, clientRepo: string, auditRepo: string, commitHash: string) => {
             this.currentRootPath = rootPath;
@@ -35,20 +38,20 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
             this._view?.webview.postMessage(msg);
         });
 
-        vscode.commands.registerCommand("weAudit.setGitConfigRoots", (rootPaths:string[]) => {
-            if(!rootPaths.includes(this.currentRootPath)){
-                if(rootPaths.length > 0){
+        vscode.commands.registerCommand("weAudit.setGitConfigRoots", (rootPaths: string[]) => {
+            if (!rootPaths.includes(this.currentRootPath)) {
+                if (rootPaths.length > 0) {
                     this.currentRootPath = rootPaths[0];
                 }
             }
             this.dirToPathMap.clear();
-            for (const rootPath of rootPaths){
-                this.dirToPathMap.set(path.basename(rootPath),rootPath);
+            for (const rootPath of rootPaths) {
+                this.dirToPathMap.set(path.basename(rootPath), rootPath);
             }
 
             const msg: SetWorkspaceRootsMessage = {
                 command: "set-workspace-roots",
-                rootDirs: rootPaths.map((rootPath)=>path.basename(rootPath)),
+                rootDirs: rootPaths.map((rootPath) => path.basename(rootPath)),
             };
             this._view?.webview.postMessage(msg);
         });
@@ -129,7 +132,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
                 switch (command) {
                     case "update-repository-config":
                         rootPath = this.dirToPathMap.get(message.rootDir);
-                        if (rootPath === undefined){
+                        if (rootPath === undefined) {
                             // TODO error
                             return;
                         }
@@ -137,7 +140,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
                         return;
                     case "choose-workspace-root":
                         rootPath = this.dirToPathMap.get(message.rootDir);
-                        if (rootPath === undefined){
+                        if (rootPath === undefined) {
                             // TODO error
                             return;
                         }
@@ -146,7 +149,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
                         return;
                     case "webview-ready":
                         vscode.commands.executeCommand("weAudit.getGitConfigRoots");
-                        vscode.commands.executeCommand("weAudit.pushGitConfigView", (this.currentRootPath ? this.currentRootPath : null));
+                        vscode.commands.executeCommand("weAudit.pushGitConfigView", this.currentRootPath ? this.currentRootPath : null);
                         return;
                 }
             },
