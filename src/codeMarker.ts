@@ -483,7 +483,7 @@ class WARoot {
      * @param files The array of audited files to be concatenated.
      */
     concatAudited(files: AuditedFile[]) {
-        this.auditedFiles.concat(files);
+        this.auditedFiles = this.auditedFiles.concat(files);
     }
 
     /**
@@ -492,7 +492,7 @@ class WARoot {
      * @param files The array of audited files to be concatenated.
      */
     concatPartiallyAudited(files: PartiallyAuditedFile[]) {
-        this.partiallyAuditedFiles.concat(files);
+        this.partiallyAuditedFiles = this.partiallyAuditedFiles.concat(files);
     }
 
     /**
@@ -2760,7 +2760,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 this.treeEntries = this.treeEntries.concat(newTreeEntries);
                 wsRoot.concatAudited(fullParsedEntries.auditedFiles);
                 // handle older versions of the extension that don't have partially audited entries
-                wsRoot.concatPartiallyAudited(fullParsedEntries.partiallyAuditedFiles ?? []);
+                if (fullParsedEntries.partiallyAuditedFiles !== undefined){
+                    wsRoot.concatPartiallyAudited(fullParsedEntries.partiallyAuditedFiles);
+                }
+                
                 // handle older versions of the extension that don't have resolved entries
                 if (fullParsedEntries.resolvedEntries !== undefined) {
                     this.resolvedEntries = this.resolvedEntries.concat(fullParsedEntries.resolvedEntries);
