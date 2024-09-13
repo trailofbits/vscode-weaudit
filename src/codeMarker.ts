@@ -2760,10 +2760,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 this.treeEntries = this.treeEntries.concat(newTreeEntries);
                 wsRoot.concatAudited(fullParsedEntries.auditedFiles);
                 // handle older versions of the extension that don't have partially audited entries
-                if (fullParsedEntries.partiallyAuditedFiles !== undefined){
+                if (fullParsedEntries.partiallyAuditedFiles !== undefined) {
                     wsRoot.concatPartiallyAudited(fullParsedEntries.partiallyAuditedFiles);
                 }
-                
+
                 // handle older versions of the extension that don't have resolved entries
                 if (fullParsedEntries.resolvedEntries !== undefined) {
                     this.resolvedEntries = this.resolvedEntries.concat(fullParsedEntries.resolvedEntries);
