@@ -54,9 +54,8 @@ jobs:
               with:
                   name: weaudit
 
-            # Uncomment the following lines to also publish the extension on the VSCode Marketplace
-            # - name: Publish Extension on VSCode's Marketplace
-            #   run: npx vsce publish --pat ${{ secrets.WEAUDIT_VSCODE_MARKETPLACE_TOKEN }} --packagePath weaudit.vsix
+            - name: Publish Extension on VSCode's Marketplace
+              run: npx vsce publish --pat ${{ secrets.WEAUDIT_VSCODE_MARKETPLACE_TOKEN }} --packagePath weaudit.vsix
 
             - name: Publish Extension on OpenVSX
               run: npx ovsx publish --pat ${{ secrets.WEAUDIT_OPENVSX_TOKEN }} --packagePath weaudit.vsix
