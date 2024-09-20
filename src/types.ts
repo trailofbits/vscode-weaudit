@@ -78,6 +78,7 @@ export interface SerializedData {
     gitSha: string;
     treeEntries: Entry[];
     auditedFiles: AuditedFile[];
+    ignoredFiles: AuditedFile[];
     // older versions do not have partiallyAuditedFiles
     partiallyAuditedFiles?: PartiallyAuditedFile[];
     resolvedEntries: Entry[];
@@ -93,6 +94,7 @@ export function createDefaultSerializedData(): SerializedData {
         gitSha: "",
         treeEntries: [],
         auditedFiles: [],
+        ignoredFiles: [],
         partiallyAuditedFiles: [],
         resolvedEntries: [],
     };

@@ -51,6 +51,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     // auditedFiles contains all files that have been audited
     private auditedFiles: AuditedFile[];
+    private ignoredFiles: AuditedFile[];
     private partiallyAuditedFiles: PartiallyAuditedFile[];
     private workspacePath: string;
     private username: string;
@@ -84,6 +85,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.treeEntries = [];
         this.resolvedEntries = [];
         this.auditedFiles = [];
+        this.ignoredFiles = [];
         this.partiallyAuditedFiles = [];
         this.workspacePath = vscode.workspace.workspaceFolders![0].uri.fsPath;
         this.clientRemote = "";
@@ -120,6 +122,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         vscode.commands.registerCommand("weAudit.toggleAudited", () => {
             this.toggleAudited();
+        });
+
+        vscode.commands.registerCommand("weAudit.toggleIgnored", () => {
+            this.toggleIgnored();
         });
 
         vscode.commands.registerCommand("weAudit.addPartiallyAudited", () => {
@@ -627,6 +633,36 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refresh(uri);
     }
 
+    toggleIgnored(): void {
+        const editor = vscode.window.activeTextEditor;
+        if (editor === undefined) {
+            return;
+        }
+
+        const uri = editor.document.uri;
+        const relativePath = path.relative(this.workspacePath, uri.fsPath);
+
+        let relevantUsername;
+        // check if file is already in list
+        const index = this.ignoredFiles.findIndex((file) => file.path === relativePath);
+        if (index > -1) {
+            // if it exists, remove it
+            const auditedEntry = this.ignoredFiles.splice(index, 1);
+            relevantUsername = auditedEntry[0].author;
+            this.checkIfAllSiblingFilesAreAudited(uri);
+        } else {
+            // if it doesn't exist, add it
+            this.ignoredFiles.push({ path: relativePath, author: this.username });
+            relevantUsername = this.username;
+            this.checkIfAllSiblingFilesAreAudited(uri);
+        }
+
+        // update decorations
+        this.decorateWithUri(uri);
+        this.updateSavedData(relevantUsername);
+        this.refresh(uri);
+    }
+
     addPartiallyAudited(): void {
         const editor = vscode.window.activeTextEditor;
         if (editor === undefined) {
@@ -838,9 +874,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const files = fs.readdirSync(folder);
         let allFilesAudited = true;
         for (const file of files) {
-            // if any file is not audited, set allFilesAudited to false
+            // if any file is not audited and not ignored, set allFilesAudited to false
             const relativePath = path.relative(this.workspacePath, path.join(folder, file));
-            if (this.auditedFiles.findIndex((file) => file.path === relativePath) === -1) {
+            if (this.auditedFiles.findIndex((file) => file.path === relativePath) === -1
+                && this.ignoredFiles.findIndex((file) => file.path === relativePath) === -1) {
                 allFilesAudited = false;
                 break;
             }
@@ -1632,6 +1669,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // filter entries of the affected user
         let filteredEntries = this.treeEntries.filter((entry) => entry.author === username);
         let filteredAuditedFiles = this.auditedFiles.filter((file) => file.author === username);
+        let filteredIgnoredFiles = this.ignoredFiles.filter((file) => file.author === username);
         let filteredPartiallyAuditedEntries = this.partiallyAuditedFiles.filter((entry) => entry.author === username);
         let filteredResolvedEntries = this.resolvedEntries.filter((entry) => entry.author === username);
 
@@ -1658,6 +1696,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 gitSha: this.gitSha,
                 treeEntries: filteredEntries,
                 auditedFiles: filteredAuditedFiles,
+                ignoredFiles: filteredIgnoredFiles,
                 partiallyAuditedFiles: filteredPartiallyAuditedEntries,
                 resolvedEntries: filteredResolvedEntries,
             },
@@ -1769,6 +1808,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
                 this.treeEntries = this.treeEntries.concat(parsedEntries.treeEntries);
                 this.auditedFiles = this.auditedFiles.concat(parsedEntries.auditedFiles);
+                this.ignoredFiles = this.ignoredFiles.concat(parsedEntries.ignoredFiles);
                 // handle older versions of the extension that don't have partially audited entries
                 this.partiallyAuditedFiles = this.partiallyAuditedFiles.concat(parsedEntries.partiallyAuditedFiles ?? []);
                 // handle older versions of the extension that don't have resolved entries
@@ -1778,6 +1818,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             } else {
                 this.treeEntries = this.treeEntries.filter((entry) => entry.author !== username);
                 this.auditedFiles = this.auditedFiles.filter((entry) => entry.author !== username);
+                this.ignoredFiles = this.ignoredFiles.filter((entry) => entry.author !== username);
                 this.partiallyAuditedFiles = this.partiallyAuditedFiles.filter((entry) => entry.author !== username);
                 this.resolvedEntries = this.resolvedEntries.filter((entry) => entry.author !== username);
             }
@@ -1903,6 +1944,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return {
                 badge: "!",
                 tooltip: "Has findings to review",
+            };
+        }
+
+        // if it's not audited and has no issues, check if it's ignored
+        const ignored = this.ignoredFiles.find(entry => entry.path === uriPath);
+        if (ignored !== undefined) {
+            return {
+                color: new vscode.ThemeColor("gitDecoration.ignoredResourceForeground"),
+                tooltip: "Marked as Ignored"
             };
         }
     }
