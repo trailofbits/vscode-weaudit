@@ -11,23 +11,11 @@ const extensionConfig = {
     platform: "node",
     mainFields: ["module", "main"],
     format: "cjs",
-    loader: {
-        ".html": "text",
-    },
+    loader: { ".html": "text" },
     entryPoints: ["./src/extension.ts"],
     outfile: "./out/extension.js",
     external: ["vscode"],
 };
-
-(async () => {
-    try {
-        await build(extensionConfig);
-        console.log("build complete");
-    } catch (err) {
-        process.stderr.write(err.stderr);
-        process.exit(1);
-    }
-})();
 
 const watchConfig = {
     watch: {
@@ -43,28 +31,6 @@ const watchConfig = {
         },
     },
 };
-
-(async () => {
-    const args = process.argv.slice(2);
-    try {
-        if (args.includes("--watch")) {
-            // Build and watch source code
-            console.log("[watch] build started");
-            await build({
-                ...extensionConfig,
-                ...watchConfig,
-            });
-            console.log("[watch] build finished");
-        } else {
-            // Build source code
-            await build(extensionConfig);
-            console.log("build complete");
-        }
-    } catch (err) {
-        process.stderr.write(err.stderr);
-        process.exit(1);
-    }
-})();
 
 const webviewConfig = {
     ...baseConfig,
@@ -88,18 +54,11 @@ const gitConfigWebviewConfig = {
         if (args.includes("--watch")) {
             // Build and watch extension and webview code
             console.log("[watch] build started");
-            await build({
-                ...extensionConfig,
-                ...watchConfig,
-            });
-            await build({
-                ...webviewConfig,
-                ...watchConfig,
-            });
-            await build({
-                ...gitConfigWebviewConfig,
-                ...watchConfig,
-            });
+
+            await build({ ...extensionConfig, ...watchConfig });
+            await build({ ...webviewConfig, ...watchConfig });
+            await build({ ...gitConfigWebviewConfig, ...watchConfig });
+
             console.log("[watch] build finished");
         } else {
             // Build extension and webview code
