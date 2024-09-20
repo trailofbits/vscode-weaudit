@@ -35,7 +35,7 @@
                 {
                     "id": "weAudit",
                     "title": "weAudit",
-                    "icon": "media/tob.svg"
+                    "icon": "media/weAuditLogo.svg"
                 }
             ]
         },
@@ -395,7 +395,6 @@
         },
         "configuration": [
             {
-                "id": "general",
                 "title": "General Settings",
                 "order": 1,
                 "properties": {
@@ -420,7 +419,6 @@
                 }
             },
             {
-                "id": "weaudit-colors",
                 "title": "Highlight colors",
                 "order": 2,
                 "properties": {

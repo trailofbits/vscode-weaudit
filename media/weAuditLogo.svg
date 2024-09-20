@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   version="1.1"
+   viewBox="0 0 354.07669 360.70001"
+   id="svg149"
+   width="354.07669"
+   height="360.70001"
+   sodipodi:docname="weAuditLogo.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview142"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     showgrid="false" />
+  <defs
+     id="defs134">
+    <inkscape:path-effect
+       effect="offset"
+       id="path-effect472"
+       is_visible="true"
+       lpeversion="1.2"
+       linejoin_type="miter"
+       unit="mm"
+       offset="-2.5"
+       miter_limit="4"
+       attempt_force_join="false"
+       update_on_knot_move="true" />
+    <inkscape:path-effect
+       effect="offset"
+       id="path-effect470"
+       is_visible="true"
+       lpeversion="1.2"
+       linejoin_type="miter"
+       unit="mm"
+       offset="-2.5"
+       miter_limit="4"
+       attempt_force_join="false"
+       update_on_knot_move="true" />
+    <inkscape:path-effect
+       effect="offset"
+       id="path-effect468"
+       is_visible="true"
+       lpeversion="1.2"
+       linejoin_type="miter"
+       unit="mm"
+       offset="-2.5"
+       miter_limit="4"
+       attempt_force_join="false"
+       update_on_knot_move="true" />
+    <inkscape:path-effect
+       effect="offset"
+       id="path-effect466"
+       is_visible="true"
+       lpeversion="1.2"
+       linejoin_type="miter"
+       unit="mm"
+       offset="-2.5"
+       miter_limit="4"
+       attempt_force_join="false"
+       update_on_knot_move="true" />
+    <style
+       id="style132">
+      .cls-1 {
+        fill: #231f20;
+      }
+
+      .cls-2 {
+        fill: #ae2a44;
+      }
+    </style>
+  </defs>
+  <!-- Generator: Adobe Illustrator 28.6.0, SVG Export Plug-In . SVG Version: 1.2.0 Build 709)  -->
+  <g
+     id="g147"
+     transform="translate(613.9844,11.45289)">
+    <g
+       id="Layer_1"
+       transform="translate(-760.9077,-155.05289)">
+      <g
+         id="g144">
+        <path
+           class="cls-2"
+           d="m 461.94922,211.11328 29.60156,36.63867 V 492.61523 L 338.00195,419.02344 184.25,492.66797 V 377.50586 l 29.70117,-22.64063 v 89.44141 l 124.09766,-58.56055 123.90039,58.6836 z"
+           id="path136"
+           inkscape:path-effect="#path-effect472"
+           inkscape:original-d="m 180.8,504.3 c -3.3,0 -6,-2.7 -6,-6 V 375.8 c 0,-1.9 0.9,-3.6 2.4,-4.8 l 36.6,-27.9 c 1.1,-0.8 2.3,-1.2 3.6,-1.2 3.3,0 6,2.7 6,6 v 81.5 l 112.1,-52.9 c 0.8,-0.4 1.7,-0.6 2.5,-0.6 0.8,0 1.8,0.2 2.6,0.6 l 111.9,53 V 201.3 c 0,-3.3 2.7,-6 6,-6 3.3,0 3.5,0.8 4.6,2.2 l 36.6,45.3 c 0.9,1.1 1.3,2.4 1.3,3.8 v 251.5 c 0,3.3 -2.7,6 -6,6 -3.3,0 -1.8,-0.2 -2.6,-0.6 L 338,429.5 183.3,503.6 c -0.8,0.4 -1.7,0.6 -2.6,0.6 z" />
+        <path
+           class="cls-1"
+           d="M 159.08594,153.04883 H 409.91016 L 433.14453,181.75 H 176.60938 Z"
+           id="path138"
+           inkscape:path-effect="#path-effect466"
+           inkscape:original-d="m 174.7,191.3 c -2.1,0 -4,-1.1 -5.1,-2.9 l -21.8,-35.7 c -1.1,-1.8 -1.2,-4.2 -0.1,-6 1.1,-1.9 3.1,-3.1 5.2,-3.1 h 258.7 c 1.8,0 3.5,0.8 4.6,2.2 l 28.9,35.7 c 1.5,1.8 1.8,4.2 0.8,6.3 -1,2.1 -3.1,3.4 -5.4,3.4 H 174.7 Z" />
+        <path
+           class="cls-1"
+           d="m 160.68555,222.25 h 199.54492 l 24.03906,28.70117 H 178.21094 Z"
+           id="path140"
+           inkscape:path-effect="#path-effect468"
+           inkscape:original-d="m 176.3,260.4 c -2.1,0 -4,-1.1 -5.1,-2.8 l -21.8,-35.7 c -1.1,-1.8 -1.2,-4.2 -0.1,-6 1.1,-1.9 3.1,-3.1 5.2,-3.1 h 207.3 c 1.8,0 3.4,0.8 4.6,2.1 l 29.9,35.7 c 1.5,1.8 1.8,4.2 0.8,6.4 -1,2.1 -3.1,3.4 -5.4,3.4 H 176.4 Z" />
+        <path
+           class="cls-1"
+           d="m 162.28516,291.34961 h 152.37695 l 20.16797,28.80078 H 179.87305 Z"
+           id="path142"
+           inkscape:path-effect="#path-effect470"
+           inkscape:original-d="m 177.9,329.6 c -2.1,0 -4,-1.1 -5.1,-2.9 L 151,291 c -1.1,-1.8 -1.2,-4.2 -0.1,-6 1.1,-1.9 3.1,-3.1 5.2,-3.1 h 160.4 c 2,0 3.8,1 4.9,2.6 l 25,35.7 c 1.3,1.8 1.4,4.2 0.4,6.2 -1,2 -3.1,3.2 -5.3,3.2 H 178 Z" />
+      </g>
+    </g>
+  </g>
+</svg>
