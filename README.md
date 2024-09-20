@@ -80,6 +80,12 @@ The following gif showcases all the scenarios described:
 
 The highlighted color can be customized in the [settings](#settings).
 
+### Ignored Files
+
+In addition to files you've audited, you can mark a file as irrelevant for the audit by calling the `weAudit: Mark Files as Ignored` command.
+The file will be greyed out in the file tree in the same way a file in `.gitignore` would.
+Folders containing only ignored files will be marked as audited.
+
 ### Detailed Findings
 
 You can fill detailed information about a finding by clicking on it in the _List of Findings_ view in the sidebar. The respective _Finding Details_ panel will open, where you can fill the information.
