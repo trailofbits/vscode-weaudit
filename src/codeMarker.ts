@@ -876,8 +876,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         for (const file of files) {
             // if any file is not audited and not ignored, set allFilesAudited to false
             const relativePath = path.relative(this.workspacePath, path.join(folder, file));
-            if (this.auditedFiles.findIndex((file) => file.path === relativePath) === -1
-                && this.ignoredFiles.findIndex((file) => file.path === relativePath) === -1) {
+            if (
+                this.auditedFiles.findIndex((file) => file.path === relativePath) === -1 &&
+                this.ignoredFiles.findIndex((file) => file.path === relativePath) === -1
+            ) {
                 allFilesAudited = false;
                 break;
             }
@@ -1680,6 +1682,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             if (previousEntries !== undefined) {
                 filteredEntries = mergeTwoEntryArrays(filteredEntries, previousEntries.treeEntries);
                 filteredAuditedFiles = mergeTwoAuditedFileArrays(filteredAuditedFiles, previousEntries.auditedFiles);
+                filteredIgnoredFiles = mergeTwoAuditedFileArrays(filteredIgnoredFiles, previousEntries.ignoredFiles);
                 filteredPartiallyAuditedEntries = mergeTwoPartiallyAuditedFileArrays(
                     filteredPartiallyAuditedEntries,
                     previousEntries.partiallyAuditedFiles ?? [],
@@ -1948,11 +1951,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         // if it's not audited and has no issues, check if it's ignored
-        const ignored = this.ignoredFiles.find(entry => entry.path === uriPath);
+        const ignored = this.ignoredFiles.find((entry) => entry.path === uriPath);
         if (ignored !== undefined) {
             return {
                 color: new vscode.ThemeColor("gitDecoration.ignoredResourceForeground"),
-                tooltip: "Marked as Ignored"
+                tooltip: "Marked as Ignored",
             };
         }
     }
