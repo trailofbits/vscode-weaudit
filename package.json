@@ -415,6 +415,11 @@
                         "type": "string",
                         "default": "trailofbits",
                         "description": "Defining the organization name for the audit repository enhances the heuristic to determine the correct git remote when creating permalinks."
+                    },
+                    "weAudit.general.username": {
+                        "type": "string",
+                        "default": "",
+                        "description": "The username to use as the finding's author. (Defaults to the system's username if left empty.)"
                     }
                 }
             },
