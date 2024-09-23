@@ -100,7 +100,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.treeViewMode = TreeViewMode.List;
         this.loadTreeViewModeConfiguration();
 
-        this.username = userInfo().username;
+        this.username = this.setUsernameConfigOrDefault();
         this.currentlySelectedUsernames = [];
         this.findAndLoadConfigurationUsernames();
         this.resolvedEntriesTree = new ResolvedEntries(context, this.resolvedEntries);
@@ -321,6 +321,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.getSelectedClientCodeAndPermalink", () => {
             return this.getSelectedClientCodeAndPermalink();
         });
+    }
+
+    public setUsernameConfigOrDefault(): string {
+        this.username = vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username;
+        return this.username;
     }
 
     /**
@@ -2714,6 +2719,8 @@ export class AuditMarker {
     private selectivelyReloadConfigurations(e: vscode.ConfigurationChangeEvent): void {
         if (e.affectsConfiguration("weAudit.general.treeViewMode")) {
             treeDataProvider.loadTreeViewModeConfiguration();
+        } else if (e.affectsConfiguration("weAudit.general.username")) {
+            treeDataProvider.setUsernameConfigOrDefault();
         } else {
             this.decorationManager.reloadAllDecorationConfigurations();
             this.decorate();
