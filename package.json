@@ -171,6 +171,10 @@
                 "title": "weAudit: Mark Region as Reviewed"
             },
             {
+                "command": "weAudit.toggleIgnored",
+                "title": "weAudit: Mark File as Ignored"
+            },
+            {
                 "command": "weAudit.addFinding",
                 "title": "weAudit: New Finding from Selection"
             },
@@ -381,6 +385,10 @@
             "editor/context": [
                 {
                     "command": "weAudit.toggleAudited",
+                    "group": "1_modification@0"
+                },
+                {
+                    "command": "weAudit.toggleIgnored",
                     "group": "1_modification@0"
                 },
                 {
