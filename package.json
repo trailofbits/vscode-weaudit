@@ -347,7 +347,7 @@
                 },
                 {
                     "command": "weAudit.setupRepositoriesAll",
-                    "when": "view == gitConfig",
+                    "when": "view == gitConfig && workspaceFolderCount > 1",
                     "group": "navigation@3"
                 },
                 {
