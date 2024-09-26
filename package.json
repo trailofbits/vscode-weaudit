@@ -2,7 +2,7 @@
     "name": "weaudit",
     "displayName": "weAudit",
     "description": "Bookmark findings and quickly navigate to areas of interest in the codebase",
-    "version": "1.1.0",
+    "version": "1.2.1",
     "publisher": "trailofbits",
     "author": "Trail of Bits",
     "categories": [],
@@ -35,7 +35,7 @@
                 {
                     "id": "weAudit",
                     "title": "weAudit",
-                    "icon": "media/tob.svg"
+                    "icon": "media/weAuditLogo.svg"
                 }
             ]
         },
@@ -425,7 +425,6 @@
         },
         "configuration": [
             {
-                "id": "general",
                 "title": "General Settings",
                 "order": 1,
                 "properties": {
@@ -446,11 +445,15 @@
                         "type": "string",
                         "default": "trailofbits",
                         "description": "Defining the organization name for the audit repository enhances the heuristic to determine the correct git remote when creating permalinks."
+                    },
+                    "weAudit.general.username": {
+                        "type": "string",
+                        "default": "",
+                        "description": "The username to use as the finding's author. (Defaults to the system's username if left empty.)"
                     }
                 }
             },
             {
-                "id": "weaudit-colors",
                 "title": "Highlight colors",
                 "order": 2,
                 "properties": {
