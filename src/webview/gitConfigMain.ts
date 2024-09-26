@@ -49,7 +49,6 @@ function main() {
                 rootList.textContent = "";
                 for (let i = 0; i < message.rootDirs.length; i++) {
                     const option = document.createElement("vscode-option");
-                    //option.value = message.rootDirs[i];
                     option.innerText = message.rootDirs[i];
                     rootList.appendChild(option);
                 }

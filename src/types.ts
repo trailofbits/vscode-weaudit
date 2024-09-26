@@ -494,8 +494,8 @@ export function treeViewModeLabel(mode: TreeViewMode): string {
 /**
  * TreeEntry union type.
  * This is used to represent the tree entries in the finding tree.
- * - Entry: a finding or a note, are used when there is a single location
- * - LocationEntry: are used to represent additional locations
+ * - FullEntry: a finding or a note, are used when there is a single location
+ * - FullLocationEntry: are used to represent additional locations
  * - PathOrganizerEntry: a path organizer, used to organize the findings by file
  */
 export type TreeEntry = FullEntry | FullLocationEntry | PathOrganizerEntry;
@@ -505,7 +505,7 @@ export type TreeEntry = FullEntry | FullLocationEntry | PathOrganizerEntry;
  * https://www.typescriptlang.org/docs/handbook/2/narrowing.html#using-type-predicates
  */
 export function isLocationEntry(treeEntry: TreeEntry): treeEntry is FullLocationEntry {
-    return (treeEntry as LocationEntry).parentEntry !== undefined;
+    return (treeEntry as FullLocationEntry).parentEntry !== undefined;
 }
 
 export function isPathOrganizerEntry(treeEntry: TreeEntry): treeEntry is PathOrganizerEntry {
@@ -513,7 +513,19 @@ export function isPathOrganizerEntry(treeEntry: TreeEntry): treeEntry is PathOrg
 }
 
 export function isEntry(treeEntry: TreeEntry): treeEntry is FullEntry {
-    return (treeEntry as Entry).entryType !== undefined;
+    return (treeEntry as FullEntry).entryType !== undefined;
+}
+
+/**
+ * TreeEntry union type.
+ * This was used to represent the tree entries in the finding tree.
+ * It is maintained for backwards compatibility with sarif-explorer.
+ * - Entry: a finding or a note, are used when there is a single location
+ * - LocationEntry: are used to represent additional locations
+ */
+export type OldTreeEntry = Entry | LocationEntry;
+export function isOldLocationEntry(treeEntry: OldTreeEntry): treeEntry is LocationEntry {
+    return (treeEntry as LocationEntry).parentEntry !== undefined;
 }
 
 export interface ConfigurationEntry {

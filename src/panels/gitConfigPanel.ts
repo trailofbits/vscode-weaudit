@@ -130,7 +130,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
                     case "update-repository-config":
                         rootPath = this.dirToPathMap.get(message.rootDir);
                         if (rootPath === undefined) {
-                            // TODO error
+                            vscode.window.showErrorMessage(`weAudit: Error updating repository config. Directory: ${message.rootDir} is not a workspace root.`);
                             return;
                         }
                         vscode.commands.executeCommand("weAudit.updateGitConfig", rootPath, message.clientURL, message.auditURL, message.commitHash);
@@ -138,10 +138,9 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
                     case "choose-workspace-root":
                         rootPath = this.dirToPathMap.get(message.rootDir);
                         if (rootPath === undefined) {
-                            // TODO error
+                            vscode.window.showErrorMessage(`weAudit: Error choosing workspace root. Directory: ${message.rootDir} is not a workspace root.`);
                             return;
                         }
-                        //this.currentRootPath = message.rootPath;
                         vscode.commands.executeCommand("weAudit.pushGitConfigView", rootPath);
                         return;
                     case "webview-ready":

@@ -42,8 +42,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         const disposable = vscode.workspace.onDidChangeWorkspaceFolders(listener);
         context.subscriptions.push(disposable);
 
-        this.activeConfigs = [];
-        this.username = userInfo().username;
+        this.username = vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username;
 
         // register a command that refreshes the tree
         vscode.commands.registerCommand("weAudit.refreshSavedFindings", (configs: ConfigurationEntry[]) => {
@@ -64,7 +63,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         for (const rootPath of this.rootPaths) {
             const vscodeFolder = path.join(rootPath, ".vscode");
             if (!fs.existsSync(vscodeFolder)) {
-                return;
+                continue;
             }
 
             const rootDir = path.basename(rootPath);
@@ -76,9 +75,6 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
                     const parsedPath = path.parse(file);
                     const entry = { path: path.join(vscodeFolder, file), username: parsedPath.name, root: rootEntry };
                     this.configurationEntries.push(entry);
-                    // if (parsedPath.name === this.username && this.activeConfigs.length === 0) {
-                    //     this.activeConfigs.push(entry);
-                    // }
                 }
             });
         }
@@ -120,7 +116,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
             const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
 
             treeItem.command = {
-                command: "weAudit.loadSavedFindings",
+                command: "weAudit.toggleSavedFindings",
                 title: "Load saved findings from file",
                 arguments: [element],
             };
