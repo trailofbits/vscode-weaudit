@@ -9,7 +9,7 @@ export interface UpdateEntryMessage {
 
 export interface UpdateRepositoryMessage {
     command: "update-repository-config";
-    rootDir: string;
+    rootLabel: string;
     clientURL: string;
     auditURL: string;
     commitHash: string;
@@ -22,7 +22,7 @@ export interface ChooseWorkspaceRootMessage {
 
 export interface SetWorkspaceRootsMessage {
     command: "set-workspace-roots";
-    rootDirs: string[];
+    rootLabels: string[];
 }
 
 export interface WebviewIsReadyMessage {

@@ -34,7 +34,7 @@ function main() {
 
         switch (message.command) {
             case "update-repository-config":
-                rootDropdown.value = message.rootDir;
+                rootDropdown.value = message.rootLabel;
                 clientURL.value = message.clientURL;
                 auditURL.value = message.auditURL;
                 commitHash.value = message.commitHash;
@@ -47,9 +47,9 @@ function main() {
                 }
                 // clear the list
                 rootList.textContent = "";
-                for (let i = 0; i < message.rootDirs.length; i++) {
+                for (let i = 0; i < message.rootLabels.length; i++) {
                     const option = document.createElement("vscode-option");
-                    option.innerText = message.rootDirs[i];
+                    option.innerText = message.rootLabels[i];
                     rootList.appendChild(option);
                 }
                 break;
@@ -70,7 +70,7 @@ function handleFieldChange(_e: Event): void {
 
     const message: UpdateRepositoryMessage = {
         command: "update-repository-config",
-        rootDir: rootDropdown.currentValue,
+        rootLabel: rootDropdown.currentValue,
         clientURL: clientURL.value,
         auditURL: auditURL.value,
         commitHash: commitHash.value,

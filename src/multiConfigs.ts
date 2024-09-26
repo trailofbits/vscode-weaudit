@@ -11,7 +11,7 @@ let darkEyePath: vscode.Uri;
 export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<ConfigTreeEntry> {
     private configurationEntries: ConfigurationEntry[];
     private rootEntries: WorkspaceRootEntry[];
-    private rootPaths: string[];
+    private rootPathsAndLabels: [string, string][];
     private activeConfigs: ConfigurationEntry[];
     private username: string;
 
@@ -22,27 +22,19 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         this._onDidChangeTreeDataEmitter.fire();
     }
 
-    constructor(context: vscode.ExtensionContext) {
-        this.rootPaths = [];
-        this.getWorkspaceRootPaths();
+    constructor() {
+        this.rootPathsAndLabels = [];
 
         this.configurationEntries = [];
         this.rootEntries = [];
         this.activeConfigs = [];
-        this.findAndLoadConfigurationFiles();
-
-        const listener = (_event: vscode.WorkspaceFoldersChangeEvent) => {
-            this.rootPaths = [];
-            this.getWorkspaceRootPaths();
-            this.configurationEntries = [];
-            this.findAndLoadConfigurationFiles();
-            this.refresh();
-        };
-
-        const disposable = vscode.workspace.onDidChangeWorkspaceFolders(listener);
-        context.subscriptions.push(disposable);
 
         this.username = vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username;
+
+        // register a command that sets the root paths and labels
+        vscode.commands.registerCommand("weAudit.setMultiConfigRoots", (rootPathsAndLabels: [string, string][]) => {
+            this.rootPathsAndLabels = rootPathsAndLabels;
+        });
 
         // register a command that refreshes the tree
         vscode.commands.registerCommand("weAudit.refreshSavedFindings", (configs: ConfigurationEntry[]) => {
@@ -60,14 +52,13 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
     findAndLoadConfigurationFiles() {
         this.configurationEntries = [];
         this.rootEntries = [];
-        for (const rootPath of this.rootPaths) {
+        for (const [rootPath, rootLabel] of this.rootPathsAndLabels) {
             const vscodeFolder = path.join(rootPath, ".vscode");
             if (!fs.existsSync(vscodeFolder)) {
                 continue;
             }
 
-            const rootDir = path.basename(rootPath);
-            const rootEntry = { label: rootDir } as WorkspaceRootEntry;
+            const rootEntry = { label: rootLabel } as WorkspaceRootEntry;
             this.rootEntries.push(rootEntry);
 
             fs.readdirSync(vscodeFolder).forEach((file) => {
@@ -82,7 +73,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
 
     // tree data provider
     getChildren(element?: ConfigTreeEntry): ConfigTreeEntry[] {
-        if (this.rootPaths.length > 1) {
+        if (this.rootPathsAndLabels.length > 1) {
             // For multiple roots, the tree root entries are the basenames of the workspace roots
             if (element === undefined) {
                 return this.rootEntries;
@@ -99,7 +90,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
     }
 
     getParent(element: ConfigTreeEntry): ConfigTreeEntry | undefined {
-        if (this.rootPaths.length > 1 && isConfigurationEntry(element)) {
+        if (this.rootPathsAndLabels.length > 1 && isConfigurationEntry(element)) {
             // For multiple roots, the parent of a configuration file is its root entry
             return element.root;
         }
@@ -130,16 +121,6 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
             return treeItem;
         }
     }
-
-    getWorkspaceRootPaths() {
-        this.rootPaths = [];
-        if (vscode.workspace.workspaceFolders === undefined) {
-            return;
-        }
-        for (const folder of vscode.workspace.workspaceFolders) {
-            this.rootPaths.push(folder.uri.fsPath);
-        }
-    }
 }
 
 export class MultipleSavedFindings {
@@ -148,7 +129,7 @@ export class MultipleSavedFindings {
         lightEyePath = vscode.Uri.file(context.asAbsolutePath("media/eye.svg"));
         darkEyePath = vscode.Uri.file(context.asAbsolutePath("media/whiteeye.svg"));
 
-        const treeDataProvider = new MultipleSavedFindingsTree(context);
+        const treeDataProvider = new MultipleSavedFindingsTree();
 
         vscode.window.onDidChangeActiveColorTheme(() => treeDataProvider.refresh());
         const treeView = vscode.window.createTreeView("savedFindings", { treeDataProvider });
