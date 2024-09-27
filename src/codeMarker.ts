@@ -60,7 +60,7 @@ class WARoot {
     private auditedFiles: AuditedFile[];
     private partiallyAuditedFiles: PartiallyAuditedFile[];
     readonly rootPath: string;
-    readonly rootLabel: string;
+    private rootLabel: string;
     public gitRemote: string;
     public gitSha: string;
     public clientRemote: string;
@@ -68,6 +68,7 @@ class WARoot {
 
     // An array corresponding to all .weaudit file in the .vscode folder of this workspace root
     private configs: ConfigurationEntry[];
+    private currentlySelectedConfigs: ConfigurationEntry[];
 
     // markedFilesDayLog contains a map associating a string representing a date to a file path.
     public markedFilesDayLog: Map<string, string[]>;
@@ -96,6 +97,7 @@ class WARoot {
 
         this.username = vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username;
         this.configs = [];
+        this.currentlySelectedConfigs = [];
         this.loadConfigurations();
     }
 
@@ -111,6 +113,14 @@ class WARoot {
             return [false, ""];
         }
         return [true, relativePath];
+    }
+
+    /**
+     * A function that returns the unique label for this root.
+     * @returns the unique root label.
+     */
+    getRootLabel(): string {
+        return this.rootLabel;
     }
 
     /**
@@ -134,6 +144,7 @@ class WARoot {
      */
     loadConfigurations() {
         this.configs = [];
+        this.currentlySelectedConfigs = [];
         const vscodeFolder = path.join(this.rootPath, ".vscode");
         if (!fs.existsSync(vscodeFolder)) {
             return;
@@ -149,6 +160,7 @@ class WARoot {
                     root: { label: this.rootLabel } as WorkspaceRootEntry,
                 } as ConfigurationEntry;
                 this.configs.push(configEntry);
+                this.currentlySelectedConfigs.push(configEntry);
             }
         });
     }
@@ -160,6 +172,63 @@ class WARoot {
      */
     getConfigs(): ConfigurationEntry[] {
         return this.configs;
+    }
+
+    /**
+     * Get the currently selected configurations (.weaudit files) of this
+     * workspace root.
+     * @returns The currently selectedconfiguration entries
+     */
+    getSelectedConfigs(): ConfigurationEntry[] {
+        return this.currentlySelectedConfigs;
+    }
+
+    /**
+     * Returns whether a config is currently selected, and optionally selects it if not.
+     */
+    manageConfiguration(config: ConfigurationEntry, select: boolean): boolean {
+        if (this.currentlySelectedConfigs.findIndex((entry) => configEntryEquals(entry, config)) === -1) {
+            if (select) {
+                this.currentlySelectedConfigs.push(config);
+            }
+            return false;
+        }
+        return true;
+    }
+
+    toggleConfiguration(config: ConfigurationEntry): boolean {
+        const idx = this.currentlySelectedConfigs.findIndex((entry) => configEntryEquals(entry, config));
+        const excluded = idx === -1;
+        if (excluded) {
+            this.currentlySelectedConfigs.push(config);
+        } else {
+            this.currentlySelectedConfigs.splice(idx, 1);
+        }
+        return !excluded;
+    }
+
+    getSelectedConfigurations(): ConfigurationEntry[] {
+        return this.currentlySelectedConfigs;
+    }
+
+    async updateLabel(label: string): Promise<void> {
+        if (label !== this.rootLabel) {
+            for (const configEntry of this.configs) {
+                const isSelected = this.manageConfiguration(configEntry, false);
+                if (isSelected) {
+                    // We need to unselect it first
+                    await vscode.commands.executeCommand("weAudit.toggleSavedFindings", configEntry);
+                    // Now we modify the configEntry root
+                    configEntry.root.label = label;
+                    // Now we toggle it back
+                    await vscode.commands.executeCommand("weAudit.toggleSavedFindings", configEntry);
+                } else {
+                    // It is not selected, so we can just modify it and no one will notice
+                    configEntry.root.label = label;
+                }
+            }
+            this.rootLabel = label;
+        }
     }
 
     /**
@@ -184,6 +253,7 @@ class WARoot {
             const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
             const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
             this.configs.push(configEntry);
+            this.currentlySelectedConfigs.push(configEntry);
         } else {
             const data = fs.readFileSync(filename).toString();
             const parsedEntries: SerializedData = JSON.parse(data);
@@ -215,6 +285,7 @@ class WARoot {
             const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
             const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
             this.configs.push(configEntry);
+            this.currentlySelectedConfigs.push(configEntry);
         } else {
             const data = fs.readFileSync(filename).toString();
             const parsedEntries: SerializedData = JSON.parse(data);
@@ -246,6 +317,7 @@ class WARoot {
             const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
             const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
             this.configs.push(configEntry);
+            this.currentlySelectedConfigs.push(configEntry);
         } else {
             const data = fs.readFileSync(filename).toString();
             const parsedEntries: SerializedData = JSON.parse(data);
@@ -806,7 +878,7 @@ class WARoot {
 
         let existsFolder = true;
         let existsFile = true;
-        let toSaveData = false;
+        let toCreateData = false;
 
         if (!fs.existsSync(vscodeFolder)) {
             existsFolder = false;
@@ -873,7 +945,7 @@ class WARoot {
         if (existsFile) {
             // if we are not seeing the current user's findings, we can't simply overwrite the file
             // we need to merge the findings of the current user with their saved findings
-            if (!vscode.commands.executeCommand("weAudit.manageConfiguration", configEntry, false)) {
+            if (!this.manageConfiguration(configEntry, false)) {
                 const previousEntries = this.loadSavedDataFromConfig(configEntry);
                 if (previousEntries !== undefined) {
                     reducedEntries = mergeTwoEntryArrays(reducedEntries, previousEntries.treeEntries);
@@ -896,9 +968,10 @@ class WARoot {
             filteredPartiallyAuditedEntries.length !== 0 ||
             reducedResolvedEntries.length !== 0
         ) {
-            toSaveData = true;
+            toCreateData = true;
         }
-        if (toSaveData) {
+
+        if (toCreateData) {
             // create .vscode folder if it doesn't exist
             if (!existsFolder) {
                 fs.mkdirSync(vscodeFolder);
@@ -906,10 +979,15 @@ class WARoot {
 
             // create a new config file if it doesn't exist
             if (!existsFile) {
-                vscode.commands.executeCommand("weAudit.manageConfiguration", configEntry, true);
+                this.manageConfiguration(configEntry, true);
                 this.configs.push(configEntry);
+                this.currentlySelectedConfigs.push(configEntry);
             }
+        }
 
+        // If the file already exists but toCreateData is false,
+        // this means we are deleting the last element
+        if (toCreateData || existsFile) {
             // save findings to file
             const data = JSON.stringify(
                 {
@@ -961,14 +1039,14 @@ class MultiRootManager {
         this.roots = this.setupRoots();
         vscode.commands.executeCommand(
             "weAudit.setMultiConfigRoots",
-            this.roots.map((root) => [root.rootPath, root.rootLabel]),
+            this.roots.map((root) => [root.rootPath, root.getRootLabel()]),
         );
         vscode.commands.executeCommand(
             "weAudit.setGitConfigRoots",
-            this.roots.map((root) => [root.rootPath, root.rootLabel]),
+            this.roots.map((root) => [root.rootPath, root.getRootLabel()]),
         );
         // Add a listener for changes to the roots
-        const listener = (event: vscode.WorkspaceFoldersChangeEvent) => {
+        const listener = async (event: vscode.WorkspaceFoldersChangeEvent) => {
             // Clear the pathToRootMap, because this change may curse the roots
             this.pathToRootMap.clear();
 
@@ -976,54 +1054,138 @@ class MultiRootManager {
             // of the tree, and hence a recreation of the pathToEntryMap (which is important in case there is
             // only one workspace root left)
             for (const removed of event.removed) {
-                this.removeRoot(removed.uri.fsPath);
+                await this.removeRoot(removed.uri.fsPath);
             }
-            for (const added of event.added) {
-                const rootPath = added.uri.fsPath;
-                const rootLabel = this.createUniqueLabel(rootPath);
-                const root = new WARoot(rootPath, rootLabel);
+
+            const newRootPathList = this.roots.map((root) => root.rootPath).concat(event.added.map((added) => added.uri.fsPath));
+            const newRootPathsAndLabels = this.createUniqueLabels(newRootPathList);
+            let i;
+            for (i = 0; i < this.roots.length; i++) {
+                await this.roots[i].updateLabel(newRootPathsAndLabels[i][1]);
+            }
+            for (; i < newRootPathsAndLabels.length; i++) {
+                const root = new WARoot(newRootPathsAndLabels[i][0], newRootPathsAndLabels[i][1]);
                 this.roots.push(root);
-                this.pathToRootMap.set(root.rootPath, [root, ""]);
                 for (const config of root.getConfigs()) {
+                    // This is a quirk, because the WARoot constructor sets the configurations as active,
+                    // but weAudit.toggleSavedFindings needs it to be inactive, we need to toggle it first
+                    // a better solution would be to register another command that just loads findings into
+                    // the tree for a specific incoming workspace root
+                    root.toggleConfiguration(config);
                     // Add the findings of new roots to the MultiConfig and load them into the tree
-                    vscode.commands.executeCommand("weAudit.toggleSavedFindings", config);
+                    await vscode.commands.executeCommand("weAudit.toggleSavedFindings", config);
                 }
             }
 
             // Tell the MultiConfig that there are new roots
-            vscode.commands.executeCommand(
+            await vscode.commands.executeCommand(
                 "weAudit.setMultiConfigRoots",
-                this.roots.map((root) => [root.rootPath, root.rootLabel]),
+                this.roots.map((root) => [root.rootPath, root.getRootLabel()]),
             );
 
+            // Refresh the configuration files
+            await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+
             // Tell the git Config WebView that there are new roots
-            vscode.commands.executeCommand(
+            await vscode.commands.executeCommand(
                 "weAudit.setGitConfigRoots",
-                this.roots.map((root) => [root.rootPath, root.rootLabel]),
+                this.roots.map((root) => [root.rootPath, root.getRootLabel()]),
             );
         };
         const disposable = vscode.workspace.onDidChangeWorkspaceFolders(listener);
         context.subscriptions.push(disposable);
     }
 
-    private createUniqueLabel(dir: string): string {
-        const label = path.basename(dir);
-        const currentLabelNumber = this.labelMap.get(label);
-        if (currentLabelNumber === undefined) {
-            this.labelMap.set(label, 0);
-            return label;
+    private recurseUniqueLabels(rootPathsAndLabels: [string, string][]): void {
+        // We have called this function because all input elements have duplicates
+        for (const rootPathAndLabel of rootPathsAndLabels) {
+            const parsedRootPath = path.parse(rootPathAndLabel[0]);
+            const labelPrefix = parsedRootPath.base ? parsedRootPath.base : "/";
+            rootPathAndLabel[1] = path.join(labelPrefix, rootPathAndLabel[1]);
+            rootPathAndLabel[0] = path.join(parsedRootPath.root, parsedRootPath.dir);
+        }
+
+        const rootLabels = rootPathsAndLabels.map(([_rootPath, rootLabel]) => rootLabel);
+        if (new Set(rootLabels).size === rootPathsAndLabels.length) {
+            return;
         } else {
-            console.log("There are workspace root folders with the same name.");
-            const nextLabelNumber = currentLabelNumber + 1;
-            this.labelMap.set(label, nextLabelNumber);
-            const newLabel = label + `_${nextLabelNumber}`;
-            return newLabel;
+            // We have duplicates
+            const duplicateMap = new Map<string, string[]>();
+
+            // First pass over the array to determine duplicates
+            for (const [rootPath, rootLabel] of rootPathsAndLabels) {
+                const duplicateEntry = duplicateMap.get(rootLabel);
+                if (duplicateEntry === undefined) {
+                    duplicateMap.set(rootLabel, [rootPath]);
+                } else {
+                    duplicateMap.set(rootLabel, duplicateEntry.concat(rootPath));
+                }
+            }
+
+            const duplicates = rootPathsAndLabels.filter(
+                ([_rootPath, rootLabel]) => duplicateMap.get(rootLabel) !== undefined && duplicateMap.get(rootLabel)!.length > 1,
+            );
+
+            this.recurseUniqueLabels(duplicates);
         }
     }
 
+    private createUniqueLabels(rootPaths: string[]): [string, string][] {
+        const rootPathsAndLabels: [string, string][] = rootPaths.map((rootPath) => [rootPath, path.basename(rootPath)]);
+        const rootLabels = rootPathsAndLabels.map(([_rootPath, rootLabel]) => rootLabel);
+
+        if (new Set(rootLabels).size === rootPaths.length) {
+            return rootPathsAndLabels;
+        } else {
+            // We have duplicates
+            console.log("There are workspace root folders with the same name.");
+            const duplicateMap = new Map<string, string[]>();
+
+            // First pass over the array to determine duplicates
+            for (const [rootPath, rootLabel] of rootPathsAndLabels) {
+                const duplicateEntry = duplicateMap.get(rootLabel);
+                if (duplicateEntry === undefined) {
+                    duplicateMap.set(rootLabel, [rootPath]);
+                } else {
+                    duplicateMap.set(rootLabel, duplicateEntry.concat(rootPath));
+                }
+            }
+
+            // Second pass over the array to process duplicates
+            const duplicates = rootPathsAndLabels.filter(
+                ([_rootPath, rootLabel]) => duplicateMap.get(rootLabel) !== undefined && duplicateMap.get(rootLabel)!.length > 1,
+            );
+            for (const duplicateEntry of duplicates) {
+                duplicateEntry[0] = path.parse(duplicateEntry[0]).dir;
+            }
+
+            this.recurseUniqueLabels(duplicates);
+            for (const duplicateEntry of duplicates) {
+                duplicateEntry[0] = path.join(duplicateEntry[0], duplicateEntry[1]);
+            }
+            return rootPathsAndLabels;
+        }
+    }
+
+    // private createUniqueLabel(dir: string): string {
+    //     const label = path.basename(dir);
+
+    //     const currentLabelNumber = this.labelMap.get(label);
+    //     if (currentLabelNumber === undefined) {
+    //         this.labelMap.set(label, 0);
+    //         return label;
+    //     } else {
+    //         console.log("There are workspace root folders with the same name.");
+    //         const nextLabelNumber = currentLabelNumber + 1;
+    //         this.labelMap.set(label, nextLabelNumber);
+    //         const newLabel = label + `_${nextLabelNumber}`;
+    //         return newLabel;
+    //     }
+    // }
+
     getUniqueLabel(rootPath: string): string | undefined {
         const [wsRoot, _relativePath] = this.getCorrespondingRootAndPath(rootPath);
-        return wsRoot?.rootLabel;
+        return wsRoot?.getRootLabel();
     }
 
     /**
@@ -1035,9 +1197,9 @@ class MultiRootManager {
         if (vscode.workspace.workspaceFolders === undefined) {
             return roots;
         }
-        for (const folder of vscode.workspace.workspaceFolders) {
-            const rootPath = folder.uri.fsPath;
-            const rootLabel = this.createUniqueLabel(rootPath);
+
+        const rootPathsAndLabels = this.createUniqueLabels(vscode.workspace.workspaceFolders.map((folder) => folder.uri.fsPath));
+        for (const [rootPath, rootLabel] of rootPathsAndLabels) {
             const root = new WARoot(rootPath, rootLabel);
             roots.push(root);
             this.pathToRootMap.set(root.rootPath, [root, ""]);
@@ -1070,7 +1232,7 @@ class MultiRootManager {
     private async removeRoot(rootPath: string): Promise<void> {
         for (const root of this.roots.filter((root) => root.rootPath === rootPath)) {
             for (const config of root.getConfigs()) {
-                if (await vscode.commands.executeCommand("weAudit.manageConfiguration", config, false)) {
+                if (root.manageConfiguration(config, false)) {
                     // Remove the findings of outgoing roots from the MultiConfig and remove them from the tree
                     vscode.commands.executeCommand("weAudit.toggleSavedFindings", config);
                 }
@@ -1197,6 +1359,30 @@ class MultiRootManager {
         return currentBest;
     }
 
+    getSelectedConfigurations(): ConfigurationEntry[] {
+        const currentlySelectedConfigs: ConfigurationEntry[] = [];
+        for (const wsRoot of this.roots) {
+            currentlySelectedConfigs.push(...wsRoot.getSelectedConfigurations());
+        }
+        return currentlySelectedConfigs;
+    }
+
+    isConfigurationSelected(config: ConfigurationEntry): boolean {
+        const [wsRoot, _relativePath] = this.getCorrespondingRootAndPath(config.path);
+        if (wsRoot === undefined) {
+            return false;
+        }
+        return wsRoot.manageConfiguration(config, false);
+    }
+
+    toggleConfiguration(config: ConfigurationEntry): void {
+        const [wsRoot, _relativePath] = this.getCorrespondingRootAndPath(config.path);
+        if (wsRoot === undefined) {
+            return;
+        }
+        wsRoot.toggleConfiguration(config);
+    }
+
     /**
      * Given the uri of the current file, finds the corresponding workspace root and returns a FullLocation
      * corresponding to the current selection of the user.
@@ -1286,7 +1472,7 @@ class MultiRootManager {
             vscode.window.showErrorMessage(`weAudit: Error creating unique path. Filepath: ${rootPath} is not a workspace root.`);
             return undefined;
         }
-        const rootLabel = wsRoot.rootLabel;
+        const rootLabel = wsRoot.getRootLabel();
         if (rootLabel !== "") {
             return path.join(rootLabel, relativePath);
         } else {
@@ -1307,7 +1493,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     private workspaces: MultiRootManager;
     private username: string;
-    private currentlySelectedConfigs: ConfigurationEntry[];
+    //private currentlySelectedConfigs: ConfigurationEntry[];
 
     // locationEntries contains a map associating a file path to an array of additional locations
     private pathToEntryMap: Map<string, TreeEntry[]>;
@@ -1338,11 +1524,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.loadTreeViewModeConfiguration();
 
         this.username = this.setUsernameConfigOrDefault();
-        this.currentlySelectedConfigs = [];
         this.findAndLoadConfigurationUsernames();
         this.resolvedEntriesTree = new ResolvedEntries(context, this.resolvedEntries);
 
-        vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.currentlySelectedConfigs);
+        vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
 
         // Fill the Git configuration webview with the current git configuration
         vscode.commands.registerCommand(
@@ -1367,7 +1552,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 }
                 vscode.commands.executeCommand(
                     "weAudit.setGitConfigView",
-                    [wsRoot.rootPath, wsRoot.rootLabel],
+                    [wsRoot.rootPath, wsRoot.getRootLabel()],
                     wsRoot.clientRemote,
                     wsRoot.gitRemote,
                     wsRoot.gitSha,
@@ -1380,7 +1565,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.getGitConfigRoots", () => {
             vscode.commands.executeCommand(
                 "weAudit.setGitConfigRoots",
-                this.workspaces.getRoots().map((root) => [root.rootPath, root.rootLabel]),
+                this.workspaces.getRoots().map((root) => [root.rootPath, root.getRootLabel()]),
             );
         });
 
@@ -1546,16 +1731,14 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.toggleSavedFindings", (config: ConfigurationEntry) => {
             // Push configuration entry if not already in list, remove otherwise.
 
-            const idx = this.currentlySelectedConfigs.findIndex((entry) => configEntryEquals(entry, config));
-            const savedData = this.loadSavedDataFromConfig(config, true, idx === -1);
-            if (idx === -1) {
-                this.currentlySelectedConfigs.push(config);
-            } else {
-                this.currentlySelectedConfigs.splice(idx, 1);
-            }
+            // Toggle a specific config file
+            //const idx = this.currentlySelectedConfigs.findIndex((entry) => configEntryEquals(entry, config));
+            const isSelected = this.workspaces.isConfigurationSelected(config);
+            const savedData = this.loadSavedDataFromConfig(config, true, !isSelected);
+            this.workspaces.toggleConfiguration(config);
 
             // refresh the currently selected files, findings tree and file decorations
-            vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.currentlySelectedConfigs);
+            vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
             this.resolvedEntriesTree.setResolvedEntries(this.resolvedEntries);
             this.refreshTree();
             this.decorate();
@@ -1655,10 +1838,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.exportFindingsInMarkdown();
         });
 
-        // Returns whether a configuration is currently selected and optionally selects it if not
-        vscode.commands.registerCommand("weAudit.manageConfiguration", (config: ConfigurationEntry, select: boolean) => {
-            return this.manageConfiguration(config, select);
-        });
+        // // Returns whether a configuration is currently selected and optionally selects it if not
+        // vscode.commands.registerCommand("weAudit.manageConfiguration", (config: ConfigurationEntry, select: boolean) => {
+        //     return this.manageConfiguration(config, select);
+        // });
 
         // Gets the filtered entries from the current tree that correspond to a specific username and workspace root
         vscode.commands.registerCommand("weAudit.getFilteredEntriesForSaving", (username: string, root: WARoot) => {
@@ -1922,50 +2105,29 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     /**
-     * Finds all serialized files in the .vscode folder and loads the data from them.
-     * Also updates the currently selected usernames.
+     * Because most of the handling is now done by the MultiRootManager
+     * and the individual WARoot constructors, this function merely loads
+     * saved data from all configuration files
      */
     findAndLoadConfigurationUsernames(): void {
-        this.currentlySelectedConfigs = [];
-        for (const root of this.workspaces.getRoots()) {
-            const vscodeFolder = path.join(root.rootPath, ".vscode");
-            if (!fs.existsSync(vscodeFolder)) {
-                continue;
-            }
-
-            fs.readdirSync(vscodeFolder).forEach((file) => {
-                if (path.extname(file) === SERIALIZED_FILE_EXTENSION) {
-                    const parsedPath = path.parse(file);
-
-                    const configEntry = {
-                        path: path.join(vscodeFolder, file),
-                        username: parsedPath.name,
-                        root: { label: root.rootLabel } as WorkspaceRootEntry,
-                    } as ConfigurationEntry;
-
-                    const idx = this.currentlySelectedConfigs.findIndex((entry) => configEntryEquals(entry, configEntry));
-                    if (idx === -1) {
-                        this.currentlySelectedConfigs.push(configEntry);
-                    }
-                    this.loadSavedDataFromConfig(configEntry, true, true);
-                }
-            });
+        for (const configEntry of this.workspaces.getSelectedConfigurations()) {
+            this.loadSavedDataFromConfig(configEntry, true, true);
         }
         vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
     }
 
-    /**
-     * Returns whether a config is currently selected, and optionally selects it if not.
-     */
-    manageConfiguration(config: ConfigurationEntry, select: boolean): boolean {
-        if (!this.currentlySelectedConfigs.includes(config)) {
-            if (select) {
-                this.currentlySelectedConfigs.push(config);
-            }
-            return false;
-        }
-        return true;
-    }
+    // /**
+    //  * Returns whether a config is currently selected, and optionally selects it if not.
+    //  */
+    // manageConfiguration(config: ConfigurationEntry, select: boolean): boolean {
+    //     if (this.currentlySelectedConfigs.findIndex((entry) => configEntryEquals(entry, config)) === -1) {
+    //         if (select) {
+    //             this.currentlySelectedConfigs.push(config);
+    //         }
+    //         return false;
+    //     }
+    //     return true;
+    // }
 
     /**
      * Toggles the current active file as audited or not audited.
@@ -2872,7 +3034,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 // This is to avoid duplicates
                 // However, in a multi-root setting it is possible that this username is active in multiple roots
                 // In that case, we only remove findings where all locations correspond to the workspace root of the
-                if (!this.currentlySelectedConfigs.map((selectedConfig) => selectedConfig.username).includes(config.username)) {
+                // config file whose data is loaded
+                if (
+                    !this.workspaces
+                        .getSelectedConfigurations()
+                        .map((selectedConfig) => selectedConfig.username)
+                        .includes(config.username)
+                ) {
                     this.treeEntries = this.treeEntries.filter(
                         (entry) =>
                             entry.author !== config.username ||
@@ -3080,9 +3248,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 for (const location of entry.locations) {
                     const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(path.join(location.rootPath, location.path));
 
+                    // Check whether the config file is selected based on author and label
                     if (
                         wsRoot === undefined || // The root is not currently added as a workspace
-                        this.currentlySelectedConfigs.findIndex((config) => config.username === entry.author && config.root.label === wsRoot.rootLabel) === -1 // The corresponding config file is not selected
+                        this.workspaces
+                            .getSelectedConfigurations()
+                            .findIndex((config) => config.username === entry.author && config.root.label === wsRoot.getRootLabel()) === -1 // The corresponding config file is not selected
                     ) {
                         continue;
                     }
@@ -3155,10 +3326,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
             return entry.locations
                 .filter((location) => {
-                    const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(path.join(location.rootPath, location.path));
+                    const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(location.rootPath);
+                    // Check whether the config file is selected based on author and label
                     if (
                         wsRoot === undefined || // The location's root is not a current workspace root
-                        this.currentlySelectedConfigs.findIndex((config) => config.username === entry.author && config.root.label === wsRoot.rootLabel) === -1 // The corresponding config file is not selected
+                        this.workspaces
+                            .getSelectedConfigurations()
+                            .findIndex((config) => config.username === entry.author && config.root.label === wsRoot.getRootLabel()) === -1 // The corresponding config file is not selected
                     ) {
                         return false;
                     }
