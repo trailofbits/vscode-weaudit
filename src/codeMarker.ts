@@ -196,6 +196,11 @@ class WARoot {
         return true;
     }
 
+    /**
+     * Deselect the provided configuration if it is selected, and select it if not
+     * @param config the configuration to be (de)selected
+     * @returns whether the configuration was selected
+     */
     toggleConfiguration(config: ConfigurationEntry): boolean {
         const idx = this.currentlySelectedConfigs.findIndex((entry) => configEntryEquals(entry, config));
         const excluded = idx === -1;
@@ -207,10 +212,19 @@ class WARoot {
         return !excluded;
     }
 
+    /**
+     * Returns the currently selected configurations in this workspace root
+     * @returns the currently selected configurations
+     */
     getSelectedConfigurations(): ConfigurationEntry[] {
         return this.currentlySelectedConfigs;
     }
 
+    /**
+     * Update the unique workspace root label to the provided label.
+     * Updates all the configuration entries to use the new label
+     * @param label the new unique label for this workspace root.
+     */
     async updateLabel(label: string): Promise<void> {
         if (label !== this.rootLabel) {
             for (const configEntry of this.configs) {
@@ -1096,6 +1110,14 @@ class MultiRootManager {
         context.subscriptions.push(disposable);
     }
 
+    /**
+     * Given a list of root paths and labels where all labels collide, this function
+     * takes a directory from the root path and moves it to the label. It then checks
+     * whether there are still any duplicates, and if so, it recurses on the remaining
+     * root paths / label pairs where the labels have duplicates.
+     * @param rootPathsAndLabels a list of root paths and labels where each label occurs
+     * more than once.
+     */
     private recurseUniqueLabels(rootPathsAndLabels: [string, string][]): void {
         // We have called this function because all input elements have duplicates
         for (const rootPathAndLabel of rootPathsAndLabels) {
@@ -1130,6 +1152,12 @@ class MultiRootManager {
         }
     }
 
+    /**
+     * Creates unique labels for a list of root paths, where Each label is a postfix of
+     * the corresponding root path.
+     * @param rootPaths the list of root paths that require unique labels
+     * @returns a list of [root path, label] tuples where each label is unique
+     */
     private createUniqueLabels(rootPaths: string[]): [string, string][] {
         const rootPathsAndLabels: [string, string][] = rootPaths.map((rootPath) => [rootPath, path.basename(rootPath)]);
         const rootLabels = rootPathsAndLabels.map(([_rootPath, rootLabel]) => rootLabel);
@@ -1167,22 +1195,11 @@ class MultiRootManager {
         }
     }
 
-    // private createUniqueLabel(dir: string): string {
-    //     const label = path.basename(dir);
-
-    //     const currentLabelNumber = this.labelMap.get(label);
-    //     if (currentLabelNumber === undefined) {
-    //         this.labelMap.set(label, 0);
-    //         return label;
-    //     } else {
-    //         console.log("There are workspace root folders with the same name.");
-    //         const nextLabelNumber = currentLabelNumber + 1;
-    //         this.labelMap.set(label, nextLabelNumber);
-    //         const newLabel = label + `_${nextLabelNumber}`;
-    //         return newLabel;
-    //     }
-    // }
-
+    /**
+     * Get the unique label for a specific root path.
+     * @param rootPath the path to the workspace root.
+     * @returns the unique label of this workspace root.
+     */
     getUniqueLabel(rootPath: string): string | undefined {
         const [wsRoot, _relativePath] = this.getCorrespondingRootAndPath(rootPath);
         return wsRoot?.getRootLabel();
@@ -1359,6 +1376,10 @@ class MultiRootManager {
         return currentBest;
     }
 
+    /**
+     * Get the selected configurations of all workspace roots
+     * @returns the selected configurations of all workspace roots
+     */
     getSelectedConfigurations(): ConfigurationEntry[] {
         const currentlySelectedConfigs: ConfigurationEntry[] = [];
         for (const wsRoot of this.roots) {
@@ -1367,6 +1388,11 @@ class MultiRootManager {
         return currentlySelectedConfigs;
     }
 
+    /**
+     * Given a configuration, checks whether it is selected
+     * @param config the target configuration.
+     * @returns true if it is selected, false if not.
+     */
     isConfigurationSelected(config: ConfigurationEntry): boolean {
         const [wsRoot, _relativePath] = this.getCorrespondingRootAndPath(config.path);
         if (wsRoot === undefined) {
@@ -1375,6 +1401,10 @@ class MultiRootManager {
         return wsRoot.manageConfiguration(config, false);
     }
 
+    /**
+     * Given a configuration, toggle its selection status.
+     * @param config the target configuration.
+     */
     toggleConfiguration(config: ConfigurationEntry): void {
         const [wsRoot, _relativePath] = this.getCorrespondingRootAndPath(config.path);
         if (wsRoot === undefined) {
