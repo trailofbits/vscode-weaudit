@@ -46,6 +46,7 @@ import {
     ConfigurationEntry,
     WorkspaceRootEntry,
     configEntryEquals,
+    RootPathAndLabel,
 } from "./types";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
@@ -993,7 +994,6 @@ class WARoot {
 
             // create a new config file if it doesn't exist
             if (!existsFile) {
-                this.manageConfiguration(configEntry, true);
                 this.configs.push(configEntry);
                 this.currentlySelectedConfigs.push(configEntry);
             }
@@ -1051,13 +1051,13 @@ class MultiRootManager {
         this.labelMap = new Map<string, number>();
         this.pathToRootMap = new Map<string, [WARoot, string]>();
         this.roots = this.setupRoots();
-        vscode.commands.executeCommand(
-            "weAudit.setMultiConfigRoots",
-            this.roots.map((root) => [root.rootPath, root.getRootLabel()]),
-        );
+
+        // We tell the Git Config Webview about the roots
+        // MultiConfig will request the roots by itself when
+        // weAudit.findAndLoadConfigurationFiles is executed by the CodeMarker
         vscode.commands.executeCommand(
             "weAudit.setGitConfigRoots",
-            this.roots.map((root) => [root.rootPath, root.getRootLabel()]),
+            this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
         );
         // Add a listener for changes to the roots
         const listener = async (event: vscode.WorkspaceFoldersChangeEvent) => {
@@ -1075,10 +1075,10 @@ class MultiRootManager {
             const newRootPathsAndLabels = this.createUniqueLabels(newRootPathList);
             let i;
             for (i = 0; i < this.roots.length; i++) {
-                await this.roots[i].updateLabel(newRootPathsAndLabels[i][1]);
+                await this.roots[i].updateLabel(newRootPathsAndLabels[i].rootLabel);
             }
             for (; i < newRootPathsAndLabels.length; i++) {
-                const root = new WARoot(newRootPathsAndLabels[i][0], newRootPathsAndLabels[i][1]);
+                const root = new WARoot(newRootPathsAndLabels[i].rootPath, newRootPathsAndLabels[i].rootLabel);
                 this.roots.push(root);
                 for (const config of root.getConfigs()) {
                     // This is a quirk, because the WARoot constructor sets the configurations as active,
@@ -1091,19 +1091,13 @@ class MultiRootManager {
                 }
             }
 
-            // Tell the MultiConfig that there are new roots
-            await vscode.commands.executeCommand(
-                "weAudit.setMultiConfigRoots",
-                this.roots.map((root) => [root.rootPath, root.getRootLabel()]),
-            );
-
-            // Refresh the configuration files
+            // Refresh the configuration files: This will request the roots and currently selected configurations
             await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
 
             // Tell the git Config WebView that there are new roots
             await vscode.commands.executeCommand(
                 "weAudit.setGitConfigRoots",
-                this.roots.map((root) => [root.rootPath, root.getRootLabel()]),
+                this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
             );
         };
         const disposable = vscode.workspace.onDidChangeWorkspaceFolders(listener);
@@ -1118,16 +1112,16 @@ class MultiRootManager {
      * @param rootPathsAndLabels a list of root paths and labels where each label occurs
      * more than once.
      */
-    private recurseUniqueLabels(rootPathsAndLabels: [string, string][]): void {
+    private recurseUniqueLabels(rootPathsAndLabels: RootPathAndLabel[]): void {
         // We have called this function because all input elements have duplicates
         for (const rootPathAndLabel of rootPathsAndLabels) {
-            const parsedRootPath = path.parse(rootPathAndLabel[0]);
+            const parsedRootPath = path.parse(rootPathAndLabel.rootPath);
             const labelPrefix = parsedRootPath.base ? parsedRootPath.base : "/";
-            rootPathAndLabel[1] = path.join(labelPrefix, rootPathAndLabel[1]);
-            rootPathAndLabel[0] = path.join(parsedRootPath.root, parsedRootPath.dir);
+            rootPathAndLabel.rootLabel = path.join(labelPrefix, rootPathAndLabel.rootLabel);
+            rootPathAndLabel.rootPath = path.join(parsedRootPath.root, parsedRootPath.dir);
         }
 
-        const rootLabels = rootPathsAndLabels.map(([_rootPath, rootLabel]) => rootLabel);
+        const rootLabels = rootPathsAndLabels.map((rootPathAndLabel) => rootPathAndLabel.rootLabel);
         if (new Set(rootLabels).size === rootPathsAndLabels.length) {
             return;
         } else {
@@ -1135,17 +1129,17 @@ class MultiRootManager {
             const duplicateMap = new Map<string, string[]>();
 
             // First pass over the array to determine duplicates
-            for (const [rootPath, rootLabel] of rootPathsAndLabels) {
-                const duplicateEntry = duplicateMap.get(rootLabel);
+            for (const rootPathAndLabel of rootPathsAndLabels) {
+                const duplicateEntry = duplicateMap.get(rootPathAndLabel.rootLabel);
                 if (duplicateEntry === undefined) {
-                    duplicateMap.set(rootLabel, [rootPath]);
+                    duplicateMap.set(rootPathAndLabel.rootLabel, [rootPathAndLabel.rootPath]);
                 } else {
-                    duplicateMap.set(rootLabel, duplicateEntry.concat(rootPath));
+                    duplicateMap.set(rootPathAndLabel.rootLabel, duplicateEntry.concat(rootPathAndLabel.rootPath));
                 }
             }
 
             const duplicates = rootPathsAndLabels.filter(
-                ([_rootPath, rootLabel]) => duplicateMap.get(rootLabel) !== undefined && duplicateMap.get(rootLabel)!.length > 1,
+                (rootPathAndLabel) => duplicateMap.get(rootPathAndLabel.rootLabel) !== undefined && duplicateMap.get(rootPathAndLabel.rootLabel)!.length > 1,
             );
 
             this.recurseUniqueLabels(duplicates);
@@ -1158,9 +1152,11 @@ class MultiRootManager {
      * @param rootPaths the list of root paths that require unique labels
      * @returns a list of [root path, label] tuples where each label is unique
      */
-    private createUniqueLabels(rootPaths: string[]): [string, string][] {
-        const rootPathsAndLabels: [string, string][] = rootPaths.map((rootPath) => [rootPath, path.basename(rootPath)]);
-        const rootLabels = rootPathsAndLabels.map(([_rootPath, rootLabel]) => rootLabel);
+    private createUniqueLabels(rootPaths: string[]): RootPathAndLabel[] {
+        const rootPathsAndLabels: RootPathAndLabel[] = rootPaths.map(
+            (rootPath) => ({ rootPath: rootPath, rootLabel: path.basename(rootPath) }) as RootPathAndLabel,
+        );
+        const rootLabels = rootPathsAndLabels.map((rootPathAndLabel) => rootPathAndLabel.rootLabel);
 
         if (new Set(rootLabels).size === rootPaths.length) {
             return rootPathsAndLabels;
@@ -1170,26 +1166,26 @@ class MultiRootManager {
             const duplicateMap = new Map<string, string[]>();
 
             // First pass over the array to determine duplicates
-            for (const [rootPath, rootLabel] of rootPathsAndLabels) {
-                const duplicateEntry = duplicateMap.get(rootLabel);
+            for (const rootPathAndLabel of rootPathsAndLabels) {
+                const duplicateEntry = duplicateMap.get(rootPathAndLabel.rootLabel);
                 if (duplicateEntry === undefined) {
-                    duplicateMap.set(rootLabel, [rootPath]);
+                    duplicateMap.set(rootPathAndLabel.rootLabel, [rootPathAndLabel.rootPath]);
                 } else {
-                    duplicateMap.set(rootLabel, duplicateEntry.concat(rootPath));
+                    duplicateMap.set(rootPathAndLabel.rootLabel, duplicateEntry.concat(rootPathAndLabel.rootPath));
                 }
             }
 
             // Second pass over the array to process duplicates
             const duplicates = rootPathsAndLabels.filter(
-                ([_rootPath, rootLabel]) => duplicateMap.get(rootLabel) !== undefined && duplicateMap.get(rootLabel)!.length > 1,
+                (rootPathAndLabel) => duplicateMap.get(rootPathAndLabel.rootLabel) !== undefined && duplicateMap.get(rootPathAndLabel.rootLabel)!.length > 1,
             );
             for (const duplicateEntry of duplicates) {
-                duplicateEntry[0] = path.parse(duplicateEntry[0]).dir;
+                duplicateEntry.rootPath = path.parse(duplicateEntry.rootPath).dir;
             }
 
             this.recurseUniqueLabels(duplicates);
             for (const duplicateEntry of duplicates) {
-                duplicateEntry[0] = path.join(duplicateEntry[0], duplicateEntry[1]);
+                duplicateEntry.rootPath = path.join(duplicateEntry.rootPath, duplicateEntry.rootLabel);
             }
             return rootPathsAndLabels;
         }
@@ -1216,8 +1212,8 @@ class MultiRootManager {
         }
 
         const rootPathsAndLabels = this.createUniqueLabels(vscode.workspace.workspaceFolders.map((folder) => folder.uri.fsPath));
-        for (const [rootPath, rootLabel] of rootPathsAndLabels) {
-            const root = new WARoot(rootPath, rootLabel);
+        for (const rootPathAndLabel of rootPathsAndLabels) {
+            const root = new WARoot(rootPathAndLabel.rootPath, rootPathAndLabel.rootLabel);
             roots.push(root);
             this.pathToRootMap.set(root.rootPath, [root, ""]);
         }
@@ -1523,7 +1519,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     private workspaces: MultiRootManager;
     private username: string;
-    //private currentlySelectedConfigs: ConfigurationEntry[];
 
     // locationEntries contains a map associating a file path to an array of additional locations
     private pathToEntryMap: Map<string, TreeEntry[]>;
@@ -1582,7 +1577,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 }
                 vscode.commands.executeCommand(
                     "weAudit.setGitConfigView",
-                    [wsRoot.rootPath, wsRoot.getRootLabel()],
+                    { rootPath: wsRoot.rootPath, rootLabel: wsRoot.getRootLabel() } as RootPathAndLabel,
                     wsRoot.clientRemote,
                     wsRoot.gitRemote,
                     wsRoot.gitSha,
@@ -1595,7 +1590,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.getGitConfigRoots", () => {
             vscode.commands.executeCommand(
                 "weAudit.setGitConfigRoots",
-                this.workspaces.getRoots().map((root) => [root.rootPath, root.getRootLabel()]),
+                this.workspaces.getRoots().map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
             );
         });
 
@@ -1615,6 +1610,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         });
 
         this.decorate();
+
+        // Pushes the roots and currently selected configurations to the MultiConfig
+        vscode.commands.registerCommand("weAudit.getMultiConfigRoots", () => {
+            const rootPathsAndLabels = this.workspaces
+                .getRoots()
+                .map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel);
+            vscode.commands.executeCommand("weAudit.setMultiConfigRoots", rootPathsAndLabels);
+            vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
+        });
 
         vscode.commands.registerCommand("weAudit.toggleAudited", () => {
             this.toggleAudited();
@@ -1762,7 +1766,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             // Push configuration entry if not already in list, remove otherwise.
 
             // Toggle a specific config file
-            //const idx = this.currentlySelectedConfigs.findIndex((entry) => configEntryEquals(entry, config));
             const isSelected = this.workspaces.isConfigurationSelected(config);
             const savedData = this.loadSavedDataFromConfig(config, true, !isSelected);
             this.workspaces.toggleConfiguration(config);
@@ -1867,11 +1870,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.exportFindingsInMarkdown", () => {
             this.exportFindingsInMarkdown();
         });
-
-        // // Returns whether a configuration is currently selected and optionally selects it if not
-        // vscode.commands.registerCommand("weAudit.manageConfiguration", (config: ConfigurationEntry, select: boolean) => {
-        //     return this.manageConfiguration(config, select);
-        // });
 
         // Gets the filtered entries from the current tree that correspond to a specific username and workspace root
         vscode.commands.registerCommand("weAudit.getFilteredEntriesForSaving", (username: string, root: WARoot) => {
@@ -2145,19 +2143,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
         vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
     }
-
-    // /**
-    //  * Returns whether a config is currently selected, and optionally selects it if not.
-    //  */
-    // manageConfiguration(config: ConfigurationEntry, select: boolean): boolean {
-    //     if (this.currentlySelectedConfigs.findIndex((entry) => configEntryEquals(entry, config)) === -1) {
-    //         if (select) {
-    //             this.currentlySelectedConfigs.push(config);
-    //         }
-    //         return false;
-    //     }
-    //     return true;
-    // }
 
     /**
      * Toggles the current active file as audited or not audited.
