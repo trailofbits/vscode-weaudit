@@ -167,6 +167,10 @@
                 "title": "weAudit: Mark File as Reviewed"
             },
             {
+                "command": "weAudit.toggleAuditedUri",
+                "title": "weAudit: Mark as Reviewed by URI"
+            },
+            {
                 "command": "weAudit.addPartiallyAudited",
                 "title": "weAudit: Mark Region as Reviewed"
             },
@@ -391,6 +395,12 @@
                     "command": "weAudit.copySelectedCodeClientPermalink",
                     "group": "9_cutcopypaste@0"
                 }
+            ],
+            "explorer/context": [
+                {
+                    "command": "weAudit.toggleAuditedUri",
+                    "group": "1_modification"
+                }
             ]
         },
         "configuration": [
@@ -420,6 +430,21 @@
                         "type": "string",
                         "default": "",
                         "description": "The username to use as the finding's author. (Defaults to the system's username if left empty.)"
+                    },
+                    "weAudit.general.recursionBehavior": {
+                        "type": "string",
+                        "default": "full",
+                        "enum": [
+                            "none",
+                            "direct",
+                            "full"
+                        ],
+                        "enumDescriptions": [
+                            "Do not recurse, toggle directory only",
+                            "Recurse to direct children only, no subdirectories",
+                            "Fully recurse to all children and subdirectories"
+                        ],
+                        "description": "Recursion style when marking directory as audited."
                     }
                 }
             },

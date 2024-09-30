@@ -122,6 +122,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.toggleAudited();
         });
 
+        vscode.commands.registerCommand("weAudit.toggleAuditedUri", (uri) => {
+            this.toggleAuditedUri(uri);
+        });
+
         vscode.commands.registerCommand("weAudit.addPartiallyAudited", () => {
             this.addPartiallyAudited();
         });
@@ -602,7 +606,32 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
         const uri = editor.document.uri;
         // get path relative to workspace
+        this.toggleAuditedUri(uri)
+    }
+
+    private getRecursionBehavior(): string {
+        return vscode.workspace.getConfiguration("weaudit").get("general.recursionBehavior")!
+    }
+
+    private async toggleAuditedUri(uri: vscode.Uri): Promise<void> {
         const relativePath = path.relative(this.workspacePath, uri.fsPath);
+
+        // check if we marked a dir, then start recursion if desired
+        const stat = await vscode.workspace.fs.stat(uri)
+        const recursionBehavior = this.getRecursionBehavior()
+        if (stat.type == vscode.FileType.Directory && recursionBehavior != "none") { // if no recursion desired, skip the whole loop
+            let children = await vscode.workspace.fs.readDirectory(uri)
+
+            if (recursionBehavior == "direct") // if direct only, filter subdirs
+                children = children.filter(([path, t], _) => { t != vscode.FileType.Directory })
+
+            children.forEach(([child, __], _) => {
+                const childUri = vscode.Uri.joinPath(uri, child)
+                this.toggleAuditedUri(childUri)
+            })
+        }
+
+        // add the entry itself
 
         let relevantUsername;
         // check if file is already in list
