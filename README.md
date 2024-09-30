@@ -63,6 +63,8 @@ After reviewing a file, you can mark it as audited by calling the `weAudit: Mark
 
 ![Mark File as Reviewed](media/readme/gifs/mark_audited.gif)
 
+Alternatively, you can right click the file in the Explorer view and select `weAudit: Mark as Reviewed`
+
 The highlighted color can be customized in the [settings](#settings).
 
 ### Partially Audited Files
