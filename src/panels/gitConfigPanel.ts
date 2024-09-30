@@ -3,6 +3,7 @@ import * as crypto from "crypto";
 
 import { getUri } from "../utilities/getUri";
 import { WebviewMessage, UpdateRepositoryMessage, SetWorkspaceRootsMessage } from "../webview/webviewMessageTypes";
+import { RootPathAndLabel } from "../types";
 
 export function activateGitConfigWebview(context: vscode.ExtensionContext) {
     const provider = new GitConfigProvider(context.extensionUri);
@@ -13,22 +14,22 @@ export function activateGitConfigWebview(context: vscode.ExtensionContext) {
 class GitConfigProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = "gitConfig";
     private _disposables: vscode.Disposable[] = [];
-    private currentRootPathAndLabel: [string, string];
+    private currentRootPathAndLabel: RootPathAndLabel;
     private dirToPathMap: Map<string, string>;
 
     private _view?: vscode.WebviewView;
 
     constructor(private readonly _extensionUri: vscode.Uri) {
-        this.currentRootPathAndLabel = ["", ""];
+        this.currentRootPathAndLabel = { rootPath: "", rootLabel: "" } as RootPathAndLabel;
         this.dirToPathMap = new Map<string, string>();
 
         vscode.commands.registerCommand(
             "weAudit.setGitConfigView",
-            (rootPathAndLabel: [string, string], clientRepo: string, auditRepo: string, commitHash: string) => {
+            (rootPathAndLabel: RootPathAndLabel, clientRepo: string, auditRepo: string, commitHash: string) => {
                 this.currentRootPathAndLabel = rootPathAndLabel;
                 const msg: UpdateRepositoryMessage = {
                     command: "update-repository-config",
-                    rootLabel: rootPathAndLabel[1],
+                    rootLabel: rootPathAndLabel.rootLabel,
                     clientURL: clientRepo,
                     auditURL: auditRepo,
                     commitHash,
@@ -37,36 +38,42 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
             },
         );
 
-        vscode.commands.registerCommand("weAudit.setGitConfigRoots", (rootPathsAndLabels: [string, string][]) => {
-            if (!rootPathsAndLabels.includes(this.currentRootPathAndLabel)) {
+        vscode.commands.registerCommand("weAudit.setGitConfigRoots", (rootPathsAndLabels: RootPathAndLabel[]) => {
+            const idx = rootPathsAndLabels.findIndex((rootPathAndLabel) => {
+                return (
+                    rootPathAndLabel.rootPath === this.currentRootPathAndLabel.rootPath && rootPathAndLabel.rootLabel === this.currentRootPathAndLabel.rootLabel
+                );
+            });
+
+            if (idx === -1) {
                 if (rootPathsAndLabels.length > 0) {
                     this.currentRootPathAndLabel = rootPathsAndLabels[0];
                 }
             }
             this.dirToPathMap.clear();
-            for (const [rootPath, rootLabel] of rootPathsAndLabels) {
-                this.dirToPathMap.set(rootLabel, rootPath);
+            for (const rootPathAndLabel of rootPathsAndLabels) {
+                this.dirToPathMap.set(rootPathAndLabel.rootLabel, rootPathAndLabel.rootPath);
             }
 
             const msg: SetWorkspaceRootsMessage = {
                 command: "set-workspace-roots",
-                rootLabels: rootPathsAndLabels.map((rootPathAndLabel) => rootPathAndLabel[1]),
+                rootLabels: rootPathsAndLabels.map((rootPathAndLabel) => rootPathAndLabel.rootLabel),
             };
             this._view?.webview.postMessage(msg);
         });
 
         vscode.commands.registerCommand("weAudit.nextGitConfig", async () => {
-            const nextRootPath = await vscode.commands.executeCommand("weAudit.nextRoot", this.currentRootPathAndLabel[0], true);
+            const nextRootPath = await vscode.commands.executeCommand("weAudit.nextRoot", this.currentRootPathAndLabel.rootPath, true);
             vscode.commands.executeCommand("weAudit.pushGitConfigView", nextRootPath);
         });
 
         vscode.commands.registerCommand("weAudit.prevGitConfig", async () => {
-            const prevRootPath = await vscode.commands.executeCommand("weAudit.nextRoot", this.currentRootPathAndLabel[0], false);
+            const prevRootPath = await vscode.commands.executeCommand("weAudit.nextRoot", this.currentRootPathAndLabel.rootPath, false);
             vscode.commands.executeCommand("weAudit.pushGitConfigView", prevRootPath);
         });
 
         vscode.commands.registerCommand("weAudit.setupRepositoriesCurrent", () => {
-            vscode.commands.executeCommand("weAudit.setupRepositoriesOne", this.currentRootPathAndLabel[0]);
+            vscode.commands.executeCommand("weAudit.setupRepositoriesOne", this.currentRootPathAndLabel.rootPath);
         });
     }
 
@@ -87,7 +94,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
         webviewView.onDidChangeVisibility(() => {
             if (webviewView.visible) {
                 vscode.commands.executeCommand("weAudit.getGitConfigRoots");
-                vscode.commands.executeCommand("weAudit.pushGitConfigView", this.currentRootPathAndLabel[0]);
+                vscode.commands.executeCommand("weAudit.pushGitConfigView", this.currentRootPathAndLabel.rootPath);
             }
         });
     }
@@ -140,16 +147,19 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
                         vscode.commands.executeCommand("weAudit.updateGitConfig", rootPath, message.clientURL, message.auditURL, message.commitHash);
                         return;
                     case "choose-workspace-root":
-                        rootPath = this.dirToPathMap.get(message.rootDir);
+                        rootPath = this.dirToPathMap.get(message.rootLabel);
                         if (rootPath === undefined) {
-                            vscode.window.showErrorMessage(`weAudit: Error choosing workspace root. Directory: ${message.rootDir} is not a workspace root.`);
+                            vscode.window.showErrorMessage(`weAudit: Error choosing workspace root. Directory: ${message.rootLabel} is not a workspace root.`);
                             return;
                         }
                         vscode.commands.executeCommand("weAudit.pushGitConfigView", rootPath);
                         return;
                     case "webview-ready":
                         vscode.commands.executeCommand("weAudit.getGitConfigRoots");
-                        vscode.commands.executeCommand("weAudit.pushGitConfigView", this.currentRootPathAndLabel[0] ? this.currentRootPathAndLabel[0] : null);
+                        vscode.commands.executeCommand(
+                            "weAudit.pushGitConfigView",
+                            this.currentRootPathAndLabel.rootPath ? this.currentRootPathAndLabel.rootPath : null,
+                        );
                         return;
                 }
             },

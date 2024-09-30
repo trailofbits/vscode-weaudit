@@ -1,9 +1,16 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
-import { userInfo } from "os";
 import { SERIALIZED_FILE_EXTENSION } from "./codeMarker";
-import { ConfigurationEntry, WorkspaceRootEntry, ConfigTreeEntry, isConfigurationEntry, isWorkspaceRootEntry, configEntryEquals } from "./types";
+import {
+    ConfigurationEntry,
+    WorkspaceRootEntry,
+    ConfigTreeEntry,
+    isConfigurationEntry,
+    isWorkspaceRootEntry,
+    configEntryEquals,
+    RootPathAndLabel,
+} from "./types";
 
 let lightEyePath: vscode.Uri;
 let darkEyePath: vscode.Uri;
@@ -11,9 +18,8 @@ let darkEyePath: vscode.Uri;
 export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<ConfigTreeEntry> {
     private configurationEntries: ConfigurationEntry[];
     private rootEntries: WorkspaceRootEntry[];
-    private rootPathsAndLabels: [string, string][];
+    private rootPathsAndLabels: RootPathAndLabel[];
     private activeConfigs: ConfigurationEntry[];
-    private username: string;
 
     private _onDidChangeTreeDataEmitter = new vscode.EventEmitter<ConfigTreeEntry | undefined | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeDataEmitter.event;
@@ -29,10 +35,8 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         this.rootEntries = [];
         this.activeConfigs = [];
 
-        this.username = vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username;
-
         // register a command that sets the root paths and labels
-        vscode.commands.registerCommand("weAudit.setMultiConfigRoots", (rootPathsAndLabels: [string, string][]) => {
+        vscode.commands.registerCommand("weAudit.setMultiConfigRoots", (rootPathsAndLabels: RootPathAndLabel[]) => {
             this.rootPathsAndLabels = rootPathsAndLabels;
         });
 
@@ -43,7 +47,8 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         });
 
         // register a command that calls findAndLoadConfigurationFiles
-        vscode.commands.registerCommand("weAudit.findAndLoadConfigurationFiles", () => {
+        vscode.commands.registerCommand("weAudit.findAndLoadConfigurationFiles", async () => {
+            await vscode.commands.executeCommand("weAudit.getMultiConfigRoots");
             this.findAndLoadConfigurationFiles();
             this.refresh();
         });
@@ -52,13 +57,13 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
     findAndLoadConfigurationFiles() {
         this.configurationEntries = [];
         this.rootEntries = [];
-        for (const [rootPath, rootLabel] of this.rootPathsAndLabels) {
-            const vscodeFolder = path.join(rootPath, ".vscode");
+        for (const rootPathAndLabel of this.rootPathsAndLabels) {
+            const vscodeFolder = path.join(rootPathAndLabel.rootPath, ".vscode");
             if (!fs.existsSync(vscodeFolder)) {
                 continue;
             }
 
-            const rootEntry = { label: rootLabel } as WorkspaceRootEntry;
+            const rootEntry = { label: rootPathAndLabel.rootLabel } as WorkspaceRootEntry;
             this.rootEntries.push(rootEntry);
 
             fs.readdirSync(vscodeFolder).forEach((file) => {

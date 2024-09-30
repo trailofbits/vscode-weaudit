@@ -314,6 +314,13 @@ export interface FullPath {
 }
 
 /**
+ * A tuple containing a root path and a unique label for that root path
+ */
+export interface RootPathAndLabel {
+    rootPath: string;
+    rootLabel: string;
+}
+/**
  * Creates a PathOrganizer entry.
  * @param path the path of the file
  * @returns the PathOrganizer entry

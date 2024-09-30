@@ -17,7 +17,7 @@ export interface UpdateRepositoryMessage {
 
 export interface ChooseWorkspaceRootMessage {
     command: "choose-workspace-root";
-    rootDir: string;
+    rootLabel: string;
 }
 
 export interface SetWorkspaceRootsMessage {

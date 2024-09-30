@@ -83,7 +83,7 @@ function handleDropdownChange(_e: Event): void {
 
     const message: ChooseWorkspaceRootMessage = {
         command: "choose-workspace-root",
-        rootDir: rootDropdown.value,
+        rootLabel: rootDropdown.value,
     };
     vscode.postMessage(message);
 }
