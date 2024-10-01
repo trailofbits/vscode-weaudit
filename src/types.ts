@@ -524,15 +524,10 @@ export function isEntry(treeEntry: TreeEntry): treeEntry is FullEntry {
 }
 
 /**
- * TreeEntry union type.
- * This was used to represent the tree entries in the finding tree.
- * It is maintained for backwards compatibility with sarif-explorer.
- * - Entry: a finding or a note, are used when there is a single location
- * - LocationEntry: are used to represent additional locations
+ * Type predicate for backwards compatibility purposes
  */
-export type OldTreeEntry = Entry | LocationEntry;
-export function isOldLocationEntry(treeEntry: OldTreeEntry): treeEntry is LocationEntry {
-    return (treeEntry as LocationEntry).parentEntry !== undefined;
+export function isOldEntry(entry: Entry | FullEntry | FullLocationEntry): entry is Entry {
+    return (entry as FullEntry).locations[0]?.rootPath === undefined && (entry as FullLocationEntry).location.rootPath === undefined;
 }
 
 export interface ConfigurationEntry {

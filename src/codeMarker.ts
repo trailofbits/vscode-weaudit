@@ -18,11 +18,10 @@ import {
     FullPath,
     Location,
     FullLocation,
-    LocationEntry,
     FullLocationEntry,
-    isOldLocationEntry,
     isLocationEntry,
     isEntry,
+    isOldEntry,
     Repository,
     PathOrganizerEntry,
     createDefaultEntryDetails,
@@ -1789,38 +1788,58 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.workspaces.setupRepositories();
         });
 
-        vscode.commands.registerCommand("weAudit.openGithubIssue", (entry: Entry | LocationEntry) => {
-            const actualEntry: Entry = isOldLocationEntry(entry) ? entry.parentEntry : entry;
+        /**
+         * Open a github issue. Warning: this command is used by Sarif Explorer and should at least accept Entry types.
+         * Sarif explorer will always provide absolute paths as location paths, so it should be possible to find the corresponding workspace root.
+         *  */
+        vscode.commands.registerCommand("weAudit.openGithubIssue", (entry: Entry | FullEntry | FullLocationEntry) => {
+            let actualEntry: FullEntry;
+            if (isOldEntry(entry)) {
+                // This is the Sarif Explorer case. Location paths are absolute paths.
 
-            // First check that all locations are inside one of the workspace roots:
-            for (const loc of actualEntry.locations) {
-                const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
-                if (wsRoot === undefined) {
-                    vscode.window.showErrorMessage(`Failed to open a GitHub issue. The file ${loc.path} is not in any workspace root.`);
-                    return;
+                // First check that all locations are inside one of the workspace roots:
+                for (const loc of entry.locations) {
+                    const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                    if (wsRoot === undefined) {
+                        vscode.window.showErrorMessage(`Failed to open a GitHub issue. The file ${loc.path} is not in any workspace root.`);
+                        return;
+                    }
+                }
+
+                actualEntry = {
+                    label: entry.label,
+                    entryType: entry.entryType,
+                    author: entry.author,
+                    details: entry.details,
+                    locations: entry.locations.map((loc) => {
+                        // transform absolute paths to relative paths to the workspace path
+                        const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                        return {
+                            path: relativePath,
+                            startLine: loc.startLine,
+                            endLine: loc.endLine,
+                            label: loc.label,
+                            description: loc.description,
+                            rootPath: wsRoot!.rootPath, // We checked this in the earlier for loop
+                        } as FullLocation;
+                    }),
+                } as FullEntry;
+            } else {
+                // This is the weAudit internal case, entries are either FullEntry or FullLocationEntry
+                actualEntry = isLocationEntry(entry) ? entry.parentEntry : entry;
+
+                // First check that all locations are inside one of the workspace roots:
+                for (const loc of actualEntry.locations) {
+                    const fullPath = path.join(loc.rootPath, loc.path);
+                    const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.rootPath);
+                    if (wsRoot === undefined) {
+                        vscode.window.showErrorMessage(`Failed to open a GitHub issue. The file ${fullPath} is not in any workspace root.`);
+                        return;
+                    }
                 }
             }
 
-            const actualFullEntry = {
-                label: actualEntry.label,
-                entryType: actualEntry.entryType,
-                author: actualEntry.author,
-                details: actualEntry.details,
-                locations: actualEntry.locations.map((loc) => {
-                    // transform absolute paths to relative paths to the workspace path
-                    const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
-                    return {
-                        path: relativePath,
-                        startLine: loc.startLine,
-                        endLine: loc.endLine,
-                        label: loc.label,
-                        description: loc.description,
-                        rootPath: wsRoot!.rootPath, // We checked this in the earlier for loop
-                    } as FullLocation;
-                }),
-            } as FullEntry;
-
-            this.openGithubIssue(actualFullEntry);
+            this.openGithubIssue(actualEntry);
         });
 
         // This command takes a configuration file, toggles its current selection, and shows/hides the corresponding findings
@@ -1898,6 +1917,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.showMarkedFilesDayLog();
         });
 
+        // This command is only used by Sarif Explorer, which will provide a location with an absolute path
         vscode.commands.registerCommand("weAudit.getClientPermalink", (location: Location) => {
             const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(location.path);
             if (wsRoot === undefined) {
