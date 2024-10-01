@@ -1061,16 +1061,17 @@ class MultiRootManager {
         );
         // Add a listener for changes to the roots
         const listener = async (event: vscode.WorkspaceFoldersChangeEvent) => {
-            // Clear the pathToRootMap and pathToMultiRootMap, because this change may (un)curse the roots
-            this.pathToRootMap.clear();
-            this.pathToMultipleRootMap.clear();
-
             // Any removed or added roots will execute weAudit.toggleSavedFindings, which will cause a refresh
             // of the tree, and hence a recreation of the pathToEntryMap (which is important in case there is
             // only one workspace root left)
             for (const removed of event.removed) {
                 await this.removeRoot(removed.uri.fsPath);
             }
+
+            // Clear the pathToRootMap and pathToMultiRootMap after removing the roots,
+            // but before adding the new ones because this change may (un)curse the roots
+            this.pathToRootMap.clear();
+            this.pathToMultipleRootMap.clear();
 
             const newRootPathList = this.roots.map((root) => root.rootPath).concat(event.added.map((added) => added.uri.fsPath));
             const newRootPathsAndLabels = this.createUniqueLabels(newRootPathList);
@@ -1207,6 +1208,8 @@ class MultiRootManager {
      * @returns An array of current the current WARoot instances.
      */
     private setupRoots(): WARoot[] {
+        this.pathToRootMap.clear();
+        this.pathToMultipleRootMap.clear();
         const roots: WARoot[] = [];
         if (vscode.workspace.workspaceFolders === undefined) {
             return roots;
@@ -1455,17 +1458,48 @@ class MultiRootManager {
     /**
      * Given the `uri` of the current file, finds the corresponding workspace root and toggles the file as audited.
      * @param uri The `uri` of the current file.
-     * @returns A list of `uri`s to be decorated and the relative path of the input `uri` to its workspace root
+     * @returns A list of `uri`s to be decorated and a list of relevant usernames
      * (or `undefined` and "" if the `uri` is not in any workspace root.)
      */
-    toggleAudited(uri: vscode.Uri): [vscode.Uri[] | undefined, string] {
-        const [wsRoot, relativePath] = this.getCorrespondingRootAndPath(uri.fsPath);
-        if (wsRoot !== undefined) {
-            return wsRoot.toggleAudited(uri, relativePath);
-        } else {
-            vscode.window.showErrorMessage(`weAudit: Error adding a partially audited file. The file at ${uri.fsPath} is not in any workspace root.`);
+    toggleAudited(uri: vscode.Uri): [vscode.Uri[] | undefined, string[]] {
+        const [closestRoot, closestRelativePath, inMultipleRoots] = this.getCorrespondingRootAndPath(uri.fsPath);
+        if (closestRoot === undefined) {
+            vscode.window.showErrorMessage(`weAudit: Error marking a file as audited. The file at ${uri.fsPath} is not in any workspace root.`);
             // This file was not in any workspace root. No URIs to update.
-            return [undefined, ""];
+            return [undefined, []];
+        }
+
+        if (!inMultipleRoots) {
+            // Only in one workspace root: default behavior
+            const [urisToDecorate, relevantUsername] = closestRoot.toggleAudited(uri, closestRelativePath);
+            return [urisToDecorate, [relevantUsername]];
+        } else {
+            // In multiple workspace roots: stupid behavior
+            const allRootsAndPaths = this.getAllCorrespondingRootsAndPaths(uri.fsPath);
+            let isAudited = false;
+            const urisToDecorateMultiple: vscode.Uri[] = [];
+            const relevantUsernamesMultiple: string[] = [];
+
+            // Check if the file is audited anywhere and remove it from there
+            for (const [wsRoot, relativePath] of allRootsAndPaths) {
+                if (wsRoot.isAudited(relativePath)) {
+                    isAudited = true;
+                    const [urisToAdd, relevantUsernameToAdd] = wsRoot.toggleAudited(uri, relativePath);
+                    urisToDecorateMultiple.push(...urisToAdd);
+                    relevantUsernamesMultiple.push(relevantUsernameToAdd);
+                }
+            }
+
+            // If it was not audited anywhere, toggle it everywhere
+            if (!isAudited) {
+                for (const [wsRoot, relativePath] of allRootsAndPaths) {
+                    const [urisToAdd, relevantUsernameToAdd] = wsRoot.toggleAudited(uri, relativePath);
+                    urisToDecorateMultiple.push(...urisToAdd);
+                    relevantUsernamesMultiple.push(relevantUsernameToAdd);
+                }
+            }
+
+            return [urisToDecorateMultiple, relevantUsernamesMultiple];
         }
     }
 
@@ -2182,8 +2216,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
         const uri = editor.document.uri;
-        // get path relative to workspace
-        const [urisToDecorate, relevantUsername] = this.workspaces.toggleAudited(uri);
+
+        const [urisToDecorate, relevantUsernames] = this.workspaces.toggleAudited(uri);
         if (urisToDecorate !== undefined) {
             for (const uriToDecorate of urisToDecorate) {
                 this._onDidChangeFileDecorationsEmitter.fire(uriToDecorate);
@@ -2191,7 +2225,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
         // update decorations
         this.decorateWithUri(uri);
-        this.updateSavedData(relevantUsername);
+        for (const relevantUsername of relevantUsernames) {
+            this.updateSavedData(relevantUsername);
+        }
         this.refresh(uri);
     }
 
@@ -3137,27 +3173,45 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @returns the decoration for the file
      */
     provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
-        const [wsRoot, uriPath] = this.workspaces.getCorrespondingRootAndPath(uri.fsPath);
+        const [wsRoot, relativePath, inMultipleRoots] = this.workspaces.getCorrespondingRootAndPath(uri.fsPath);
 
         if (wsRoot === undefined) {
             return;
         }
 
         let hasFindings = false;
+        let isAudited = false;
+
+        const allRootsAndPaths: [WARoot, string][] = [];
+        if (!inMultipleRoots) {
+            // There is only one root, so we use it
+            allRootsAndPaths.push([wsRoot, relativePath]);
+        } else {
+            // There are multiple roots, we need to look up all of them
+            allRootsAndPaths.push(...this.workspaces.getAllCorrespondingRootsAndPaths(uri.fsPath));
+        }
 
         outer: for (const entry of this.treeEntries) {
             // if any of the locations is on this file, badge it
             if (entry.entryType === EntryType.Finding && entry.locations) {
                 for (const location of entry.locations) {
-                    if (location.path === uriPath && location.rootPath === wsRoot.rootPath) {
-                        hasFindings = true;
-                        break outer;
+                    for (const [wsRoot, relativePath] of allRootsAndPaths) {
+                        if (location.path === relativePath && location.rootPath === wsRoot.rootPath) {
+                            hasFindings = true;
+                            break outer;
+                        }
                     }
                 }
             }
         }
         // check if there is an entry for this file in the audited files
-        if (wsRoot.isAudited(uriPath)) {
+        for (const [wsRoot, relativePath] of allRootsAndPaths) {
+            if (wsRoot.isAudited(relativePath)) {
+                isAudited = true;
+            }
+        }
+
+        if (isAudited) {
             if (hasFindings) {
                 return {
                     badge: "✓!",
