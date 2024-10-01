@@ -127,7 +127,7 @@ class WARoot {
     /**
      * Loads the day log from storage.
      */
-    loadDayLogFromFile() {
+    loadDayLogFromFile(): void {
         const vscodeFolder = path.join(this.rootPath, ".vscode");
         if (!fs.existsSync(vscodeFolder)) {
             return;
@@ -143,7 +143,7 @@ class WARoot {
     /**
      * Loads the configurations (.weaudit files) from the .vscode folder.
      */
-    loadConfigurations() {
+    loadConfigurations(): void {
         this.configs = [];
         this.currentlySelectedConfigs = [];
         const vscodeFolder = path.join(this.rootPath, ".vscode");
@@ -1043,13 +1043,13 @@ class WARoot {
 class MultiRootManager {
     private roots: WARoot[];
     private _onDidChangeRootsEmitter = new vscode.EventEmitter<[WARoot[], WARoot[]]>();
-    private pathToRootMap: Map<string, [WARoot, string]>;
-    private labelMap: Map<string, number>;
+    private pathToRootMap: Map<string, [WARoot, string, boolean]>;
+    private pathToMultipleRootMap: Map<string, [WARoot, string][]>;
     readonly onDidChangeRoots = this._onDidChangeRootsEmitter.event;
 
     constructor(context: vscode.ExtensionContext) {
-        this.labelMap = new Map<string, number>();
-        this.pathToRootMap = new Map<string, [WARoot, string]>();
+        this.pathToRootMap = new Map<string, [WARoot, string, boolean]>();
+        this.pathToMultipleRootMap = new Map<string, [WARoot, string][]>();
         this.roots = this.setupRoots();
 
         // We tell the Git Config Webview about the roots
@@ -1061,8 +1061,9 @@ class MultiRootManager {
         );
         // Add a listener for changes to the roots
         const listener = async (event: vscode.WorkspaceFoldersChangeEvent) => {
-            // Clear the pathToRootMap, because this change may curse the roots
+            // Clear the pathToRootMap and pathToMultiRootMap, because this change may (un)curse the roots
             this.pathToRootMap.clear();
+            this.pathToMultipleRootMap.clear();
 
             // Any removed or added roots will execute weAudit.toggleSavedFindings, which will cause a refresh
             // of the tree, and hence a recreation of the pathToEntryMap (which is important in case there is
@@ -1215,7 +1216,6 @@ class MultiRootManager {
         for (const rootPathAndLabel of rootPathsAndLabels) {
             const root = new WARoot(rootPathAndLabel.rootPath, rootPathAndLabel.rootLabel);
             roots.push(root);
-            this.pathToRootMap.set(root.rootPath, [root, ""]);
         }
 
         return roots;
@@ -1336,11 +1336,11 @@ class MultiRootManager {
     /**
      * Checks whether the following path is contained in any of the current workspace roots.
      * @param path The absolute path to be checked.
-     * @returns A tuple containing the corresponding WARoot if it exists (undefined otherwise)
-     * and a string with the relative path to this root folder ("" otherwise). If the path is
-     * in multiple workspace roots, the closest is returned.
+     * @returns A triple containing the corresponding WARoot if it exists (undefined otherwise),
+     * a string with the relative path to this root folder ("" otherwise), and a boolean stating
+     * whether the path is in multiple workspace roots. If so, the path to the closest root is returned.
      */
-    getCorrespondingRootAndPath(path: string): [WARoot | undefined, string] {
+    getCorrespondingRootAndPath(path: string): [WARoot | undefined, string, boolean] {
         const cached = this.pathToRootMap.get(path);
         if (cached !== undefined) {
             return cached;
@@ -1351,25 +1351,53 @@ class MultiRootManager {
         // This corresponds to the shortest relative path.
         let currentBest: [WARoot | undefined, string] = [undefined, ""];
         let currentDistance = -1;
+        let inMultipleRoots = false;
         for (const root of this.roots) {
             const [inWS, relativePath] = root.isInThisWorkspaceRoot(path);
             if (inWS) {
                 if (currentBest[0] === undefined) {
                     currentBest = [root, relativePath];
                     currentDistance = relativePath.length;
-                    this.pathToRootMap.set(path, [root, relativePath]);
+                    this.pathToRootMap.set(path, [root, relativePath, false]);
                 } else {
                     console.log("Path is present in multiple workspace roots.");
+                    inMultipleRoots = true;
                     if (relativePath.length < currentDistance) {
                         currentBest = [root, relativePath];
                         currentDistance = relativePath.length;
-                        this.pathToRootMap.set(path, [root, relativePath]);
+                        this.pathToRootMap.set(path, [root, relativePath, true]);
                     }
                 }
             }
         }
+        return [...currentBest, inMultipleRoots];
+    }
 
-        return currentBest;
+    /**
+     * Returns all workspace roots that contain this path. This function only exists to deal
+     * with the deeply cursed scenario when a user adds workspace roots that are contained in
+     * other workspace roots.
+     * @param path The absolute path to be checked.
+     * @returns A an array of tuples containing a WARoot and a string with the relative path
+     * to that root folder.
+     */
+    getAllCorrespondingRootsAndPaths(path: string): [WARoot, string][] {
+        const cached = this.pathToMultipleRootMap.get(path);
+        if (cached !== undefined) {
+            return cached;
+        }
+
+        const correspondingRootsAndPaths: [WARoot, string][] = [];
+
+        for (const root of this.roots) {
+            const [inWS, relativePath] = root.isInThisWorkspaceRoot(path);
+            if (inWS) {
+                correspondingRootsAndPaths.push([root, relativePath]);
+            }
+        }
+
+        this.pathToMultipleRootMap.set(path, correspondingRootsAndPaths);
+        return correspondingRootsAndPaths;
     }
 
     /**
@@ -3180,13 +3208,20 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (editor === undefined) {
             return;
         }
-        const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(editor.document.fileName);
+        const [wsRoot, relativePath, inMultipleRoots] = this.workspaces.getCorrespondingRootAndPath(editor.document.fileName);
 
         if (wsRoot === undefined || relativePath === undefined) {
             return;
         }
 
-        const fname = relativePath;
+        const allRootsAndPaths: [WARoot, string][] = [];
+        if (!inMultipleRoots) {
+            // There is only one root, so we use it
+            allRootsAndPaths.push([wsRoot, relativePath]);
+        } else {
+            // There are multiple roots, we need to look up all of them
+            allRootsAndPaths.push(...this.workspaces.getAllCorrespondingRootsAndPaths(editor.document.fileName));
+        }
 
         const ownDecorations: vscode.Range[] = [];
         const otherDecorations: vscode.Range[] = [];
@@ -3201,24 +3236,26 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
             // decorate additional locations for that entry
             for (const location of treeItem.locations) {
-                if (location.path !== fname || location.rootPath !== wsRoot.rootPath) {
-                    continue;
-                }
-                const range = new vscode.Range(location.startLine, 0, location.endLine, Number.MAX_SAFE_INTEGER);
-                if (treeItem.entryType === EntryType.Finding) {
-                    findingDecoration.push(range);
-                } else if (treeItem.entryType === EntryType.Note) {
-                    noteDecoration.push(range);
-                }
-                // add the author information
-                const extraLabel = isOwnEntry ? "(you)" : "(" + treeItem.author + ")";
-                const labelString =
-                    treeItem.label === location.label ? `${treeItem.label}  ${extraLabel}` : `${treeItem.label} ${location.label}  ${extraLabel}`;
+                for (const [wsRoot, fname] of allRootsAndPaths) {
+                    if (location.path !== fname || location.rootPath !== wsRoot.rootPath) {
+                        continue;
+                    }
+                    const range = new vscode.Range(location.startLine, 0, location.endLine, Number.MAX_SAFE_INTEGER);
+                    if (treeItem.entryType === EntryType.Finding) {
+                        findingDecoration.push(range);
+                    } else if (treeItem.entryType === EntryType.Note) {
+                        noteDecoration.push(range);
+                    }
+                    // add the author information
+                    const extraLabel = isOwnEntry ? "(you)" : "(" + treeItem.author + ")";
+                    const labelString =
+                        treeItem.label === location.label ? `${treeItem.label}  ${extraLabel}` : `${treeItem.label} ${location.label}  ${extraLabel}`;
 
-                labelDecorations.push(labelAfterFirstLineTextDecoration(location.startLine, labelString));
+                    labelDecorations.push(labelAfterFirstLineTextDecoration(location.startLine, labelString));
 
-                const afterLineRange = new vscode.Range(location.startLine, Number.MAX_SAFE_INTEGER, location.startLine, Number.MAX_SAFE_INTEGER);
-                labelDecorations.push(hoverOnLabel(afterLineRange, treeItem.label));
+                    const afterLineRange = new vscode.Range(location.startLine, Number.MAX_SAFE_INTEGER, location.startLine, Number.MAX_SAFE_INTEGER);
+                    labelDecorations.push(hoverOnLabel(afterLineRange, treeItem.label));
+                }
             }
         }
 
@@ -3231,13 +3268,16 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // check if editor is audited, and mark it as such
         let range: vscode.Range[] = [];
-        if (wsRoot.isAudited(fname)) {
-            range = [new vscode.Range(0, 0, editor.document.lineCount, 0)];
+        const partiallyAuditedFiles: PartiallyAuditedFile[] = [];
+        for (const [wsRoot, fname] of allRootsAndPaths) {
+            if (wsRoot.isAudited(fname)) {
+                range = [new vscode.Range(0, 0, editor.document.lineCount, 0)];
+            }
+            partiallyAuditedFiles.push(...wsRoot.getPartiallyAudited().filter((entry) => entry.path === fname));
         }
 
         // check if editor is partially audited, and mark locations as such
-        const partiallyAuditedRanges = wsRoot.getPartiallyAudited().filter((entry) => entry.path === fname);
-        const partiallyAuditedDecorations = partiallyAuditedRanges.map((r) => new vscode.Range(r.startLine, 0, r.endLine, 0));
+        const partiallyAuditedDecorations = partiallyAuditedFiles.map((r) => new vscode.Range(r.startLine, 0, r.endLine, 0));
         editor.setDecorations(this.decorationManager.auditedFileDecorationType, range.concat(partiallyAuditedDecorations));
     }
 
