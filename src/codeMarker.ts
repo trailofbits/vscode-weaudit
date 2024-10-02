@@ -1793,7 +1793,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
          * Sarif explorer will always provide absolute paths as location paths, so it should be possible to find the corresponding workspace root.
          *  */
         vscode.commands.registerCommand("weAudit.openGithubIssue", (entry: Entry | FullEntry | FullLocationEntry) => {
-            let actualEntry: FullEntry;
+            let actualEntries: FullEntry[];
             if (isOldEntry(entry)) {
                 // This is the Sarif Explorer case. Location paths are absolute paths.
 
@@ -1806,27 +1806,31 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     }
                 }
 
-                actualEntry = {
-                    label: entry.label,
-                    entryType: entry.entryType,
-                    author: entry.author,
-                    details: entry.details,
-                    locations: entry.locations.map((loc) => {
-                        // transform absolute paths to relative paths to the workspace path
-                        const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
-                        return {
-                            path: relativePath,
-                            startLine: loc.startLine,
-                            endLine: loc.endLine,
-                            label: loc.label,
-                            description: loc.description,
-                            rootPath: wsRoot!.rootPath, // We checked this in the earlier for loop
-                        } as FullLocation;
-                    }),
-                } as FullEntry;
+                const splitEntries = this.splitLocationsFromEntry(entry);
+                actualEntries = splitEntries.map(
+                    (entry) =>
+                        ({
+                            label: entry.label,
+                            entryType: entry.entryType,
+                            author: entry.author,
+                            details: entry.details,
+                            locations: entry.locations.map((loc) => {
+                                // transform absolute paths to relative paths to the workspace path
+                                const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                                return {
+                                    path: relativePath,
+                                    startLine: loc.startLine,
+                                    endLine: loc.endLine,
+                                    label: loc.label,
+                                    description: loc.description,
+                                    rootPath: wsRoot!.rootPath, // We checked this in the earlier for loop
+                                } as FullLocation;
+                            }),
+                        }) as FullEntry,
+                );
             } else {
                 // This is the weAudit internal case, entries are either FullEntry or FullLocationEntry
-                actualEntry = isLocationEntry(entry) ? entry.parentEntry : entry;
+                const actualEntry = isLocationEntry(entry) ? entry.parentEntry : entry;
 
                 // First check that all locations are inside one of the workspace roots:
                 for (const loc of actualEntry.locations) {
@@ -1837,9 +1841,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                         return;
                     }
                 }
+
+                actualEntries = [actualEntry];
             }
 
-            this.openGithubIssue(actualEntry);
+            for (const actualEntry of actualEntries) {
+                this.openGithubIssue(actualEntry);
+            }
         });
 
         // This command takes a configuration file, toggles its current selection, and shows/hides the corresponding findings
@@ -1893,30 +1901,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             const entriesToPush: Entry[] = [];
 
             results.forEach((result, ind) => {
-                const allRoots: Set<WARoot> = new Set(
-                    result.locations.map((loc) => {
-                        const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(loc.path);
-                        return wsRoot!;
-                    }),
-                );
+                const splitEntries = this.splitLocationsFromEntry(result);
 
-                if (allRoots.size > 1) {
+                // If it contains only one entry, there was nothing to split
+                if (splitEntries.length > 1) {
                     indicesToRemove.push(ind);
-                    for (const root of allRoots) {
-                        const newLocations = result.locations.filter((loc) => {
-                            const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(loc.path);
-                            return root === wsRoot;
-                        });
-                        const newEntry = {
-                            label: result.label,
-                            entryType: result.entryType,
-                            author: result.author,
-                            details: result.details,
-                            locations: newLocations,
-                        } as Entry;
-
-                        entriesToPush.push(newEntry);
-                    }
+                    entriesToPush.push(...splitEntries);
                 }
             });
 
@@ -2095,24 +2085,43 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     /**
-     * Transforms a relative or absolute path in a normalized path relative to the path of a workspace root.
-     * @param _path the path to transform
-     * @param _rootPath the root path to be used to relativize the target path
-     * @returns the normalized path relative to the path of a workspace root
-     * @throws an error if the path is not in the workspace
+     * When Sarif Explorer provides entries, it does not know anything about workspace roots.
+     * So the locations inside the entries can correspond to multiple workspace roots.
+     * This function splits out entries into one entry per workspace root.
+     * @param entry The entry provided by Sarif Explorer
+     * @returns An array containing one entry per workspace root in the locations of the original entry
      */
-    private relativizePath(_path: string, _rootPath: string): string {
-        _path = path.normalize(_path);
+    splitLocationsFromEntry(entry: Entry): Entry[] {
+        const splitEntries: Entry[] = [];
 
-        if (path.isAbsolute(_path)) {
-            _path = path.relative(_rootPath, _path);
+        const allRoots: Set<WARoot> = new Set(
+            entry.locations.map((loc) => {
+                const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                return wsRoot!;
+            }),
+        );
+
+        if (allRoots.size > 1) {
+            for (const root of allRoots) {
+                const newLocations = entry.locations.filter((loc) => {
+                    const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                    return root === wsRoot;
+                });
+                const newEntry = {
+                    label: entry.label,
+                    entryType: entry.entryType,
+                    author: entry.author,
+                    details: entry.details,
+                    locations: newLocations,
+                } as Entry;
+
+                splitEntries.push(newEntry);
+            }
+        } else {
+            splitEntries.push(entry);
         }
 
-        if (_path.startsWith("..")) {
-            throw new Error(`The file ${_path} is not in the workspace (${_rootPath}).`);
-        }
-
-        return _path;
+        return splitEntries;
     }
 
     externallyLoadFindings(entries: FullEntry[]): void {

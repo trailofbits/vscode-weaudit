@@ -527,7 +527,7 @@ export function isEntry(treeEntry: TreeEntry): treeEntry is FullEntry {
  * Type predicate for backwards compatibility purposes
  */
 export function isOldEntry(entry: Entry | FullEntry | FullLocationEntry): entry is Entry {
-    return (entry as FullEntry).locations[0]?.rootPath === undefined && (entry as FullLocationEntry).location.rootPath === undefined;
+    return (entry as FullEntry).locations[0]?.rootPath === undefined && (entry as FullLocationEntry).location?.rootPath === undefined;
 }
 
 export interface ConfigurationEntry {
