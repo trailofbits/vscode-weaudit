@@ -2134,12 +2134,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             // If we have a similar entry (same author and title) in tree entries, modify the existing entry
             let foundSimilarEntry = false;
             for (const e of this.treeEntries) {
-                if (e.author === entry.author && e.label === entry.label) {
+                if (e.author === entry.author && e.label === entry.label && e.locations[0]?.rootPath === entry.locations[0]?.rootPath) {
                     // We do not update the details because these may have been modified by the user
                     // We do not remove locations; we only add the ones that are missing
                     for (const loc of entry.locations) {
                         const idx = e.locations.findIndex((l) => l.path === loc.path && l.startLine === loc.startLine && l.endLine === loc.endLine);
-                        if (idx === -1 && e.locations[0]?.rootPath === loc.rootPath) {
+                        if (idx === -1) {
                             e.locations.push(loc);
                         }
                     }
