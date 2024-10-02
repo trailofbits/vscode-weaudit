@@ -1530,12 +1530,12 @@ class MultiRootManager {
      * Gives the merged marked files by daily log for all roots.
      * The paths are all extended to full.
      */
-    getMarkedFilesDayLog(): Map<string, FullPath[]> {
-        const mergedMarkedFilesDayLog: Map<string, FullPath[]> = new Map<string, FullPath[]>();
+    getMarkedFilesDayLog(): Map<string, [FullPath, string][]> {
+        const mergedMarkedFilesDayLog: Map<string, [FullPath, string][]> = new Map<string, [FullPath, string][]>();
         for (const root of this.roots) {
             root.markedFilesDayLog.forEach((value, key) => {
                 const currentValue = mergedMarkedFilesDayLog.get(key);
-                const updateValue = value.map((path) => ({ rootPath: root.rootPath, path: path }) as FullPath);
+                const updateValue = value.map((path) => [{ rootPath: root.rootPath, path: path } as FullPath, root.getRootLabel()] as [FullPath, string]);
                 if (currentValue === undefined) {
                     mergedMarkedFilesDayLog.set(key, updateValue);
                 } else {
@@ -1876,6 +1876,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.workspaces.updateGitConfig(rootPath, clientRemote, auditRemote, gitSha);
         });
 
+        // This command is used by Sarif Explorer and requires to accept Entry for backwards compatibility
         vscode.commands.registerCommand("weAudit.externallyLoadFindings", (results: Entry[]) => {
             // First check that all locations are inside one of the workspace roots:
             for (const result of results) {
@@ -1887,6 +1888,43 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     }
                 }
             }
+
+            const indicesToRemove: number[] = [];
+            const entriesToPush: Entry[] = [];
+
+            results.forEach((result, ind) => {
+                const allRoots: Set<WARoot> = new Set(
+                    result.locations.map((loc) => {
+                        const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                        return wsRoot!;
+                    }),
+                );
+
+                if (allRoots.size > 1) {
+                    indicesToRemove.push(ind);
+                    for (const root of allRoots) {
+                        const newLocations = result.locations.filter((loc) => {
+                            const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                            return root === wsRoot;
+                        });
+                        const newEntry = {
+                            label: result.label,
+                            entryType: result.entryType,
+                            author: result.author,
+                            details: result.details,
+                            locations: newLocations,
+                        } as Entry;
+
+                        entriesToPush.push(newEntry);
+                    }
+                }
+            });
+
+            for (const index of indicesToRemove.reverse()) {
+                results.splice(index, 1);
+            }
+
+            results.push(...entriesToPush);
 
             const fullResults = results.map(
                 (entry) =>
@@ -2284,11 +2322,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         for (const [date, files] of sortedDates) {
             if (files && files.length > 0) {
                 let filesString = `## ${date}\n - `;
-                filesString += files.map((fullPath) => fullPath.path).join("\n - ");
+                filesString += files.map(([fullPath, rootLabel]) => path.join(rootLabel, fullPath.path)).join("\n - ");
                 logString += `${filesString}\n\n`;
 
                 // count the LOC per day
-                const fullPaths = files.map((fullPath) => path.join(fullPath.rootPath, fullPath.path));
+                const fullPaths = files.map(([fullPath]) => path.join(fullPath.rootPath, fullPath.path));
                 const wcProc = spawnSync("wc", ["-l", ...fullPaths]);
                 const output = wcProc.output[1]!;
                 // wc outputs a final total line.
