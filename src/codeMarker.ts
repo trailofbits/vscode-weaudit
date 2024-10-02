@@ -2139,7 +2139,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     // We do not remove locations; we only add the ones that are missing
                     for (const loc of entry.locations) {
                         const idx = e.locations.findIndex((l) => l.path === loc.path && l.startLine === loc.startLine && l.endLine === loc.endLine);
-                        if (idx === -1) {
+                        if (idx === -1 && e.locations[0]?.rootPath === loc.rootPath) {
                             e.locations.push(loc);
                         }
                     }
