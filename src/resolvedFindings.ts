@@ -1,42 +1,40 @@
 import * as vscode from "vscode";
 import * as path from "path";
 
-import { Entry, EntryType } from "./types";
+import { FullEntry, EntryType } from "./types";
 
-export class ResolvedEntriesTree implements vscode.TreeDataProvider<Entry> {
-    private resolvedEntries: Entry[];
-    private workspacePath: string;
+export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
+    private resolvedEntries: FullEntry[];
 
-    private _onDidChangeTreeDataEmitter = new vscode.EventEmitter<Entry | undefined | void>();
+    private _onDidChangeTreeDataEmitter = new vscode.EventEmitter<FullEntry | undefined | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeDataEmitter.event;
 
     refresh(): void {
         this._onDidChangeTreeDataEmitter.fire();
     }
 
-    constructor(resolvedEntries: Entry[]) {
+    constructor(resolvedEntries: FullEntry[]) {
         this.resolvedEntries = resolvedEntries;
-        this.workspacePath = vscode.workspace.workspaceFolders![0].uri.fsPath;
     }
 
-    setResolvedEntries(entries: Entry[]): void {
+    setResolvedEntries(entries: FullEntry[]): void {
         this.resolvedEntries = entries;
         this.refresh();
     }
 
     // tree data provider
-    getChildren(element?: Entry): Entry[] {
+    getChildren(element?: FullEntry): FullEntry[] {
         if (element === undefined) {
             return this.resolvedEntries;
         }
         return [];
     }
 
-    getParent(_element: Entry): undefined {
+    getParent(_element: FullEntry): undefined {
         return undefined;
     }
 
-    getTreeItem(entry: Entry): vscode.TreeItem {
+    getTreeItem(entry: FullEntry): vscode.TreeItem {
         const label = entry.label;
         const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
         if (entry.entryType === EntryType.Note) {
@@ -48,7 +46,7 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<Entry> {
         treeItem.command = {
             command: "weAudit.openFileLines",
             title: "Open File",
-            arguments: [vscode.Uri.file(path.join(this.workspacePath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
+            arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
         };
 
         treeItem.description = path.basename(mainLocation.path);
@@ -61,7 +59,7 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<Entry> {
 export class ResolvedEntries {
     private treeDataProvider: ResolvedEntriesTree;
 
-    constructor(context: vscode.ExtensionContext, resolvedEntries: Entry[]) {
+    constructor(context: vscode.ExtensionContext, resolvedEntries: FullEntry[]) {
         this.treeDataProvider = new ResolvedEntriesTree(resolvedEntries);
 
         vscode.window.onDidChangeActiveColorTheme(() => this.treeDataProvider.refresh());
@@ -74,7 +72,7 @@ export class ResolvedEntries {
         this.treeDataProvider.refresh();
     }
 
-    public setResolvedEntries(entries: Entry[]): void {
+    public setResolvedEntries(entries: FullEntry[]): void {
         this.treeDataProvider.setResolvedEntries(entries);
         this.refresh();
     }

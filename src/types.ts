@@ -84,6 +84,21 @@ export interface SerializedData {
 }
 
 /**
+ * This object is a representation of the codeMarker class without circular references between objects.
+ * This is used when deserializing the data with JSON.parse.
+ */
+export interface FullSerializedData {
+    clientRemote: string;
+    gitRemote: string;
+    gitSha: string;
+    treeEntries: FullEntry[];
+    auditedFiles: AuditedFile[];
+    // older versions do not have partiallyAuditedFiles
+    partiallyAuditedFiles?: PartiallyAuditedFile[];
+    resolvedEntries: FullEntry[];
+}
+
+/**
  * Creates a default serialized data object.
  */
 export function createDefaultSerializedData(): SerializedData {
@@ -228,6 +243,15 @@ export interface Location {
 }
 
 /**
+ * A location in a file that also includes the corresponding root.
+ * This is needed for multi-root workspace support.
+ */
+export interface FullLocation extends Location {
+    /** The absolute path to the (multi-)root*/
+    rootPath: string;
+}
+
+/**
  * Represents an entry in the finding tree.
  */
 export interface Entry {
@@ -248,11 +272,29 @@ export interface Entry {
 }
 
 /**
+ * An entry that also includes the path to the corresponding roots.
+ * This is needed for multi-root workspace support.
+ */
+export interface FullEntry extends Entry {
+    /** Locations including the root*/
+    locations: FullLocation[];
+}
+
+/**
  * A location entry
  */
 export interface LocationEntry {
     location: Location;
     parentEntry: Entry;
+}
+
+/**
+ * A location entry that includes paths to the corresponding roots.
+ * This is needed for multi-root workspace support.
+ */
+export interface FullLocationEntry extends LocationEntry {
+    location: FullLocation;
+    parentEntry: FullEntry;
 }
 
 /**
@@ -262,6 +304,22 @@ export interface PathOrganizerEntry {
     pathLabel: string;
 }
 
+/**
+ * A full path that includes the absolute path to the workspace root
+ * and the relative path to the file included in the root.
+ */
+export interface FullPath {
+    rootPath: string;
+    path: string;
+}
+
+/**
+ * A tuple containing a root path and a unique label for that root path
+ */
+export interface RootPathAndLabel {
+    rootPath: string;
+    rootLabel: string;
+}
 /**
  * Creates a PathOrganizer entry.
  * @param path the path of the file
@@ -274,9 +332,10 @@ export function createPathOrganizer(path: string): PathOrganizerEntry {
 /**
  * Creates an additional location entry.
  * @param location the location of the entry
+ * @param parentEntry the parent of this entry
  * @returns the additional location entry
  */
-export function createLocationEntry(location: Location, parentEntry: Entry): LocationEntry {
+export function createLocationEntry(location: FullLocation, parentEntry: FullEntry): FullLocationEntry {
     return { location: location, parentEntry: parentEntry };
 }
 
@@ -442,24 +501,55 @@ export function treeViewModeLabel(mode: TreeViewMode): string {
 /**
  * TreeEntry union type.
  * This is used to represent the tree entries in the finding tree.
- * - Entry: a finding or a note, are used when there is a single location
- * - LocationEntry: are used to represent additional locations
+ * - FullEntry: a finding or a note, are used when there is a single location
+ * - FullLocationEntry: are used to represent additional locations
  * - PathOrganizerEntry: a path organizer, used to organize the findings by file
  */
-export type TreeEntry = Entry | LocationEntry | PathOrganizerEntry;
+export type TreeEntry = FullEntry | FullLocationEntry | PathOrganizerEntry;
 
 /**
  * Type predicates for the TreeEntry union type.
  * https://www.typescriptlang.org/docs/handbook/2/narrowing.html#using-type-predicates
  */
-export function isLocationEntry(treeEntry: TreeEntry): treeEntry is LocationEntry {
-    return (treeEntry as LocationEntry).parentEntry !== undefined;
+export function isLocationEntry(treeEntry: TreeEntry): treeEntry is FullLocationEntry {
+    return (treeEntry as FullLocationEntry).parentEntry !== undefined;
 }
 
 export function isPathOrganizerEntry(treeEntry: TreeEntry): treeEntry is PathOrganizerEntry {
     return (treeEntry as PathOrganizerEntry).pathLabel !== undefined;
 }
 
-export function isEntry(treeEntry: TreeEntry): treeEntry is Entry {
-    return (treeEntry as Entry).entryType !== undefined;
+export function isEntry(treeEntry: TreeEntry): treeEntry is FullEntry {
+    return (treeEntry as FullEntry).entryType !== undefined;
+}
+
+/**
+ * Type predicate for backwards compatibility purposes
+ */
+export function isOldEntry(entry: Entry | FullEntry | FullLocationEntry): entry is Entry {
+    return (entry as FullEntry).locations[0]?.rootPath === undefined && (entry as FullLocationEntry).location?.rootPath === undefined;
+}
+
+export interface ConfigurationEntry {
+    path: string;
+    username: string;
+    root: WorkspaceRootEntry;
+}
+
+export interface WorkspaceRootEntry {
+    label: string;
+}
+
+export type ConfigTreeEntry = ConfigurationEntry | WorkspaceRootEntry;
+
+export function isConfigurationEntry(treeEntry: ConfigTreeEntry): treeEntry is ConfigurationEntry {
+    return (treeEntry as ConfigurationEntry).username !== undefined;
+}
+
+export function isWorkspaceRootEntry(treeEntry: ConfigTreeEntry): treeEntry is WorkspaceRootEntry {
+    return (treeEntry as WorkspaceRootEntry).label !== undefined;
+}
+
+export function configEntryEquals(a: ConfigurationEntry, b: ConfigurationEntry): boolean {
+    return a.path === b.path && a.username === b.username && a.root.label === b.root.label;
 }
