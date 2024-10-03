@@ -1025,7 +1025,7 @@ class WARoot {
      * @param auditRemote The audit remote to be configured.
      * @param gitSha The git SHA digest to be configured.
      */
-    updateGitConfig(clientRemote: string, auditRemote: string, gitSha: string) {
+    updateGitConfig(clientRemote: string, auditRemote: string, gitSha: string): void {
         this.clientRemote = clientRemote;
         this.gitRemote = auditRemote;
         this.gitSha = gitSha;
@@ -1059,7 +1059,7 @@ class MultiRootManager {
             this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
         );
         // Add a listener for changes to the roots
-        const listener = async (event: vscode.WorkspaceFoldersChangeEvent) => {
+        const listener = async (event: vscode.WorkspaceFoldersChangeEvent): Promise<void> => {
             // Any removed or added roots will execute weAudit.toggleSavedFindings, which will cause a refresh
             // of the tree, and hence a recreation of the pathToEntryMap (which is important in case there is
             // only one workspace root left)
