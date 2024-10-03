@@ -203,7 +203,7 @@ export interface EntryDetails {
  * Creates a default entry details object.
  * @returns the default entry details object
  */
-export function createDefaultEntryDetails() {
+export function createDefaultEntryDetails(): EntryDetails {
     return {
         severity: FindingSeverity.Undefined,
         difficulty: FindingDifficulty.Undefined,
@@ -376,7 +376,7 @@ export function getEntryIndexFromArray(entry: Entry, array: Entry[]): number {
     return -1;
 }
 
-export function mergeTwoEntryArrays(a: Entry[], b: Entry[]) {
+export function mergeTwoEntryArrays(a: Entry[], b: Entry[]): Entry[] {
     // merge two arrays of entries
     // without duplicates
     const result: Entry[] = a;
