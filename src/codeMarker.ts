@@ -249,7 +249,13 @@ class WARoot {
      * Saves the client's remote repository to the current user's file
      */
     persistClientRemote(): void {
-        vscode.commands.executeCommand("weAudit.setGitConfigView", [this.rootPath, this.rootLabel], this.clientRemote, this.gitRemote, this.gitSha);
+        vscode.commands.executeCommand(
+            "weAudit.setGitConfigView",
+            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            this.clientRemote,
+            this.gitRemote,
+            this.gitSha,
+        );
         const vscodeFolder = path.join(this.rootPath, ".vscode");
         // create .vscode folder if it doesn't exist
         if (!fs.existsSync(vscodeFolder)) {
@@ -281,7 +287,13 @@ class WARoot {
      * Saves the audit remote repository to the current user's file
      */
     persistAuditRemote(): void {
-        vscode.commands.executeCommand("weAudit.setGitConfigView", [this.rootPath, this.rootLabel], this.clientRemote, this.gitRemote, this.gitSha);
+        vscode.commands.executeCommand(
+            "weAudit.setGitConfigView",
+            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            this.clientRemote,
+            this.gitRemote,
+            this.gitSha,
+        );
         const vscodeFolder = path.join(this.rootPath, ".vscode");
         // create .vscode folder if it doesn't exist
         if (!fs.existsSync(vscodeFolder)) {
@@ -313,7 +325,13 @@ class WARoot {
      * Saves the relevant git hash to the current user's file
      */
     persistGitHash(): void {
-        vscode.commands.executeCommand("weAudit.setGitConfigView", [this.rootPath, this.rootLabel], this.clientRemote, this.gitRemote, this.gitSha);
+        vscode.commands.executeCommand(
+            "weAudit.setGitConfigView",
+            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            this.clientRemote,
+            this.gitRemote,
+            this.gitSha,
+        );
         const vscodeFolder = path.join(this.rootPath, ".vscode");
         // create .vscode folder if it doesn't exist
         if (!fs.existsSync(vscodeFolder)) {

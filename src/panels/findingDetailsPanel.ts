@@ -5,7 +5,7 @@ import { getUri } from "../utilities/getUri";
 import { EntryDetails } from "../types";
 import { WebviewMessage } from "../webview/webviewMessageTypes";
 
-export function activateFindingDetailsWebview(context: vscode.ExtensionContext) {
+export function activateFindingDetailsWebview(context: vscode.ExtensionContext): void {
     const provider = new FindingDetailsProvider(context.extensionUri);
 
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(FindingDetailsProvider.viewType, provider));
@@ -19,7 +19,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
 
     constructor(private readonly _extensionUri: vscode.Uri) {}
 
-    public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken) {
+    public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken): void {
         this._view = webviewView;
 
         webviewView.webview.options = {
@@ -57,7 +57,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         });
     }
 
-    private _getHtmlForWebview(webview: vscode.Webview) {
+    private _getHtmlForWebview(webview: vscode.Webview): string {
         // Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
         const styleUri = getUri(webview, this._extensionUri, ["media", "style.css"]);
         const webviewUri = getUri(webview, this._extensionUri, ["out", "findingDetailsWebview.js"]);
@@ -88,7 +88,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         `;
     }
 
-    private _setWebviewMessageListener(webview: vscode.Webview) {
+    private _setWebviewMessageListener(webview: vscode.Webview): void {
         webview.onDidReceiveMessage(
             (message: WebviewMessage) => {
                 const command = message.command;
@@ -105,6 +105,6 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
     }
 }
 
-function getNonce() {
+function getNonce(): string {
     return crypto.randomBytes(16).toString("base64");
 }

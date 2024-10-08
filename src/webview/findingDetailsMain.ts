@@ -15,7 +15,7 @@ const vscode = acquireVsCodeApi();
 // or toolkit components
 window.addEventListener("load", main);
 
-function main() {
+function main(): void {
     const titleField = document.getElementById("label-area") as TextField;
     titleField?.addEventListener("change", handlePersistentFieldChange);
 

@@ -26,7 +26,7 @@ export class DecorationManager {
         this.auditedFileDecorationType = this.loadAuditedDecorationConfiguration();
     }
 
-    private createDecorationTypeWithString(color: string) {
+    private createDecorationTypeWithString(color: string): vscode.TextEditorDecorationType {
         return vscode.window.createTextEditorDecorationType({
             isWholeLine: true,
             backgroundColor: color,
@@ -37,31 +37,31 @@ export class DecorationManager {
         });
     }
 
-    private loadOwnDecorationConfiguration() {
+    private loadOwnDecorationConfiguration(): vscode.TextEditorDecorationType {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const color: string = vscode.workspace.getConfiguration("weAudit").get("ownFindingColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
-    private loadOtherDecorationConfiguration() {
+    private loadOtherDecorationConfiguration(): vscode.TextEditorDecorationType {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const color: string = vscode.workspace.getConfiguration("weAudit").get("otherFindingColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
-    private loadOwnNoteDecorationConfiguration() {
+    private loadOwnNoteDecorationConfiguration(): vscode.TextEditorDecorationType {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const color: string = vscode.workspace.getConfiguration("weAudit").get("ownNoteColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
-    private loadOtherNoteDecorationConfiguration() {
+    private loadOtherNoteDecorationConfiguration(): vscode.TextEditorDecorationType {
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const color: string = vscode.workspace.getConfiguration("weAudit").get("otherNoteColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
-    private loadAuditedDecorationConfiguration() {
+    private loadAuditedDecorationConfiguration(): vscode.TextEditorDecorationType {
         return vscode.window.createTextEditorDecorationType({
             isWholeLine: true,
             backgroundColor: vscode.workspace.getConfiguration("weAudit").get("auditedColor"),
@@ -72,7 +72,7 @@ export class DecorationManager {
      * Reload all decoration configurations.
      * TODO: make it possible to reload only one decoration type
      */
-    public reloadAllDecorationConfigurations() {
+    public reloadAllDecorationConfigurations(): void {
         // dispose old decoration types. This is necessary to clean up old decoration types,
         // otherwise they would be left over and we wouldn't be able to remove them.
         this.ownFindingDecorationType.dispose();
