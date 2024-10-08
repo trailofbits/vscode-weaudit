@@ -54,7 +54,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         });
     }
 
-    findAndLoadConfigurationFiles() {
+    findAndLoadConfigurationFiles(): void {
         this.configurationEntries = [];
         this.rootEntries = [];
         for (const rootPathAndLabel of this.rootPathsAndLabels) {

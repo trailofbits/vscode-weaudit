@@ -14,7 +14,7 @@ const vscode = acquireVsCodeApi();
 // or toolkit components
 window.addEventListener("load", main);
 
-function main() {
+function main(): void {
     const rootDropdown = document.getElementById("workspace-root-list-dropdown") as Dropdown;
     rootDropdown?.addEventListener("change", handleDropdownChange);
 

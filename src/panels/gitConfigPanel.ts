@@ -5,7 +5,7 @@ import { getUri } from "../utilities/getUri";
 import { WebviewMessage, UpdateRepositoryMessage, SetWorkspaceRootsMessage } from "../webview/webviewMessageTypes";
 import { RootPathAndLabel } from "../types";
 
-export function activateGitConfigWebview(context: vscode.ExtensionContext) {
+export function activateGitConfigWebview(context: vscode.ExtensionContext): void {
     const provider = new GitConfigProvider(context.extensionUri);
 
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(GitConfigProvider.viewType, provider));
@@ -77,7 +77,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
         });
     }
 
-    public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken) {
+    public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken): void {
         this._view = webviewView;
 
         webviewView.webview.options = {
@@ -99,7 +99,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
         });
     }
 
-    private _getHtmlForWebview(webview: vscode.Webview) {
+    private _getHtmlForWebview(webview: vscode.Webview): string {
         // Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
         const styleUri = getUri(webview, this._extensionUri, ["media", "style.css"]);
         const webviewUri = getUri(webview, this._extensionUri, ["out", "gitConfigWebview.js"]);
@@ -130,7 +130,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
         `;
     }
 
-    private _setWebviewMessageListener(webview: vscode.Webview) {
+    private _setWebviewMessageListener(webview: vscode.Webview): void {
         webview.onDidReceiveMessage(
             (message: WebviewMessage) => {
                 const command = message.command;
@@ -169,6 +169,6 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
     }
 }
 
-function getNonce() {
+function getNonce(): string {
     return crypto.randomBytes(16).toString("base64");
 }
