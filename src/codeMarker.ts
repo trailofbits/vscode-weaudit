@@ -2934,7 +2934,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             // otherwise, add it to the tree entries
             // create title depending on the entry type
             const inputBoxTitle = entryType === EntryType.Finding ? "Add Finding Title" : "Add Note Title";
-            const title = await vscode.window.showInputBox({ title: inputBoxTitle });
+            const title = await vscode.window.showInputBox({ title: inputBoxTitle, ignoreFocusOut: true });
             if (title === undefined) {
                 return;
             }
