@@ -83,6 +83,11 @@
                 "icon": "$(link)"
             },
             {
+                "command": "weAudit.copyEntryPermalinks",
+                "title": "Copy All Audit Permalinks",
+                "icon": "$(link)"
+            },
+            {
                 "command": "weAudit.copySelectedCodePermalink",
                 "title": "weAudit: Copy Permalink (Audit Repository)"
             },
@@ -369,7 +374,12 @@
                 },
                 {
                     "command": "weAudit.copyEntryPermalink",
-                    "when": "view == codeMarker && viewItem != pathOrganizer",
+                    "when": "view == codeMarker && viewItem == additionalLocation",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "weAudit.copyEntryPermalinks",
+                    "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
                     "group": "inline@2"
                 },
                 {
@@ -450,6 +460,11 @@
                         "type": "string",
                         "default": "",
                         "description": "The username to use as the finding's author. (Defaults to the system's username if left empty.)"
+                    },
+                    "weAudit.general.permalinkSeparator": {
+                        "type": "string",
+                        "default": "\\n",
+                        "description": "The separator to use in permalinks. (Note that \\n is interpreted as a newline)"
                     }
                 }
             },
@@ -491,7 +506,8 @@
         "compile": "node ./esbuild.js",
         "package": "NODE_ENV=production node ./esbuild.js",
         "watch": "node ./esbuild.js --watch",
-        "lint": "eslint src --ext ts"
+        "lint": "eslint src --ext ts",
+        "prettier": "prettier --write ."
     },
     "devDependencies": {
         "@microsoft/eslint-formatter-sarif": "^3.0.0",
