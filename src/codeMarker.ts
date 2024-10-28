@@ -1771,6 +1771,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.copyEntryPermalink(entry);
         });
 
+        vscode.commands.registerCommand("weAudit.copyEntryPermalinks", (entry: FullEntry) => {
+            this.copyEntryPermalinks(entry);
+        });
+
         vscode.commands.registerTextEditorCommand("weAudit.copySelectedCodePermalink", () => {
             this.copySelectedCodePermalink(Repository.Audit);
         });
@@ -2556,6 +2560,30 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
         this.copyToClipboard(remoteAndPermalink.permalink);
+    }
+
+    /**
+     * Copy all permalinks of the given entry to the clipboard
+     * @param entry The entry to copy the permalinks of
+     */
+    async copyEntryPermalinks(entry: FullEntry): Promise<void> {
+        const permalinkList = [];
+        for (const location of entry.locations) {
+            const remoteAndPermalink = await this.getEntryRemoteAndPermalink(location);
+            if (remoteAndPermalink === undefined) {
+                return;
+            }
+            permalinkList.push(remoteAndPermalink.permalink);
+        }
+
+        // get separator from configuration
+        const separator: string = vscode.workspace.getConfiguration("weAudit").get("general.permalinkSeparator") || "\n";
+        // interpret \n as newline
+        const interpretedSep = separator.replace(/\\n/g, "\n");
+        // join the permalinks with the separator
+        const permalinksString = permalinkList.join(interpretedSep);
+        // copy the permalinks to the clipboard
+        this.copyToClipboard(permalinksString);
     }
 
     /**
