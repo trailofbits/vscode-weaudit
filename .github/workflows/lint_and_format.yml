@@ -11,6 +11,8 @@ jobs:
             security-events: write
         steps:
             - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
             - uses: actions/setup-node@v4
             - name: Install modules
               run: npm install
