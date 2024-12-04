@@ -1047,6 +1047,9 @@ class WARoot {
         this.clientRemote = clientRemote;
         this.gitRemote = auditRemote;
         this.gitSha = gitSha;
+
+        // persist the data
+        this.updateSavedData(this.username);
     }
 }
 
