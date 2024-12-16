@@ -506,7 +506,7 @@
         "compile": "node ./esbuild.js",
         "package": "NODE_ENV=production node ./esbuild.js",
         "watch": "node ./esbuild.js --watch",
-        "lint": "eslint src --ext ts",
+        "lint": "eslint --ext ts --color -c .eslintrc.json src",
         "prettier": "prettier --write ."
     },
     "devDependencies": {
