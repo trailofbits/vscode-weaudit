@@ -2512,6 +2512,18 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (remoteHost === "bitbucket.org") {
             const issueLocation = `#lines-${location.startLine + 1}:${location.endLine + 1}`;
             permalink = gitRemote + "/src/" + sha + "/" + location.path + issueLocation;
+        } else if (remoteHost === "dev.azure.com") {
+            const args = new URLSearchParams({
+                version: "GC" + sha,
+                path: "/" + location.path,
+                line: String(location.startLine + 1),
+                lineEnd: String(location.endLine + 2),
+                _a: "contents",
+                lineStyle: "plain",
+                lineStartColumn: String(1),
+                lineEndColumn: String(1),
+            })
+            permalink = gitRemote + "/?" + args;
         } else {
             const issueLocation = `#L${location.startLine + 1}-L${location.endLine + 1}`;
             permalink = gitRemote + "/blob/" + sha + "/" + location.path + issueLocation;
