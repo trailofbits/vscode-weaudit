@@ -2,7 +2,7 @@
     "name": "weaudit",
     "displayName": "weAudit",
     "description": "Bookmark findings and quickly navigate to areas of interest in the codebase",
-    "version": "1.2.3",
+    "version": "1.2.4",
     "publisher": "trailofbits",
     "author": "Trail of Bits",
     "categories": [],
