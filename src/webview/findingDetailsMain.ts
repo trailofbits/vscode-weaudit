@@ -13,7 +13,11 @@ const vscode = acquireVsCodeApi();
 // Just like a regular webpage we need to wait for the webview
 // DOM to load before we can reference any of the HTML elements
 // or toolkit components
-window.addEventListener("load", main);
+window.addEventListener("load", () => {
+    main();
+    // Notify the extension that the webview is ready
+    vscode.postMessage({ command: "webview-ready" });
+});
 
 function main(): void {
     const titleField = document.getElementById("label-area") as TextField;

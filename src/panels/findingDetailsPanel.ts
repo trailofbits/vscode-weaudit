@@ -8,7 +8,21 @@ import { WebviewMessage } from "../webview/webviewMessageTypes";
 export function activateFindingDetailsWebview(context: vscode.ExtensionContext): void {
     const provider = new FindingDetailsProvider(context.extensionUri);
 
+    // Register the provider
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(FindingDetailsProvider.viewType, provider));
+
+    // Register commands
+    context.subscriptions.push(
+        vscode.commands.registerCommand("weAudit.setWebviewFindingDetails", (entry: EntryDetails, title: string) => {
+            provider.setFindingDetails(entry, title);
+        }),
+    );
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand("weAudit.hideFindingDetails", () => {
+            provider.hideFindingDetails();
+        }),
+    );
 }
 
 class FindingDetailsProvider implements vscode.WebviewViewProvider {
@@ -31,8 +45,21 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
         this._setWebviewMessageListener(this._view.webview);
 
-        vscode.commands.registerCommand("weAudit.setWebviewFindingDetails", (entry: EntryDetails, title: string) => {
-            this._view?.webview.postMessage({
+        // Register for visibility changes
+        webviewView.onDidChangeVisibility(() => {
+            if (webviewView.visible) {
+                // Refresh the webview HTML to ensure resources are loaded correctly
+                vscode.commands.executeCommand("weAudit.showSelectedEntryInFindingDetails");
+            }
+        });
+    }
+
+    /**
+     * Set finding details in the webview
+     */
+    public setFindingDetails(entry: EntryDetails, title: string): void {
+        if (this._view) {
+            this._view.webview.postMessage({
                 command: "set-finding-details",
                 severity: entry.severity,
                 difficulty: entry.difficulty,
@@ -42,19 +69,18 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                 recommendation: entry.recommendation,
                 title: title,
             });
-        });
+        }
+    }
 
-        vscode.commands.registerCommand("weAudit.hideFindingDetails", () => {
-            this._view?.webview.postMessage({
+    /**
+     * Hide finding details in the webview
+     */
+    public hideFindingDetails(): void {
+        if (this._view) {
+            this._view.webview.postMessage({
                 command: "hide-finding-details",
             });
-        });
-
-        webviewView.onDidChangeVisibility(() => {
-            if (webviewView.visible) {
-                vscode.commands.executeCommand("weAudit.showSelectedEntryInFindingDetails");
-            }
-        });
+        }
     }
 
     private _getHtmlForWebview(webview: vscode.Webview): string {
@@ -76,7 +102,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
               <link rel="stylesheet" href="${styleUri}">
-              <title>Component Gallery</title>
+              <title>Finding Details</title>
             </head>
             <body>
               <section class="component-row">
@@ -96,6 +122,10 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                 switch (command) {
                     case "update-entry":
                         vscode.commands.executeCommand("weAudit.updateCurrentSelectedEntry", message.field, message.value, message.isPersistent);
+                        return;
+                    case "webview-ready":
+                        // When the webview reports it's ready, update with current data
+                        vscode.commands.executeCommand("weAudit.showSelectedEntryInFindingDetails");
                         return;
                 }
             },
