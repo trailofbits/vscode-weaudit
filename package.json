@@ -223,6 +223,10 @@
                 "command": "weAudit.exportFindingsInMarkdown",
                 "title": "weAudit: Export Findings as Markdown",
                 "icon": "$(markdown)"
+            },
+            {
+                "command": "weAudit.navigateToNextPartiallyAuditedRegion",
+                "title": "weAudit: Navigate to Next Partially Audited Region"
             }
         ],
         "keybindings": [
@@ -265,6 +269,10 @@
                 "command": "weAudit.copySelectedCodeClientPermalink",
                 "key": "ctrl+alt+9",
                 "mac": "cmd+9"
+            },
+            {
+                "command": "weAudit.navigateToNextPartiallyAuditedRegion",
+                "key": "f3"
             }
         ],
         "menus": {
