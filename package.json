@@ -272,7 +272,8 @@
             },
             {
                 "command": "weAudit.navigateToNextPartiallyAuditedRegion",
-                "key": "f3"
+                "key": "ctrl+alt+0",
+                "mac": "cmd+0"
             }
         ],
         "menus": {

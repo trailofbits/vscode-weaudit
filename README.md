@@ -80,6 +80,10 @@ The following gif showcases all the scenarios described:
 
 The highlighted color can be customized in the [settings](#settings).
 
+#### Navigation Between Partially Audited Regions
+
+You can quickly navigate through all partially audited regions in your workspace using the `weAudit: Navigate to Next Partially Audited Region` command. This command will cycle through each partially audited region across all files, helping you efficiently review your progress.
+
 ### Detailed Findings
 
 You can fill detailed information about a finding by clicking on it in the _List of Findings_ view in the sidebar. The respective _Finding Details_ panel will open, where you can fill the information.
@@ -182,6 +186,7 @@ You can configure the keybindings to any of the extension's commands in the VSCo
 -   `weAudit.toggleAudited`: Mark Current File As Reviewed: `cmd + 7`
 -   `weAudit.addPartiallyAudited`: Mark Region As Reviewed: `cmd + shift + 7`
 -   `weAudit.copySelectedCodePermalink`: Copy Permalink (for the Selected Code Region): `cmd + 8`
+-   `weAudit.navigateToNextPartiallyAuditedRegion`: Navigate to Next Partially Audited Region: `cmd + 0`
 
 ## WeAudit Concepts
 
