@@ -2353,7 +2353,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             for (const file of partiallyAuditedFiles) {
                 allPartiallyAuditedRegions.push({
                     file,
-                    rootPath: wsRoot.rootPath
+                    rootPath: wsRoot.rootPath,
                 });
             }
         }
