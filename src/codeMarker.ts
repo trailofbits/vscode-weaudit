@@ -1617,6 +1617,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     private decorationManager: DecorationManager;
 
+    // State for navigating through partially audited regions
+    private currentPartiallyAuditedIndex = -1;
+
     constructor(context: vscode.ExtensionContext, decorationManager: DecorationManager) {
         this.treeEntries = [];
         this.resolvedEntries = [];
@@ -1720,6 +1723,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         vscode.commands.registerCommand("weAudit.addNote", () => {
             this.addNote();
+        });
+
+        vscode.commands.registerCommand("weAudit.navigateToNextPartiallyAuditedRegion", () => {
+            this.navigateToNextPartiallyAuditedRegion();
         });
 
         vscode.commands.registerCommand("weAudit.resolveFinding", (node: FullEntry) => {
@@ -2335,6 +2342,43 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // update decorations
         this.decorateWithUri(uri);
         this.updateSavedData(this.username);
+    }
+
+    private navigateToNextPartiallyAuditedRegion(): void {
+        // Collect all partially audited regions from all workspace roots
+        const allPartiallyAuditedRegions: { file: PartiallyAuditedFile; rootPath: string }[] = [];
+
+        for (const wsRoot of this.workspaces.getRoots()) {
+            const partiallyAuditedFiles = wsRoot.getPartiallyAudited();
+            for (const file of partiallyAuditedFiles) {
+                allPartiallyAuditedRegions.push({
+                    file,
+                    rootPath: wsRoot.rootPath,
+                });
+            }
+        }
+
+        if (allPartiallyAuditedRegions.length === 0) {
+            return;
+        }
+
+        // Sort regions by file path, then by start line for consistent navigation order
+        allPartiallyAuditedRegions.sort((a, b) => {
+            const pathComparison = a.file.path.localeCompare(b.file.path);
+            if (pathComparison !== 0) {
+                return pathComparison;
+            }
+            return a.file.startLine - b.file.startLine;
+        });
+
+        // Update navigation index
+        this.currentPartiallyAuditedIndex = (this.currentPartiallyAuditedIndex + 1) % allPartiallyAuditedRegions.length;
+
+        const targetRegion = allPartiallyAuditedRegions[this.currentPartiallyAuditedIndex];
+        const uri = vscode.Uri.file(path.join(targetRegion.rootPath, targetRegion.file.path));
+
+        // Navigate to the region using the same pattern as tree entries
+        vscode.commands.executeCommand("weAudit.openFileLines", uri, targetRegion.file.startLine, targetRegion.file.endLine);
     }
 
     /**
