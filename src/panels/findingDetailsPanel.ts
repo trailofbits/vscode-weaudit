@@ -31,7 +31,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
 
     private _view?: vscode.WebviewView;
 
-    constructor(private readonly _extensionUri: vscode.Uri) {}
+    constructor(private readonly _extensionUri: vscode.Uri) { }
 
     public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken): void {
         this._view = webviewView;
@@ -92,7 +92,71 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         const nonce = getNonce();
 
         // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const htmlBody = require("./findingDetails.html");
+        //const htmlBody = require("./findingDetails.html");
+
+        // List of available severities
+        const severities: Array<String> = vscode.workspace.getConfiguration('weAudit').get("general.severities") || [];
+
+        // Transform them into HTML
+        const severities_html = severities.map((val: String, index: Number) => {
+            return `<vscode-option>${val}</vscode-option>`;
+        }).join("\n");
+
+        // List of available types of findings
+        //const finding_types: Array<String> = vscode.workspace.getConfiguration("weAudit").get("general.finding_types") || [];
+
+
+        const htmlBody = /*html*/ `
+        <div id="container-div">
+    <div class="detailsDiv">
+        <span class="detailSpan">Title:</span>
+        <vscode-text-field id="label-area"></vscode-text-field>
+    </div>
+
+    <div class="detailsDiv">
+        <span class="detailSpan">Severity: </span>
+        <vscode-dropdown position="below" id="severity-dropdown">
+            <vscode-option></vscode-option>
+           ${severities_html}
+        </vscode-dropdown>
+    </div>
+
+    <div class="detailsDiv">
+        <span class="detailSpan">Difficulty:</span>
+        <vscode-dropdown position="below" id="difficulty-dropdown">
+            <vscode-option></vscode-option>
+            <vscode-option>Undetermined</vscode-option>
+            <vscode-option>N/A</vscode-option>
+            <vscode-option>Low</vscode-option>
+            <vscode-option>Medium</vscode-option>
+            <vscode-option>High</vscode-option>
+        </vscode-dropdown>
+    </div>
+    <div class="detailsDiv">
+        <span class="detailSpan">Type:</span>
+        <vscode-dropdown position="below" id="type-dropdown" width="100%">
+            <vscode-option></vscode-option>
+            <vscode-option>Access Controls</vscode-option>
+            <vscode-option>Auditing and Logging</vscode-option>
+            <vscode-option>Authentication</vscode-option>
+            <vscode-option>Configuration</vscode-option>
+            <vscode-option>Cryptography</vscode-option>
+            <vscode-option>Data Exposure</vscode-option>
+            <vscode-option>Data Validation</vscode-option>
+            <vscode-option>Denial of Service</vscode-option>
+            <vscode-option>Error Reporting</vscode-option>
+            <vscode-option>Patching</vscode-option>
+            <vscode-option>Session Management</vscode-option>
+            <vscode-option>Testing</vscode-option>
+            <vscode-option>Timing</vscode-option>
+            <vscode-option>Undefined Behavior</vscode-option>
+        </vscode-dropdown>
+    </div>
+    <div class="detailsDiv"><vscode-text-area placeholder="The finding details" id="description-area" rows="5">Description</vscode-text-area></div>
+    <div class="detailsDiv"><vscode-text-area placeholder="The exploit scenario" id="exploit-area" rows="5">Exploit Scenario</vscode-text-area></div>
+    <div class="detailsDiv"><vscode-text-area id="recommendation-area" rows="5">Recommendations</vscode-text-area></div>
+</div>
+`;
 
         return /*html*/ `
           <!DOCTYPE html>

@@ -474,6 +474,14 @@
                         "type": "string",
                         "default": "\\n",
                         "description": "The separator to use in permalinks. (Note that \\n is interpreted as a newline)"
+                    },
+                    "weAudit.general.severities": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": ["Remark", "Minor", "Major", "Critical"],
+                        "description": "The list of possible finding severities."
                     }
                 }
             },
