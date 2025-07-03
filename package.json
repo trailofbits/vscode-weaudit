@@ -433,11 +433,15 @@
                     "group": "1_modification@0"
                 },
                 {
-                    "command": "weAudit.copySelectedCodePermalink",
+                    "command": "weAudit.addPartiallyAudited",
+                    "group": "1_modification@0"
+                },
+                {
+                    "command": "weAudit.addFinding",
                     "group": "9_cutcopypaste@0"
                 },
                 {
-                    "command": "weAudit.copySelectedCodeClientPermalink",
+                    "command": "weAudit.addNote",
                     "group": "9_cutcopypaste@0"
                 }
             ]
