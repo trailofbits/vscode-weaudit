@@ -31,7 +31,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
 
     private _view?: vscode.WebviewView;
 
-    constructor(private readonly _extensionUri: vscode.Uri) { }
+    constructor(private readonly _extensionUri: vscode.Uri) {}
 
     public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken): void {
         this._view = webviewView;
@@ -95,16 +95,17 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         //const htmlBody = require("./findingDetails.html");
 
         // List of available severities
-        const severities: Array<String> = vscode.workspace.getConfiguration('weAudit').get("general.severities") || [];
+        const severities: Array<String> = vscode.workspace.getConfiguration("weAudit").get("general.severities") || [];
 
         // Transform them into HTML
-        const severities_html = severities.map((val: String, index: Number) => {
-            return `<vscode-option>${val}</vscode-option>`;
-        }).join("\n");
+        const severities_html = severities
+            .map((val: String, index: Number) => {
+                return `<vscode-option>${val}</vscode-option>`;
+            })
+            .join("\n");
 
         // List of available types of findings
         //const finding_types: Array<String> = vscode.workspace.getConfiguration("weAudit").get("general.finding_types") || [];
-
 
         const htmlBody = /*html*/ `
         <div id="container-div">
