@@ -98,15 +98,15 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         const severities: Array<string> = vscode.workspace.getConfiguration("weAudit").get("general.severities") || [];
 
         // Transform them into HTML
-        const severities_html = severities
+        const severitiesHtml = severities
             .map((val: string, _index: number) => {
                 return `<vscode-option>${val}</vscode-option>`;
             })
             .join("\n");
 
         // List of available types of findings
-        const finding_types: Array<string> = vscode.workspace.getConfiguration("weAudit").get("general.finding_types") || [];
-        const findings_html = finding_types
+        const findingTypes: Array<string> = vscode.workspace.getConfiguration("weAudit").get("general.finding_types") || [];
+        const findingsHtml = findingTypes
             .map((val: string, _index: number) => {
                 return `<vscode-option>${val}</vscode-option>`;
             })
@@ -123,7 +123,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         <span class="detailSpan">Severity: </span>
         <vscode-dropdown position="below" id="severity-dropdown">
             <vscode-option></vscode-option>
-           ${severities_html}
+           ${severitiesHtml}
         </vscode-dropdown>
     </div>
 
@@ -142,7 +142,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         <span class="detailSpan">Type:</span>
         <vscode-dropdown position="below" id="type-dropdown" width="100%">
             <vscode-option></vscode-option>
-            ${findings_html}
+            ${findingsHtml}
         </vscode-dropdown>
     </div>
     <div class="detailsDiv"><vscode-text-area placeholder="The finding details" id="description-area" rows="5">Description</vscode-text-area></div>

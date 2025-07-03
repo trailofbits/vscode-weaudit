@@ -2744,35 +2744,14 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     private async getEntryMarkdown(entry: FullEntry): Promise<string | void> {
-        const clientPermalinks = [];
-        const auditPermalinks = [];
         let locationDescriptions = "";
-
-        let atLeastOneUniqueClientRemote = false;
 
         // Use .entries to iterate over entry.locations
         for (const [i, location] of entry.locations.entries()) {
-            const clientRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Client, location);
-            const auditRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Audit, location);
-            if (auditRemoteAndPermalink === undefined) {
-                return;
-            }
-            if (
-                clientRemoteAndPermalink !== undefined &&
-                clientRemoteAndPermalink.remote !== "" &&
-                clientRemoteAndPermalink.remote !== auditRemoteAndPermalink.remote
-            ) {
-                atLeastOneUniqueClientRemote = true;
-            }
-            const clientPermalink = clientRemoteAndPermalink === undefined ? "" : clientRemoteAndPermalink.permalink;
-            clientPermalinks.push(clientPermalink);
-            auditPermalinks.push(auditRemoteAndPermalink.permalink);
-
             if (location.description !== "") {
                 locationDescriptions += `\n\n---\n`;
                 locationDescriptions += `#### Location ${i + 1} ${location.label}\n`;
                 locationDescriptions += `${location.description}\n\n`;
-                locationDescriptions += `${auditRemoteAndPermalink.permalink}`;
             }
         }
 
@@ -2791,8 +2770,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         const target = Array.from(locationSet).join(", ");
-        const permalinks = auditPermalinks.join("\n");
-        const clientPermalinkString = clientPermalinks.join("\n");
 
         let issueBodyText = `### Title\n${entry.label}\n\n`;
         issueBodyText += `### Severity\n${entry.details.severity}\n\n`;
@@ -2803,11 +2780,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         issueBodyText += `## Exploit Scenario\n${entry.details.exploit}\n\n`;
         issueBodyText += `## Recommendations\n${entry.details.recommendation}\n\n\n`;
 
-        issueBodyText += `Permalink:\n${permalinks}\n\n`;
-        // TODO: this breaks the finding writer
-        if (clientPermalinkString !== "" && atLeastOneUniqueClientRemote) {
-            issueBodyText += `Client PermaLink:\n${clientPermalinkString}\n`;
-        }
         return issueBodyText;
     }
 
