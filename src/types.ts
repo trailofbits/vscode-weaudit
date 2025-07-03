@@ -23,18 +23,6 @@ export enum Repository {
 }
 
 /**
- * Trail of Bits finding severities.
- */
-export enum FindingSeverity {
-    Informational = "Informational",
-    Undetermined = "Undetermined",
-    Low = "Low",
-    Medium = "Medium",
-    High = "High",
-    Undefined = "",
-}
-
-/**
  * Trail of Bits finding difficulties.
  */
 export enum FindingDifficulty {
@@ -46,26 +34,6 @@ export enum FindingDifficulty {
     Undefined = "",
 }
 
-/**
- * Trail of Bits finding types.
- */
-export enum FindingType {
-    AccessControls = "Access Controls",
-    AuditingAndLogging = "Auditing and Logging",
-    Authentication = "Authentication",
-    Configuration = "Configuration",
-    Cryptography = "Cryptography",
-    DataExposure = "Data Exposure",
-    DataValidation = "Data Validation",
-    DenialOfService = "Denial of Service",
-    ErrorReporting = "Error Reporting",
-    Patching = "Patching",
-    SessionManagement = "Session Management",
-    Testing = "Testing",
-    Timing = "Timing",
-    UndefinedBehavior = "Undefined Behavior",
-    Undefined = "",
-}
 /* eslint-enable @typescript-eslint/naming-convention */
 
 /**
@@ -191,9 +159,9 @@ function validateEntryDetails(entryDetails: EntryDetails): boolean {
 
 // The data used to fill the Finding Details panel
 export interface EntryDetails {
-    severity: FindingSeverity;
+    severity: string;
     difficulty: FindingDifficulty;
-    type: FindingType;
+    type: string;
     description: string;
     exploit: string;
     recommendation: string;
@@ -205,12 +173,12 @@ export interface EntryDetails {
  */
 export function createDefaultEntryDetails(): EntryDetails {
     return {
-        severity: FindingSeverity.Undefined,
+        severity: "",
         difficulty: FindingDifficulty.Undefined,
-        type: FindingType.Undefined,
+        type: "",
         description: "",
         exploit: "",
-        recommendation: "Short term, \nLong term, \n",
+        recommendation: "",
     };
 }
 

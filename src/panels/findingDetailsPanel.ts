@@ -105,7 +105,12 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
             .join("\n");
 
         // List of available types of findings
-        //const finding_types: Array<String> = vscode.workspace.getConfiguration("weAudit").get("general.finding_types") || [];
+        const finding_types: Array<string> = vscode.workspace.getConfiguration("weAudit").get("general.finding_types") || [];
+        const findings_html = finding_types
+            .map((val: string, _index: number) => {
+                return `<vscode-option>${val}</vscode-option>`;
+            })
+            .join("\n");
 
         const htmlBody = /*html*/ `
         <div id="container-div">
@@ -137,20 +142,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         <span class="detailSpan">Type:</span>
         <vscode-dropdown position="below" id="type-dropdown" width="100%">
             <vscode-option></vscode-option>
-            <vscode-option>Access Controls</vscode-option>
-            <vscode-option>Auditing and Logging</vscode-option>
-            <vscode-option>Authentication</vscode-option>
-            <vscode-option>Configuration</vscode-option>
-            <vscode-option>Cryptography</vscode-option>
-            <vscode-option>Data Exposure</vscode-option>
-            <vscode-option>Data Validation</vscode-option>
-            <vscode-option>Denial of Service</vscode-option>
-            <vscode-option>Error Reporting</vscode-option>
-            <vscode-option>Patching</vscode-option>
-            <vscode-option>Session Management</vscode-option>
-            <vscode-option>Testing</vscode-option>
-            <vscode-option>Timing</vscode-option>
-            <vscode-option>Undefined Behavior</vscode-option>
+            ${findings_html}
         </vscode-dropdown>
     </div>
     <div class="detailsDiv"><vscode-text-area placeholder="The finding details" id="description-area" rows="5">Description</vscode-text-area></div>

@@ -486,7 +486,30 @@
                             "Major",
                             "Critical"
                         ],
-                        "description": "The list of possible finding severities."
+                        "description": "The list of possible finding severities. Need to reload the editor in order for modifications to be taken into account"
+                    },
+                    "weAudit.general.finding_types": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": [
+                            "Access Controls",
+                            "Auditing and Logging",
+                            "Authentication",
+                            "Configuration",
+                            "Cryptography",
+                            "Data Exposure",
+                            "Data Validation",
+                            "Denial of Service",
+                            "Error Reporting",
+                            "Patching",
+                            "Session Management",
+                            "Testing",
+                            "Timing",
+                            "Undefined Behavior"
+                        ],
+                        "description": "The list of possible finding severities. Need to reload the editor in order for modifications to be taken into account"
                     }
                 }
             },

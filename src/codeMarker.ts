@@ -29,8 +29,6 @@ import {
     createLocationEntry,
     isPathOrganizerEntry,
     FindingDifficulty,
-    FindingSeverity,
-    FindingType,
     EntryType,
     RemoteAndPermalink,
     validateSerializedData,
@@ -2229,13 +2227,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // TODO: determine how to update the entry from the field string
         switch (field) {
             case "severity":
-                entry.details.severity = value as FindingSeverity;
+                entry.details.severity = value;
                 break;
             case "difficulty":
                 entry.details.difficulty = value as FindingDifficulty;
                 break;
             case "type":
-                entry.details.type = value as FindingType;
+                entry.details.type = value;
                 break;
             case "description":
                 entry.details.description = value;
