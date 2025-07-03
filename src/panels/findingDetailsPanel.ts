@@ -95,11 +95,11 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         //const htmlBody = require("./findingDetails.html");
 
         // List of available severities
-        const severities: Array<String> = vscode.workspace.getConfiguration("weAudit").get("general.severities") || [];
+        const severities: Array<string> = vscode.workspace.getConfiguration("weAudit").get("general.severities") || [];
 
         // Transform them into HTML
         const severities_html = severities
-            .map((val: String, index: Number) => {
+            .map((val: string, _index: number) => {
                 return `<vscode-option>${val}</vscode-option>`;
             })
             .join("\n");
