@@ -2063,7 +2063,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         let markdown = "";
         for (const entry of selectedEntries) {
             const entryMarkdown = await this.getEntryMarkdown(entry.entry);
-            markdown += `---\n---\n---\n${entryMarkdown}\n\n`;
+            markdown += entryMarkdown;
         }
 
         vscode.workspace
@@ -2746,39 +2746,67 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     private async getEntryMarkdown(entry: FullEntry): Promise<string | void> {
         let locationDescriptions = "";
 
-        // Use .entries to iterate over entry.locations
-        for (const [i, location] of entry.locations.entries()) {
-            if (location.description !== "") {
-                locationDescriptions += `\n\n---\n`;
-                locationDescriptions += `#### Location ${i + 1} ${location.label}\n`;
-                locationDescriptions += `${location.description}\n\n`;
-            }
-        }
+        // Order the locations by path. If there is only one entry for a given path, this will
+        // be shown as path:start_line-end_line. If there are multiple entries for a given path,
+        // this will be shown in markdown as :
+        // path:
+        // - line(s) start_line:end_line
+        // - line(s) start_line:end_line,
+        // etc.
+        // end_line will be omitted if it is equal to start_line.
 
-        // deduplicate the target paths
-        const locationSet: Set<string> = new Set();
+        // Step 1 : collect all locations into a map, indexed by its path
+        const locationsByPath: Map<string, FullLocation[]> = new Map();
         for (const location of entry.locations) {
-            // Multi-root may have colliding paths
+            let pathKey;
             if (this.workspaces.moreThanOneRoot()) {
                 const uniquePath = this.workspaces.createUniquePath(location.rootPath, location.path);
                 if (uniquePath !== undefined) {
-                    locationSet.add(uniquePath);
+                    pathKey = uniquePath;
+                } else {
+                    continue; // Skip this location if it cannot be uniquely identified
                 }
             } else {
-                locationSet.add(location.path);
+                pathKey = location.path;
+            }
+            if (!locationsByPath.has(pathKey)) {
+                locationsByPath.set(pathKey, []);
+            }
+            locationsByPath.get(pathKey)!.push(location);
+        }
+
+        // Step 2 : create the location descriptions
+        if (locationsByPath.size !== 0) {
+            locationDescriptions += `\n### Locations\n`;
+
+            for (const [path, locations] of locationsByPath.entries()) {
+                // Sort the entries by increasing startlines
+                locations.sort((a, b) => a.startLine - b.startLine);
+
+                if (locations.length === 1) {
+                    const loc = locations[0];
+                    const multiline = loc.endLine !== loc.startLine;
+                    locationDescriptions += `- line${multiline ? `s` : ``} ${path}:${loc.startLine + 1}${multiline ? `-${loc.endLine + 1}` : ""}\n`;
+                } else {
+                    locations.sort((a, b) => a.startLine - b.startLine);
+                    locationDescriptions += `- ${path}:\n`;
+                    for (const loc of locations) {
+                        const multiline = loc.endLine !== loc.startLine;
+                        locationDescriptions += `  - line${multiline ? `s` : ``} ${loc.startLine + 1}${multiline ? `-${loc.endLine + 1}` : ""}\n`;
+                    }
+                }
             }
         }
 
-        const target = Array.from(locationSet).join(", ");
+        let issueBodyText = `# Title\n${entry.label}\n\n`;
+        issueBodyText += entry.details.severity.length !== 0 ? `### Severity\n${entry.details.severity}\n\n` : "";
+        issueBodyText += entry.details.difficulty.length !== 0 ? `### Difficulty\n${entry.details.difficulty}\n\n` : "";
+        issueBodyText += entry.details.type.length !== 0 ? `### Type\n${entry.details.type}\n\n` : "";
+        issueBodyText += `## Description\n${entry.details.description}\n${locationDescriptions}\n\n`;
+        issueBodyText += entry.details.exploit.length !== 0 ? `## Exploit Scenario\n${entry.details.exploit}\n\n` : "";
+        issueBodyText += entry.details.recommendation.length !== 0 ? `## Recommendations\n${entry.details.recommendation}\n\n` : "";
 
-        let issueBodyText = `### Title\n${entry.label}\n\n`;
-        issueBodyText += `### Severity\n${entry.details.severity}\n\n`;
-        issueBodyText += `### Difficulty\n${entry.details.difficulty}\n\n`;
-        issueBodyText += `### Type\n${entry.details.type}\n\n`;
-        issueBodyText += `### Target\n${target}\n\n`;
-        issueBodyText += `## Description\n${entry.details.description}${locationDescriptions}\n\n`;
-        issueBodyText += `## Exploit Scenario\n${entry.details.exploit}\n\n`;
-        issueBodyText += `## Recommendations\n${entry.details.recommendation}\n\n\n`;
+        issueBodyText += "\n";
 
         return issueBodyText;
     }
