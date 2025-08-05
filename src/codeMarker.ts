@@ -1723,6 +1723,14 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.addNote();
         });
 
+        vscode.commands.registerCommand("weAudit.addGlobalFinding", () => {
+            this.addLocationlessFinding();
+        });
+
+        vscode.commands.registerCommand("weAudit.addGlobalNote", () => {
+            this.addLocationlessNote();
+        });
+
         vscode.commands.registerCommand("weAudit.navigateToNextPartiallyAuditedRegion", () => {
             this.navigateToNextPartiallyAuditedRegion();
         });
@@ -2105,6 +2113,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     async getCodeToCopyFromLocation(entry: FullEntry | FullLocationEntry): Promise<FromLocationResponse | void> {
+        if (!isLocationEntry(entry) && entry.locations.length === 0) {
+            return;
+        }
         const location = isLocationEntry(entry) ? entry.location : entry.locations[0];
         const permalink = await this.getClientPermalink(location);
         if (permalink === undefined) {
@@ -2607,6 +2618,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param entry The entry to copy the permalink of
      */
     async copyEntryPermalink(entry: FullEntry | FullLocationEntry): Promise<void> {
+        if (!isLocationEntry(entry) && entry.locations.length === 0) {
+            return;
+        }
         const location = isLocationEntry(entry) ? entry.location : entry.locations[0];
         const remoteAndPermalink = await this.getEntryRemoteAndPermalink(location);
         if (remoteAndPermalink === undefined) {
@@ -2880,6 +2894,20 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     resolveFinding(entry: FullEntry): void {
         this.deleteAndResolveFinding(entry, true);
     }
+    /**
+     *  Creates a new finding without any location associated with it
+     */
+
+    addLocationlessFinding(): void {
+        this.createLocationlessEntry(EntryType.Finding);
+    }
+
+    /**
+     * Creates a new note without any location associated with it
+     */
+    addLocationlessNote(): void {
+        this.createLocationlessEntry(EntryType.Note);
+    }
 
     /**
      * Creates a new finding entry and adds it to the tree entries list,
@@ -2982,6 +3010,39 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
         this.resolvedEntriesTree.refresh();
         this.decorate();
+    }
+
+    /**
+     * Creates a new entry without a specific location and adds it to the tree entries list.
+     * @param entryType the type of the entry to create
+     */
+
+    async createLocationlessEntry(entryType: EntryType): Promise<void> {
+        const editor = vscode.window.activeTextEditor;
+        if (editor === undefined) {
+            return;
+        }
+        const uri = editor.document.uri;
+
+        // create title depending on the entry type
+        const inputBoxTitle = entryType === EntryType.Finding ? "Add Finding Title" : "Add Note Title";
+        const title = await vscode.window.showInputBox({ title: inputBoxTitle, ignoreFocusOut: true });
+        if (title === undefined) {
+            return;
+        }
+
+        const entry: FullEntry = {
+            label: title,
+            entryType: entryType,
+            author: this.username,
+            locations: [],
+            details: createDefaultEntryDetails(),
+        };
+        this.treeEntries.push(entry);
+        this.updateSavedData(this.username);
+
+        this.decorateWithUri(uri);
+        this.refresh(uri);
     }
 
     /**
@@ -3119,11 +3180,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     getFilteredEntriesForSaving(username: string, root: WARoot): [FullEntry[], FullEntry[]] {
         const filteredEntries = this.treeEntries.filter((entry) => {
             let inWs = false;
+
             for (const location of entry.locations) {
                 if (location.rootPath === root.rootPath) {
                     inWs = true;
                     break;
                 }
+            }
+            if (entry.locations.length === 0) {
+                inWs = true; // if there are no locations, we consider it in the workspace root
             }
             return entry.author === username && inWs;
         });
@@ -3752,20 +3817,23 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             treeItem.iconPath = new vscode.ThemeIcon("bug");
         }
 
-        const mainLocation = entry.locations[0];
+        if (entry.locations.length > 0) {
+            const mainLocation = entry.locations[0];
 
-        const basePath = path.basename(mainLocation.path);
-        treeItem.description = basePath + ":" + (mainLocation.startLine + 1).toString();
+            const basePath = path.basename(mainLocation.path);
+            treeItem.description = basePath + ":" + (mainLocation.startLine + 1).toString();
+            treeItem.command = {
+                command: "weAudit.openFileLines",
+                title: "Open File",
+                arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
+            };
+        } else {
+            treeItem.description = "∅";
+        }
 
         if (entry.author !== this.username) {
             treeItem.description += " (" + entry.author + ")";
         }
-
-        treeItem.command = {
-            command: "weAudit.openFileLines",
-            title: "Open File",
-            arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
-        };
 
         return treeItem;
     }
@@ -3804,7 +3872,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             let location;
             if (isLocationEntry(entry)) {
                 location = entry.location;
-            } else if (isEntry(entry)) {
+            } else if (isEntry(entry) && entry.locations.length > 0) {
                 location = entry.locations[0];
             } else {
                 continue;
@@ -3948,7 +4016,7 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                 }
 
                 // Prevent mixing findings that belong to different workspace roots, because it is a headache to synchronize this.
-                if (target!.locations[0].rootPath !== locationEntry.location.rootPath) {
+                if (target!.locations[0]?.rootPath !== locationEntry.location.rootPath) {
                     vscode.window.showErrorMessage(
                         "weAudit: Error moving a location to a different finding, as this finding is in a different workspace root.",
                     );
@@ -4061,7 +4129,7 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
             }
 
             // Prevent mixing findings that belong to different workspace roots, because it is a headache to synchronize this.
-            if (target.locations[0].rootPath !== entry.locations[0].rootPath) {
+            if (target.locations[0]?.rootPath !== entry.locations[0]?.rootPath) {
                 vscode.window.showErrorMessage("weAudit: Error merging findings, as this finding is in a different workspace root.");
                 return;
             }

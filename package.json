@@ -199,6 +199,14 @@
                 "title": "weAudit: New Note from Selection"
             },
             {
+                "command": "weAudit.addGlobalFinding",
+                "title": "weAudit: New Finding (Global)"
+            },
+            {
+                "command": "weAudit.addGlobalNote",
+                "title": "weAudit: New Note (Global)"
+            },
+            {
                 "command": "weAudit.editEntryUnderCursor",
                 "title": "weAudit: Edit Finding Under Cursor"
             },

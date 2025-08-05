@@ -42,14 +42,17 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
         } else {
             treeItem.iconPath = new vscode.ThemeIcon("bug");
         }
-        const mainLocation = entry.locations[0];
-        treeItem.command = {
-            command: "weAudit.openFileLines",
-            title: "Open File",
-            arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
-        };
 
-        treeItem.description = path.basename(mainLocation.path);
+        if (entry.locations.length !== 0) {
+            const mainLocation = entry.locations[0];
+            treeItem.command = {
+                command: "weAudit.openFileLines",
+                title: "Open File",
+                arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
+            };
+            treeItem.description = path.basename(mainLocation.path);
+        }
+
         treeItem.tooltip = entry.author + "'s findings";
 
         return treeItem;
