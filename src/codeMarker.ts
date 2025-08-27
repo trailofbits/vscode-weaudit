@@ -721,93 +721,97 @@ class WARoot {
     addPartiallyAudited(relativePath: string): void {
         // check if file is already in list
         const index = this.auditedFiles.findIndex((file) => file.path === relativePath);
-
         // if file is already audited ignore
         if (index > -1) {
             return;
         }
 
-        const location = this.getActiveSelectionLocation();
-        const alreadyMarked = this.partiallyAuditedFiles.findIndex(
-            (file) => file.path === relativePath && file.startLine <= location.startLine && file.endLine >= location.endLine,
-        );
+        const locations = this.getActiveSelectionLocation();
 
-        // this section is already marked. Remove it then
-        if (alreadyMarked > -1) {
-            // Splits the existing entry into 2 and remove the location marked by the user
-            const previousMarkedEntry = this.partiallyAuditedFiles[alreadyMarked];
+        // Process each selection/location separately
+        for (const location of locations) {
+            const alreadyMarked = this.partiallyAuditedFiles.findIndex(
+                (file) => file.path === relativePath && file.startLine <= location.startLine && file.endLine >= location.endLine,
+            );
 
-            // same area has been selected so lets delete it
-            if (previousMarkedEntry.startLine === location.startLine && previousMarkedEntry.endLine === location.endLine) {
-                this.partiallyAuditedFiles.splice(alreadyMarked, 1);
+            // this section is already marked. Remove it then
+            if (alreadyMarked > -1) {
+                // Splits the existing entry into 2 and remove the location marked by the user
+                const previousMarkedEntry = this.partiallyAuditedFiles[alreadyMarked];
+
+                // same area has been selected so lets delete it
+                if (previousMarkedEntry.startLine === location.startLine && previousMarkedEntry.endLine === location.endLine) {
+                    this.partiallyAuditedFiles.splice(alreadyMarked, 1);
+                } else {
+                    // not the same area so we need to split the entry or change it
+
+                    const locationClone = { ...previousMarkedEntry };
+
+                    // if either the end line or the start line is the same we don't need
+                    // to split the entry but can just adjust the current one
+                    let splitNeeded = true;
+                    if (previousMarkedEntry.endLine === location.endLine) {
+                        previousMarkedEntry.endLine = location.startLine - 1;
+                        splitNeeded = false;
+                    }
+
+                    if (previousMarkedEntry.startLine === location.startLine) {
+                        previousMarkedEntry.startLine = location.endLine + 1;
+                        splitNeeded = false;
+                    }
+
+                    if (splitNeeded) {
+                        previousMarkedEntry.endLine = location.startLine - 1;
+                        locationClone.startLine = location.endLine + 1;
+
+                        this.partiallyAuditedFiles.push(locationClone);
+                    }
+
+                    this.partiallyAuditedFiles[alreadyMarked] = previousMarkedEntry;
+                }
             } else {
-                // not the same area so we need to split the entry or change it
-
-                const locationClone = { ...previousMarkedEntry };
-
-                // if either the end line or the start line is the same we don't need
-                // to split the entry but can just adjust the current one
-                let splitNeeded = true;
-                if (previousMarkedEntry.endLine === location.endLine) {
-                    previousMarkedEntry.endLine = location.startLine - 1;
-                    splitNeeded = false;
-                }
-
-                if (previousMarkedEntry.startLine === location.startLine) {
-                    previousMarkedEntry.startLine = location.endLine + 1;
-                    splitNeeded = false;
-                }
-
-                if (splitNeeded) {
-                    previousMarkedEntry.endLine = location.startLine - 1;
-                    locationClone.startLine = location.endLine + 1;
-
-                    this.partiallyAuditedFiles.push(locationClone);
-                }
-
-                this.partiallyAuditedFiles[alreadyMarked] = previousMarkedEntry;
+                this.partiallyAuditedFiles.push({
+                    path: relativePath,
+                    author: this.username,
+                    startLine: location.startLine,
+                    endLine: location.endLine,
+                });
             }
-        } else {
-            this.partiallyAuditedFiles.push({
-                path: relativePath,
-                author: this.username,
-                startLine: location.startLine,
-                endLine: location.endLine,
-            });
         }
 
         this.mergePartialAudits();
     }
 
     /**
-     * Gets the active selection location.
-     * @returns A Location corresponding to the active selection location.
+     * Gets the active selection locations, supporting multiple selections.
+     * @returns An array of FullLocations corresponding to all active selections.
      */
-    getActiveSelectionLocation(): FullLocation {
+    getActiveSelectionLocation(): FullLocation[] {
         // the null assertion is never undefined because we check if the editor is undefined
         const editor = vscode.window.activeTextEditor!;
         const uri = editor.document.uri;
-
-        const selectedCode = editor.selection;
-        const startLine = selectedCode.start.line;
-
-        let endLine = selectedCode.end.line;
-        // vscode sets the end of a fully selected line as the first character of the next line
-        // so we decrement the end line if the end character is 0 and the end line is not the same as the start line
-        if (endLine > selectedCode.start.line && selectedCode.end.character === 0) {
-            endLine--;
-        }
-
-        // github preview does not show the preview if the last document line is empty
-        // so we decrement it by one
-        if (endLine === editor.document.lineCount - 1 && editor.document.lineAt(endLine).text === "") {
-            // ensure that we don't go before the start line
-            endLine = Math.max(endLine - 1, startLine);
-        }
-
         const relativePath = path.relative(this.rootPath, uri.fsPath);
-        // TODO: error if not in this workspace root?
-        return { path: relativePath, startLine, endLine, label: "", description: "", rootPath: this.rootPath };
+
+        return editor.selections.map((selection) => {
+            const startLine = selection.start.line;
+            let endLine = selection.end.line;
+
+            // vscode sets the end of a fully selected line as the first character of the next line
+            // so we decrement the end line if the end character is 0 and the end line is not the same as the start line
+            if (endLine > selection.start.line && selection.end.character === 0) {
+                endLine--;
+            }
+
+            // github preview does not show the preview if the last document line is empty
+            // so we decrement it by one
+            if (endLine === editor.document.lineCount - 1 && editor.document.lineAt(endLine).text === "") {
+                // ensure that we don't go before the start line
+                endLine = Math.max(endLine - 1, startLine);
+            }
+
+            // TODO: error if not in this workspace root?
+            return { path: relativePath, startLine, endLine, label: "", description: "", rootPath: this.rootPath };
+        });
     }
 
     /**
@@ -1466,7 +1470,7 @@ class MultiRootManager {
      * @param uri The uri of the current file.
      * @returns A FullLocation corresponding to the selection or undefined if the current file is not in any workspace root.
      */
-    getActiveSelectionLocation(uri: vscode.Uri): FullLocation | undefined {
+    getActiveSelectionLocation(uri: vscode.Uri): FullLocation[] | undefined {
         const [wsRoot, _relativePath] = this.getCorrespondingRootAndPath(uri.fsPath);
         const result = wsRoot?.getActiveSelectionLocation();
         if (result === undefined) {
@@ -2092,10 +2096,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     async getSelectedClientCodeAndPermalink(): Promise<FromLocationResponse | void> {
-        const location = this.getActiveSelectionLocation();
-        if (location === undefined) {
+        const locations = this.getActiveSelectionLocation();
+        if (locations === undefined || locations.length === 0) {
             return;
         }
+
+        // Use the first (primary) selection if more than one is present
+        const location = locations[0];
         const editor = vscode.window.activeTextEditor!;
 
         const remoteAndPermalink = await this.getRemoteAndPermalink(Repository.Client, location);
@@ -2598,10 +2605,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param repository If the repository is the Audit repository or the Client repository
      */
     async copySelectedCodePermalink(repository: Repository): Promise<void> {
-        const location = this.getActiveSelectionLocation();
-        if (location === undefined) {
+        const locations = this.getActiveSelectionLocation();
+        if (locations === undefined || locations.length === 0) {
             return;
         }
+        // Use the first selection
+        const location = locations[0];
 
         const remoteAndPermalink = await this.getRemoteAndPermalink(repository, location);
         if (remoteAndPermalink === undefined) {
@@ -3005,12 +3014,17 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
         const uri = editor.document.uri;
-        const location = this.workspaces.getActiveSelectionLocation(uri);
+        const locations = this.workspaces.getActiveSelectionLocation(uri);
 
-        if (location === undefined) {
+        if (locations === undefined) {
             vscode.window.showErrorMessage("Trying to add entries to a file outside this workspace: " + uri.fsPath);
             return;
         }
+        if (locations.length === 0) {
+            return;
+        }
+
+        const location = locations[0];
 
         const intersectedIdx = this.getIntersectingTreeEntryIndex(location, entryType);
 
@@ -3032,7 +3046,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 label: title,
                 entryType: entryType,
                 author: this.username,
-                locations: [location],
+                locations: locations,
                 details: createDefaultEntryDetails(),
             };
             this.treeEntries.push(entry);
@@ -3059,18 +3073,18 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refresh(uri);
     }
 
-    getActiveSelectionLocation(): FullLocation | undefined {
+    getActiveSelectionLocation(): FullLocation[] | undefined {
         // the null assertion is never undefined because we check if the editor is undefined
         const editor = vscode.window.activeTextEditor!;
         const uri = editor.document.uri;
-        const location = this.workspaces.getActiveSelectionLocation(uri);
+        const locations = this.workspaces.getActiveSelectionLocation(uri);
 
-        if (location === undefined) {
+        if (locations === undefined) {
             vscode.window.showErrorMessage(`weAudit: Error determining location of selected code. Filepath: ${uri.fsPath} is not in any workspace root.`);
             return;
         }
 
-        return location;
+        return locations;
     }
 
     /**
@@ -3156,15 +3170,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (editor === undefined) {
             return;
         }
-        const location = this.getActiveSelectionLocation();
-        if (location === undefined) {
+        const locations = this.getActiveSelectionLocation();
+        if (locations === undefined || locations.length === 0) {
             return;
         }
 
         // create a quick pick to select the entry to add the region to
         const items = this.treeEntries
             .filter((entry) => {
-                if (entry.locations.length === 0 || entry.locations[0].rootPath !== location.rootPath) {
+                if (entry.locations.length === 0 || entry.locations[0].rootPath !== locations[0].rootPath) {
                     return false;
                 }
                 return true;
@@ -3192,7 +3206,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     return;
                 }
                 const entry = pickItem.entry;
-                entry.locations.push(location);
+                // Add each selection as a separate region
+                for (const location of locations) {
+                    entry.locations.push(location);
+                }
                 this.updateSavedData(entry.author);
                 this.decorateWithUri(editor.document.uri);
                 this.refresh(editor.document.uri);
