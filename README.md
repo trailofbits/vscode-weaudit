@@ -37,7 +37,7 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Multiple Users**](#multiple-users) - Findings can be viewed from multiple different users.
 -   [**Hide Findings**](#hide-findings) - Hide all findings associated with a specific user.
 -   [**Search & Filter Findings**](#search--filter-findings) - Search and filter the findings in the _List of Findings_ panel.
--   [**Export Findings**](#export-findings) - Export findings to a markdown file.
+-   [**Export Findings**](#export-findings) - Export findings.
 -   [**Drag & drop Findings and Locations**](#drag--drop-findings-and-locations) - Drag and drop findings and locations in the _List of Findings_ panel.
 -   [**Settings**](#settings) - Customize colors.
 
@@ -154,7 +154,7 @@ You can search for and filter the findings in the `List of Findings` panel by ca
 ![Filter Findings](media/readme/gifs/filter_findings.gif)
 
 ### Export Findings
-You can export the findings to a markdown file by calling the `weAudit: Export Findings as Markdown` command.
+You can export the findings to a file by calling the `weAudit: Export Findings` command. It can either be a markdown file or a custom format, specified by a [mustache](https://github.com/janl/mustache.js) file.
 
 ### Drag & Drop Findings and Locations
 You can drag and drop findings and locations in the _List of Findings_ panel to:

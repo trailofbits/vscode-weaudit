@@ -228,9 +228,9 @@
                 "title": "weAudit: Search and Filter Findings"
             },
             {
-                "command": "weAudit.exportFindingsInMarkdown",
-                "title": "weAudit: Export Findings as Markdown",
-                "icon": "$(markdown)"
+                "command": "weAudit.exportFindings",
+                "title": "weAudit: Export Findings",
+                "icon": "$(export)"
             },
             {
                 "command": "weAudit.navigateToNextPartiallyAuditedRegion",
@@ -353,7 +353,7 @@
                     "group": "navigation@0"
                 },
                 {
-                    "command": "weAudit.exportFindingsInMarkdown",
+                    "command": "weAudit.exportFindings",
                     "when": "view == codeMarker",
                     "group": "navigation@1"
                 },
@@ -526,6 +526,45 @@
                 }
             },
             {
+                "title": "Export",
+                "order": 3,
+                "properties": {
+                    "weAudit.export.markdown": {
+                        "order": 1,
+                        "type": "string",
+                        "default": "# Title\n{{title}}\n{{#severity}}### Severity\n{{severity}}\n{{/severity}}## Description\n{{&description}}\n",
+                        "description": "The mustache template used for markdown export",
+                        "editPresentation": "multilineText"
+                    },
+                    "weAudit.export.custom1Name": {
+                        "order": 2,
+                        "type": "string",
+                        "default": "XML",
+                        "description": "The name of the target for the first custom export"
+                    },
+                    "weAudit.export.custom1Template": {
+                        "order": 3,
+                        "type": "string",
+                        "default": "<item kind=\"{{kind}}\">\n<title>{{title}}</title>\n<description>{{&description}}</description>{{#severity}}\n<severity>{{severity}}</severity>{{/severity}}\n</item>",
+                        "description": "The mustache template used for the first custom export",
+                        "editPresentation": "multilineText"
+                    },
+                    "weAudit.export.custom2Name": {
+                        "order": 4,
+                        "type": "string",
+                        "default": "Typst",
+                        "description": "The name of the target for the second custom export"
+                    },
+                    "weAudit.export.custom2Template": {
+                        "order": 5,
+                        "type": "string",
+                        "default": "= Title\n{{title}}\n{{#severity}}=== Severity\n{{severity}}\n{{/severity}}== Description\n{{&description}}\n",
+                        "description": "The mustache template used for the second custom export",
+                        "editPresentation": "multilineText"
+                    }
+                }
+            },
+            {
                 "title": "Highlight colors",
                 "order": 2,
                 "properties": {
@@ -578,7 +617,7 @@
         "@typescript-eslint/eslint-plugin": "^5.30.0",
         "@typescript-eslint/parser": "^5.30.0",
         "@vscode/test-electron": "^2.1.5",
-        "esbuild": "^0.16.17",
+        "esbuild": "^0.25.9",
         "eslint": "^8.18.0",
         "glob": "^8.0.3",
         "mocha": "^10.0.0",
@@ -587,6 +626,7 @@
     },
     "dependencies": {
         "@vscode/webview-ui-toolkit": "^1.4.0",
-        "asciichart": "^1.5.25"
+        "asciichart": "^1.5.25",
+        "mustache": "^4.2.0"
     }
 }

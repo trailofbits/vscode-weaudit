@@ -45,9 +45,11 @@ import {
     configEntryEquals,
     RootPathAndLabel,
 } from "./types";
+import Mustache = require("mustache");
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
+
 
 /**
  * Class representing a WeAudit workspace root. Each root maintains its own set of
@@ -63,6 +65,7 @@ class WARoot {
     public gitSha: string;
     public clientRemote: string;
     private username: string;
+    private exportConfig: {md:string, fstname: string, fstvalue: string, sndname: string, sndvalue: string};
 
     // An array corresponding to all .weaudit file in the .vscode folder of this workspace root
     private configs: ConfigurationEntry[];
@@ -1599,6 +1602,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     private workspaces: MultiRootManager;
     private username: string;
+    private exportConfig: {md:string, fstname: string, fstvalue: string, sndname: string, sndvalue: string};
 
     // locationEntries contains a map associating a file path to an array of additional locations
     private pathToEntryMap: Map<string, TreeEntry[]>;
@@ -1630,6 +1634,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         this.treeViewMode = TreeViewMode.List;
         this.loadTreeViewModeConfiguration();
+
+        this.exportConfig = this.setExportConfig();
 
         this.username = this.setUsernameConfigOrDefault();
         this.findAndLoadConfigurationUsernames();
@@ -2015,8 +2021,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.showFindingsSearchBar();
         });
 
-        vscode.commands.registerCommand("weAudit.exportFindingsInMarkdown", () => {
-            this.exportFindingsInMarkdown();
+        vscode.commands.registerCommand("weAudit.exportFindings", () => {
+            this.exportFindings();
         });
 
         // Gets the filtered entries from the current tree that correspond to a specific username and workspace root
@@ -2039,11 +2045,29 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return this.username;
     }
 
+    public setExportConfig(): {md:string, fstname: string, fstvalue: string, sndname: string, sndvalue: string} {
+
+        const fstname: string = vscode.workspace.getConfiguration("weAudit").get("export.custom1Name") || "Custom 1";
+        const fstvalue: string = vscode.workspace.getConfiguration("weAudit").get("export.custom1Template") || "";
+        const sndname:string = vscode.workspace.getConfiguration("weAudit").get("export.custom2Name") || "Custom 2";
+        const sndvalue:string = vscode.workspace.getConfiguration("weAudit").get("export.custom2Template") || "";
+        this.exportConfig = {
+            md:vscode.workspace.getConfiguration("weAudit").get("export.markdown") || "",
+            fstname: fstname,
+            fstvalue: fstvalue,
+            sndname: sndname,
+            sndvalue: sndvalue,
+        };
+        return this.exportConfig;
+    }
+
+
     /**
-     * Exports the findings to a markdown file
+     * Exports the findings to a new file
      * allowing the user to select which findings to export
+     * and which export format to choose
      */
-    private async exportFindingsInMarkdown(): Promise<void> {
+    private async exportFindings(): Promise<void> {
         if (this.treeEntries.length === 0) {
             vscode.window.showInformationMessage("No findings to export.");
             return;
@@ -2060,7 +2084,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         const selectedEntries = await vscode.window.showQuickPick(items, {
             ignoreFocusOut: true,
-            title: "Select the findings to export to markdown",
+            title: "Select the findings to export",
             canPickMany: true,
         });
 
@@ -2068,20 +2092,65 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        let markdown = "";
-        for (const entry of selectedEntries) {
-            const entryMarkdown = await this.getEntryMarkdown(entry.entry);
-            markdown += entryMarkdown;
-        }
+        const formats = ["Markdown", this.exportConfig.fstname, this.exportConfig.sndname, "Custom"];
+        let template: string;
+        let language: string;
+        vscode.window.showQuickPick(formats, {
+        ignoreFocusOut: true,
+        title: "Select the target format",
+        }).then(async (item) => {
+            if (item === undefined) {
+                return;
+            }
+            else if (item === "Markdown") {
+                language = "markdown";
+                template = this.exportConfig.md;
+            }
+            else if (item === this.exportConfig.fstname) {
+                language = this.exportConfig.fstname;
+                template = this.exportConfig.fstvalue;
+            }
+            else if (item === this.exportConfig.sndname) {
+                language = this.exportConfig.sndname;
+                template = this.exportConfig.sndvalue;
+            }
+            else if (item === "Custom") {
+                await vscode.window.showOpenDialog({title: "Select mustache file"}).then(
+                    (file) => {
+                        if(file === undefined || file.length === 0) {
+                            return;
+                        }
+                        template = fs.readFileSync(file[0].fsPath).toString();
+                });
+            }
+            else {
+                vscode.window.showWarningMessage("Invalid format");
+                return;
+            }
 
-        vscode.workspace
-            .openTextDocument({
-                language: "markdown",
-                content: markdown,
-            })
-            .then((doc) => {
-                vscode.window.showTextDocument(doc);
-            });
+            let result = "";
+            let first = true;
+
+            for (const entry of selectedEntries) {
+                if(first) {
+                    first = false;
+                } else {
+                    result +="\n\n";
+                }
+                result += this.getEntryFmt(entry.entry, template);
+            }
+
+            vscode.workspace
+                .openTextDocument({
+                    language: language,
+                    content: result,
+                })
+                .then((doc) => {
+                    vscode.window.showTextDocument(doc);
+                });
+
+
+        });
     }
 
     private async showFindingsSearchBar(): Promise<void> {
@@ -2691,7 +2760,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // open github issue with the issue body with the finding text and permalink
         const title = encodeURIComponent(entry.label);
 
-        const issueBodyText = await this.getEntryMarkdown(entry);
+        const issueBodyText = this.getEntryFmt(entry, "md");
         if (issueBodyText === undefined) {
             return;
         }
@@ -2757,72 +2826,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             });
     }
 
-    private async getEntryMarkdown(entry: FullEntry): Promise<string | void> {
-        let locationDescriptions = "";
-
-        // Order the locations by path. If there is only one entry for a given path, this will
-        // be shown as path:start_line-end_line. If there are multiple entries for a given path,
-        // this will be shown in markdown as :
-        // path:
-        // - line(s) start_line:end_line
-        // - line(s) start_line:end_line,
-        // etc.
-        // end_line will be omitted if it is equal to start_line.
-
-        // Step 1 : collect all locations into a map, indexed by its path
-        const locationsByPath: Map<string, FullLocation[]> = new Map();
-        for (const location of entry.locations) {
-            let pathKey;
-            if (this.workspaces.moreThanOneRoot()) {
-                const uniquePath = this.workspaces.createUniquePath(location.rootPath, location.path);
-                if (uniquePath !== undefined) {
-                    pathKey = uniquePath;
-                } else {
-                    continue; // Skip this location if it cannot be uniquely identified
-                }
-            } else {
-                pathKey = location.path;
-            }
-            if (!locationsByPath.has(pathKey)) {
-                locationsByPath.set(pathKey, []);
-            }
-            locationsByPath.get(pathKey)!.push(location);
+    private getEntryFmt(entry: FullEntry, template: string): string | void {
+        if(template === undefined) {
+            template = this.exportConfig.md;
         }
-
-        // Step 2 : create the location descriptions
-        if (locationsByPath.size !== 0) {
-            locationDescriptions += `\n### Locations\n`;
-
-            for (const [path, locations] of locationsByPath.entries()) {
-                // Sort the entries by increasing startlines
-                locations.sort((a, b) => a.startLine - b.startLine);
-
-                if (locations.length === 1) {
-                    const loc = locations[0];
-                    const multiline = loc.endLine !== loc.startLine;
-                    locationDescriptions += `- line${multiline ? `s` : ``} ${path}:${loc.startLine + 1}${multiline ? `-${loc.endLine + 1}` : ""}\n`;
-                } else {
-                    locations.sort((a, b) => a.startLine - b.startLine);
-                    locationDescriptions += `- ${path}:\n`;
-                    for (const loc of locations) {
-                        const multiline = loc.endLine !== loc.startLine;
-                        locationDescriptions += `  - line${multiline ? `s` : ``} ${loc.startLine + 1}${multiline ? `-${loc.endLine + 1}` : ""}\n`;
-                    }
-                }
-            }
-        }
-
-        let issueBodyText = `# Title\n${entry.label}\n\n`;
-        issueBodyText += entry.details.severity.length !== 0 ? `### Severity\n${entry.details.severity}\n\n` : "";
-        issueBodyText += entry.details.difficulty.length !== 0 ? `### Difficulty\n${entry.details.difficulty}\n\n` : "";
-        issueBodyText += entry.details.type.length !== 0 ? `### Type\n${entry.details.type}\n\n` : "";
-        issueBodyText += `## Description\n${entry.details.description}\n${locationDescriptions}\n\n`;
-        issueBodyText += entry.details.exploit.length !== 0 ? `## Exploit Scenario\n${entry.details.exploit}\n\n` : "";
-        issueBodyText += entry.details.recommendation.length !== 0 ? `## Recommendations\n${entry.details.recommendation}\n\n` : "";
-
-        issueBodyText += "\n";
-
-        return issueBodyText;
+        return Mustache.render(template,
+                {   kind: entry.entryType===EntryType.Finding?"finding":"note",
+                    title: entry.label,
+                    description: entry.details.description,
+                    severity:entry.details.severity });
     }
 
     /**
@@ -4346,6 +4358,8 @@ export class AuditMarker {
             treeDataProvider.loadTreeViewModeConfiguration();
         } else if (e.affectsConfiguration("weAudit.general.username")) {
             treeDataProvider.setUsernameConfigOrDefault();
+        } else if (e.affectsConfiguration("weAudit.export.markdown")) {
+            treeDataProvider.setExportConfig();
         } else {
             this.decorationManager.reloadAllDecorationConfigurations();
             this.decorate();
