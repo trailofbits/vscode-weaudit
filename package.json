@@ -532,7 +532,7 @@
                     "weAudit.export.markdown": {
                         "order": 1,
                         "type": "string",
-                        "default": "# Title\n{{title}}\n{{#severity}}### Severity\n{{severity}}\n{{/severity}}## Description\n{{&description}}\n",
+                        "default": "# Title\n{{title}}\n{{#severity}}\n### Severity\n{{severity}}\n{{/severity}}\n{{#difficulty}}\n### Difficulty\n{{difficulty}}\n{{/difficulty}}\n{{#type}}\n### Type\n{{type}}\n{{/type}}\n## Description\n{{{description}}}\n{{#location.length}}\n### Location\n{{#location}}\n{{#singleloc}}\n{{^singlefile}}- {{/singlefile}}File {{file}},{{#lines}} line{{#multiline}}s{{/multiline}} {{start}}{{#multiline}}-{{end}}{{/multiline}}{{/lines}}\n{{/singleloc}}\n{{^singleloc}}\n{{^singlefile}}- {{/singlefile}}File {{file}}:\n{{#lines}}\n{{^singlefile}}  {{/singlefile}}- line{{#multiline}}s{{/multiline}} {{start}}{{#multiline}}-{{end}}{{/multiline}}\n{{/lines}}\n{{/singleloc}} {{/location}}\n{{/location.length}}\n{{#exploit}}\n### Exploit Scenario\n{{{exploit}}}\n{{/exploit}}\n{{#recommendation}}\n### Recommendation\n{{{recommendation}}}\n{{/recommendation}}\n",
                         "description": "The mustache template used for markdown export",
                         "editPresentation": "multilineText"
                     },

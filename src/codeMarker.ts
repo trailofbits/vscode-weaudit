@@ -2092,7 +2092,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        const formats = ["Markdown", this.exportConfig.fstname, this.exportConfig.sndname, "Custom"];
+        const formats = ["Markdown", this.exportConfig.fstname, this.exportConfig.sndname, "From file"];
         let template: string;
         let language: string;
         vscode.window.showQuickPick(formats, {
@@ -2107,14 +2107,14 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 template = this.exportConfig.md;
             }
             else if (item === this.exportConfig.fstname) {
-                language = this.exportConfig.fstname;
+                language = item.toLowerCase();
                 template = this.exportConfig.fstvalue;
             }
             else if (item === this.exportConfig.sndname) {
-                language = this.exportConfig.sndname;
+                language = item.toLowerCase();
                 template = this.exportConfig.sndvalue;
             }
-            else if (item === "Custom") {
+            else if (item === "From file") {
                 await vscode.window.showOpenDialog({title: "Select mustache file"}).then(
                     (file) => {
                         if(file === undefined || file.length === 0) {
@@ -2830,11 +2830,51 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if(template === undefined) {
             template = this.exportConfig.md;
         }
+        // Create locations
+        // Step 1 : collect all locations into a map, indexed by their path
+        const locationsByPath: Map<string, FullLocation[]> = new Map();
+        for (const location of entry.locations) {
+            let pathKey;
+            if (this.workspaces.moreThanOneRoot()) {
+                const uniquePath = this.workspaces.createUniquePath(location.rootPath, location.path);
+                if (uniquePath !== undefined) {
+                    pathKey = uniquePath;
+                } else {
+                    continue; // Skip this location if it cannot be uniquely identified
+                }
+            } else {
+                pathKey = location.path;
+            }
+            if (!locationsByPath.has(pathKey)) {
+                locationsByPath.set(pathKey, []);
+            }
+            locationsByPath.get(pathKey)!.push(location);
+        }
+        // Step 2: create a list
+        const all_locations = []
+        for (const [path, locations] of locationsByPath.entries()) {
+            // Sort the entries by increasing startlines
+            locations.sort((a, b) => a.startLine - b.startLine);
+            let lines = []
+            for (const loc of locations) {
+                const multiline = loc.endLine !== loc.startLine;
+                lines.push({"start":loc.startLine+1, "end":loc.endLine+1, "multiline":multiline});
+            }
+
+            all_locations.push({"file": path, "lines": lines, "singleloc": lines.length === 1})
+
+        }
         return Mustache.render(template,
-                {   kind: entry.entryType===EntryType.Finding?"finding":"note",
-                    title: entry.label,
-                    description: entry.details.description,
-                    severity:entry.details.severity });
+                {   "kind": entry.entryType===EntryType.Finding?"finding":"note",
+                    "title": entry.label,
+                    "description": entry.details.description,
+                    "difficulty": entry.details.difficulty,
+                    "type": entry.details.type,
+                    "exploit": entry.details.exploit,
+                    "recommendation": entry.details.recommendation,
+                    "severity":entry.details.severity,
+                    "location": all_locations,
+                    "singlefile": all_locations.length === 1 })
     }
 
     /**
