@@ -50,7 +50,6 @@ import Mustache = require("mustache");
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
 
-
 /**
  * Class representing a WeAudit workspace root. Each root maintains its own set of
  * configuration files (configs) with clientRemote, gitRemote, gitSha, treeEntries, auditedFiles,
@@ -65,7 +64,7 @@ class WARoot {
     public gitSha: string;
     public clientRemote: string;
     private username: string;
-    private exportConfig: {md:string, fstname: string, fstvalue: string, sndname: string, sndvalue: string};
+    private exportConfig: { md: string; fstname: string; fstvalue: string; sndname: string; sndvalue: string };
 
     // An array corresponding to all .weaudit file in the .vscode folder of this workspace root
     private configs: ConfigurationEntry[];
@@ -1602,7 +1601,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     private workspaces: MultiRootManager;
     private username: string;
-    private exportConfig: {md:string, fstname: string, fstvalue: string, sndname: string, sndvalue: string};
+    private exportConfig: { md: string; fstname: string; fstvalue: string; sndname: string; sndvalue: string };
 
     // locationEntries contains a map associating a file path to an array of additional locations
     private pathToEntryMap: Map<string, TreeEntry[]>;
@@ -2045,14 +2044,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return this.username;
     }
 
-    public setExportConfig(): {md:string, fstname: string, fstvalue: string, sndname: string, sndvalue: string} {
-
+    public setExportConfig(): { md: string; fstname: string; fstvalue: string; sndname: string; sndvalue: string } {
         const fstname: string = vscode.workspace.getConfiguration("weAudit").get("export.custom1Name") || "Custom 1";
         const fstvalue: string = vscode.workspace.getConfiguration("weAudit").get("export.custom1Template") || "";
-        const sndname:string = vscode.workspace.getConfiguration("weAudit").get("export.custom2Name") || "Custom 2";
-        const sndvalue:string = vscode.workspace.getConfiguration("weAudit").get("export.custom2Template") || "";
+        const sndname: string = vscode.workspace.getConfiguration("weAudit").get("export.custom2Name") || "Custom 2";
+        const sndvalue: string = vscode.workspace.getConfiguration("weAudit").get("export.custom2Template") || "";
         this.exportConfig = {
-            md:vscode.workspace.getConfiguration("weAudit").get("export.markdown") || "",
+            md: vscode.workspace.getConfiguration("weAudit").get("export.markdown") || "",
             fstname: fstname,
             fstvalue: fstvalue,
             sndname: sndname,
@@ -2060,7 +2058,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         };
         return this.exportConfig;
     }
-
 
     /**
      * Exports the findings to a new file
@@ -2095,62 +2092,56 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const formats = ["Markdown", this.exportConfig.fstname, this.exportConfig.sndname, "From file"];
         let template: string;
         let language: string;
-        vscode.window.showQuickPick(formats, {
-        ignoreFocusOut: true,
-        title: "Select the target format",
-        }).then(async (item) => {
-            if (item === undefined) {
-                return;
-            }
-            else if (item === "Markdown") {
-                language = "markdown";
-                template = this.exportConfig.md;
-            }
-            else if (item === this.exportConfig.fstname) {
-                language = item.toLowerCase();
-                template = this.exportConfig.fstvalue;
-            }
-            else if (item === this.exportConfig.sndname) {
-                language = item.toLowerCase();
-                template = this.exportConfig.sndvalue;
-            }
-            else if (item === "From file") {
-                await vscode.window.showOpenDialog({title: "Select mustache file"}).then(
-                    (file) => {
-                        if(file === undefined || file.length === 0) {
+        vscode.window
+            .showQuickPick(formats, {
+                ignoreFocusOut: true,
+                title: "Select the target format",
+            })
+            .then(async (item) => {
+                if (item === undefined) {
+                    return;
+                } else if (item === "Markdown") {
+                    language = "markdown";
+                    template = this.exportConfig.md;
+                } else if (item === this.exportConfig.fstname) {
+                    language = item.toLowerCase();
+                    template = this.exportConfig.fstvalue;
+                } else if (item === this.exportConfig.sndname) {
+                    language = item.toLowerCase();
+                    template = this.exportConfig.sndvalue;
+                } else if (item === "From file") {
+                    await vscode.window.showOpenDialog({ title: "Select mustache file" }).then((file) => {
+                        if (file === undefined || file.length === 0) {
                             return;
                         }
                         template = fs.readFileSync(file[0].fsPath).toString();
-                });
-            }
-            else {
-                vscode.window.showWarningMessage("Invalid format");
-                return;
-            }
-
-            let result = "";
-            let first = true;
-
-            for (const entry of selectedEntries) {
-                if(first) {
-                    first = false;
+                    });
                 } else {
-                    result +="\n\n";
+                    vscode.window.showWarningMessage("Invalid format");
+                    return;
                 }
-                result += this.getEntryFmt(entry.entry, template);
-            }
 
-            vscode.workspace
-                .openTextDocument({
-                    language: language,
-                    content: result,
-                })
-                .then((doc) => {
-                    vscode.window.showTextDocument(doc);
-                });
+                let result = "";
+                let first = true;
 
+                for (const entry of selectedEntries) {
+                    if (first) {
+                        first = false;
+                    } else {
+                        result += "\n\n";
+                    }
+                    result += this.getEntryFmt(entry.entry, template);
+                }
 
-        });
+                vscode.workspace
+                    .openTextDocument({
+                        language: language,
+                        content: result,
+                    })
+                    .then((doc) => {
+                        vscode.window.showTextDocument(doc);
+                    });
+            });
     }
 
     private async showFindingsSearchBar(): Promise<void> {
@@ -2827,7 +2818,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     private getEntryFmt(entry: FullEntry, template: string): string | void {
-        if(template === undefined) {
+        if (template === undefined) {
             template = this.exportConfig.md;
         }
         // Create locations
@@ -2851,30 +2842,35 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             locationsByPath.get(pathKey)!.push(location);
         }
         // Step 2: create a list
-        const all_locations = []
+        const all_locations = [];
         for (const [path, locations] of locationsByPath.entries()) {
             // Sort the entries by increasing startlines
             locations.sort((a, b) => a.startLine - b.startLine);
-            let lines = []
+            const lines = [];
             for (const loc of locations) {
                 const multiline = loc.endLine !== loc.startLine;
-                lines.push({"start":loc.startLine+1, "end":loc.endLine+1, "multiline":multiline});
+                lines.push({ start: loc.startLine + 1, end: loc.endLine + 1, multiline: multiline });
             }
 
-            all_locations.push({"file": path, "lines": lines, "singleloc": lines.length === 1})
-
+            all_locations.push({ file: path, lines: lines, singleloc: lines.length === 1 });
         }
-        return Mustache.render(template,
-                {   "kind": entry.entryType===EntryType.Finding?"finding":"note",
-                    "title": entry.label,
-                    "description": entry.details.description,
-                    "difficulty": entry.details.difficulty,
-                    "type": entry.details.type,
-                    "exploit": entry.details.exploit,
-                    "recommendation": entry.details.recommendation,
-                    "severity":entry.details.severity,
-                    "location": all_locations,
-                    "singlefile": all_locations.length === 1 })
+        // Overwrite the sanitizing function. We do not need want to escape special characters, for now
+        Mustache.escape = function (value: String) {
+            return value;
+        };
+
+        return Mustache.render(template, {
+            kind: entry.entryType === EntryType.Finding ? "finding" : "note",
+            title: entry.label,
+            description: entry.details.description,
+            difficulty: entry.details.difficulty,
+            type: entry.details.type,
+            exploit: entry.details.exploit,
+            recommendation: entry.details.recommendation,
+            severity: entry.details.severity,
+            location: all_locations,
+            singlefile: all_locations.length === 1,
+        });
     }
 
     /**
