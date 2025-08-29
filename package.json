@@ -486,8 +486,15 @@
                         "type": "string",
                         "default": "\\n",
                         "description": "The separator to use in permalinks. (Note that \\n is interpreted as a newline)"
-                    },
+                    }
+                }
+            },
+            {
+                "title": "Personalization",
+                "order": 3,
+                "properties": {
                     "weAudit.general.severities": {
+                        "order": 0,
                         "type": "array",
                         "items": {
                             "type": "string"
@@ -500,7 +507,23 @@
                         ],
                         "description": "The list of possible finding severities. Need to reload the editor in order for modifications to be taken into account"
                     },
-                    "weAudit.general.finding_types": {
+                    "weAudit.general.difficulties": {
+                        "order": 1,
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "default": [
+                            "Undetermined",
+                            "N/A",
+                            "Low",
+                            "Medium",
+                            "High"
+                        ],
+                        "description": "The list of possible finding difficulties. Need to reload the editor in order for modifications to be taken into account"
+                    },
+                    "weAudit.general.findingTypes": {
+                        "order": 2,
                         "type": "array",
                         "items": {
                             "type": "string"
@@ -527,7 +550,7 @@
             },
             {
                 "title": "Export",
-                "order": 3,
+                "order": 4,
                 "properties": {
                     "weAudit.export.markdown": {
                         "order": 1,

@@ -105,8 +105,16 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
             .join("\n");
 
         // List of available types of findings
-        const findingTypes: Array<string> = vscode.workspace.getConfiguration("weAudit").get("general.finding_types") || [];
+        const findingTypes: Array<string> = vscode.workspace.getConfiguration("weAudit").get("general.findingTypes") || [];
         const findingsHtml = findingTypes
+            .map((val: string, _index: number) => {
+                return `<vscode-option>${val}</vscode-option>`;
+            })
+            .join("\n");
+
+        // List of available types of findings
+        const difficulties: Array<string> = vscode.workspace.getConfiguration("weAudit").get("general.difficulties") || [];
+        const difficultiesHtml = difficulties
             .map((val: string, _index: number) => {
                 return `<vscode-option>${val}</vscode-option>`;
             })
@@ -131,11 +139,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         <span class="detailSpan">Difficulty:</span>
         <vscode-dropdown position="below" id="difficulty-dropdown">
             <vscode-option></vscode-option>
-            <vscode-option>Undetermined</vscode-option>
-            <vscode-option>N/A</vscode-option>
-            <vscode-option>Low</vscode-option>
-            <vscode-option>Medium</vscode-option>
-            <vscode-option>High</vscode-option>
+            ${difficultiesHtml}
         </vscode-dropdown>
     </div>
     <div class="detailsDiv">

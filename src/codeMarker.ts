@@ -2855,7 +2855,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             all_locations.push({ file: path, lines: lines, singleloc: lines.length === 1 });
         }
         // Overwrite the sanitizing function. We do not need want to escape special characters, for now
-        Mustache.escape = function (value: String) {
+        Mustache.escape = function (value: string) {
             return value;
         };
 
