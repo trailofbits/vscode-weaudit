@@ -556,7 +556,7 @@
                         "order": 1,
                         "type": "string",
                         "default": "# Title\n{{title}}\n{{#severity}}\n### Severity\n{{severity}}\n{{/severity}}\n{{#difficulty}}\n### Difficulty\n{{difficulty}}\n{{/difficulty}}\n{{#type}}\n### Type\n{{type}}\n{{/type}}\n## Description\n{{{description}}}\n{{#location.length}}\n### Location\n{{#location}}\n{{#singleloc}}\n{{^singlefile}}- {{/singlefile}}File {{file}},{{#lines}} line{{#multiline}}s{{/multiline}} {{start}}{{#multiline}}-{{end}}{{/multiline}}{{/lines}}\n{{/singleloc}}\n{{^singleloc}}\n{{^singlefile}}- {{/singlefile}}File {{file}}:\n{{#lines}}\n{{^singlefile}}  {{/singlefile}}- line{{#multiline}}s{{/multiline}} {{start}}{{#multiline}}-{{end}}{{/multiline}}\n{{/lines}}\n{{/singleloc}} {{/location}}\n{{/location.length}}\n{{#exploit}}\n### Exploit Scenario\n{{{exploit}}}\n{{/exploit}}\n{{#recommendation}}\n### Recommendation\n{{{recommendation}}}\n{{/recommendation}}\n",
-                        "description": "The mustache template used for markdown export",
+                        "markdownDescription": "The mustache template used for markdown export. Note that you have access to the following properties:\n\n- title\n- severity\n- difficulty\n- type\n- description\n- singlefile: true if there is only one file related to this finding\n- location: the list of locations, containing the following attributes: \n\t- file: the file where this location appears\n\t- lines: the list of lines for that finding in this file\n\t\t- start: the start column for that location\n\t\t- end: the end location for that finding\n\t- singleloc: true if there is only one line in that file that is related to the finding\n- exploit\n- recommendation ",
                         "editPresentation": "multilineText"
                     },
                     "weAudit.export.custom1Name": {
@@ -569,7 +569,7 @@
                         "order": 3,
                         "type": "string",
                         "default": "<item kind=\"{{kind}}\">\n<title>{{title}}</title>\n<description>{{&description}}</description>{{#severity}}\n<severity>{{severity}}</severity>{{/severity}}\n</item>",
-                        "description": "The mustache template used for the first custom export",
+                        "description": "The mustache template used for the first custom export. See the description of the markdown export for the list of accessible properties.",
                         "editPresentation": "multilineText"
                     },
                     "weAudit.export.custom2Name": {
@@ -582,7 +582,7 @@
                         "order": 5,
                         "type": "string",
                         "default": "= Title\n{{title}}\n{{#severity}}=== Severity\n{{severity}}\n{{/severity}}== Description\n{{&description}}\n",
-                        "description": "The mustache template used for the second custom export",
+                        "description": "The mustache template used for the second custom export. See the description of the markdown export for the list of accessible properties.",
                         "editPresentation": "multilineText"
                     }
                 }
