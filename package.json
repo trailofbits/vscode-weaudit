@@ -227,6 +227,10 @@
             {
                 "command": "weAudit.navigateToNextPartiallyAuditedRegion",
                 "title": "weAudit: Navigate to Next Partially Audited Region"
+            },
+            {
+                "command": "weAudit.toggleFindingsHighlighting",
+                "title": "weAudit: Toggle Findings Highlighting"
             }
         ],
         "keybindings": [
