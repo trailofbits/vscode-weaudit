@@ -41,7 +41,9 @@ const watchPlugin = {
         });
 
         build.onEnd((result) => {
-            console.log(`${result.errors.length > 0 ? "[watch] build finished with errors" : "[watch] build finished successfully"} (${build.initialOptions.outfile})`);
+            console.log(
+                `${result.errors.length > 0 ? "[watch] build finished with errors" : "[watch] build finished successfully"} (${build.initialOptions.outfile})`,
+            );
         });
     },
 };
