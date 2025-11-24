@@ -6,3 +6,4 @@ node_modules
 *.mov
 *.vsix
 *.sarif*
+PLAN.md
