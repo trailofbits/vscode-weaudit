@@ -3299,7 +3299,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             ),
         } as FullSerializedData;
 
-        // Normalize all the paths from loaded files. These can come from different OSes with different path 
+        // Normalize all the paths from loaded files. These can come from different OSes with different path
         // conventions. We do a best effort to match them to the current OS format.
         fullParsedEntries.treeEntries.forEach((entry) => {
             entry.locations.forEach((loc) => {
