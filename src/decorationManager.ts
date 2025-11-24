@@ -39,7 +39,7 @@ export class DecorationManager {
     }
     /**
      * Returns the same color as the provided hex string but with a boosted alpha channel,
-     * making it less transparent while preserving the hue for overview rulers/minimap.
+     * making it less transparent while preserving the hue for overview rulers.
      */
     private withLessTransparentAlpha(color: string | undefined): string | undefined {
         if (color === undefined || !color.startsWith("#")) {
