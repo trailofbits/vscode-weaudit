@@ -7,3 +7,4 @@ node_modules
 *.vsix
 *.sarif*
 PLAN.md
+codeql-findings.json
