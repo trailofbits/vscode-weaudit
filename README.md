@@ -148,6 +148,9 @@ You can hide all findings associated with a specific user by clicking on that us
 
 ![Hide Findings associated to a user](media/readme/gifs/hide_findings.gif)
 
+### Toggle Highlights
+Hide every findings/notes highlight in the editor by running the `weAudit: Toggle Findings Highlighting` command from the Command Palette. Run the command again to bring the highlights back whenever you need to review them.
+
 ### Search & Filter Findings
 You can search for and filter the findings in the `List of Findings` panel by calling the `weAudit: Search and Filter Findings` command.
 

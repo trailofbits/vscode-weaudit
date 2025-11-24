@@ -87,6 +87,16 @@ export class DecorationManager {
         this.otherNoteDecorationType = this.loadOtherNoteDecorationConfiguration();
         this.auditedFileDecorationType = this.loadAuditedDecorationConfiguration();
     }
+
+    /**
+     * Removes the finding decorations from the given editor so the file can be shown without highlights.
+     */
+    public clearEditorDecorations(editor: vscode.TextEditor): void {
+        editor.setDecorations(this.ownFindingDecorationType, []);
+        editor.setDecorations(this.otherFindingDecorationType, []);
+        editor.setDecorations(this.ownNoteDecorationType, []);
+        editor.setDecorations(this.otherNoteDecorationType, []);
+    }
 }
 
 /**

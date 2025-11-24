@@ -1616,6 +1616,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     private resolvedEntriesTree: ResolvedEntries;
 
     private decorationManager: DecorationManager;
+    private decorationsEnabled = true;
 
     // State for navigating through partially audited regions
     private currentPartiallyAuditedIndex = -1;
@@ -1711,6 +1712,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         vscode.commands.registerCommand("weAudit.addPartiallyAudited", () => {
             this.addPartiallyAudited();
+        });
+
+        vscode.commands.registerCommand("weAudit.toggleFindingsHighlighting", () => {
+            this.decorationsEnabled = !this.decorationsEnabled;
+            this.decorate();
         });
 
         vscode.commands.registerCommand("weAudit.toggleTreeViewMode", () => {
@@ -3430,6 +3436,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (editor === undefined) {
             return;
         }
+
+        // If highlights were disabled, clear the decorations and return
+        if (!this.decorationsEnabled) {
+            this.decorationManager.clearEditorDecorations(editor);
+            return;
+        }
+
         const [wsRoot, relativePath, inMultipleRoots] = this.workspaces.getCorrespondingRootAndPath(editor.document.fileName);
 
         if (wsRoot === undefined || relativePath === undefined) {
