@@ -27,14 +27,38 @@ export class DecorationManager {
     }
 
     private createDecorationTypeWithString(color: string): vscode.TextEditorDecorationType {
+        const overviewColor = this.withLessTransparentAlpha(color);
         return vscode.window.createTextEditorDecorationType({
             isWholeLine: true,
             backgroundColor: color,
             gutterIconPath: this.gutterIconPath,
             gutterIconSize: "contain",
-            overviewRulerColor: color,
-            overviewRulerLane: vscode.OverviewRulerLane.Full,
+            overviewRulerColor: overviewColor,
+            overviewRulerLane: vscode.OverviewRulerLane.Center,
         });
+    }
+    /**
+     * Returns the same color as the provided hex string but with a boosted alpha channel,
+     * making it less transparent while preserving the hue for overview rulers.
+     */
+    private withLessTransparentAlpha(color: string | undefined): string | undefined {
+        if (color === undefined || !color.startsWith("#")) {
+            return color;
+        }
+        const hex = color.slice(1);
+        if (hex.length === 4) {
+            const base = hex.slice(0, 3);
+            const alpha = parseInt(hex[3], 16);
+            const newAlpha = Math.min(0xf, alpha + 0x7);
+            return `#${base}${newAlpha.toString(16)}`;
+        }
+        if (hex.length === 8) {
+            const base = hex.slice(0, 6);
+            const alpha = parseInt(hex.slice(6), 16);
+            const newAlpha = Math.min(0xff, alpha + 0x77);
+            return `#${base}${newAlpha.toString(16).padStart(2, "0")}`;
+        }
+        return color;
     }
 
     private loadOwnDecorationConfiguration(): vscode.TextEditorDecorationType {
@@ -62,9 +86,12 @@ export class DecorationManager {
     }
 
     private loadAuditedDecorationConfiguration(): vscode.TextEditorDecorationType {
+        const color: string | undefined = vscode.workspace.getConfiguration("weAudit").get("auditedColor");
         return vscode.window.createTextEditorDecorationType({
             isWholeLine: true,
-            backgroundColor: vscode.workspace.getConfiguration("weAudit").get("auditedColor"),
+            backgroundColor: color,
+            overviewRulerColor: this.withLessTransparentAlpha(color),
+            overviewRulerLane: vscode.OverviewRulerLane.Full,
         });
     }
 
