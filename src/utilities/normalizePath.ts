@@ -4,6 +4,7 @@ import * as fs from "fs";
 /**
  * A method that normalizes the slashes in a path based on current operating system.
  *
+ * @param wsRoot - The workspace root path to resolve relative paths
  * @param filePath - The file path string to normalize
  * @returns The path with slashes normalized for the current operating system
  */
