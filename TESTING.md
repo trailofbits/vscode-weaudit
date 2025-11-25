@@ -335,6 +335,220 @@ Extension-host tests require display server on Linux:
 
 Consider VS Code version matrix: `stable`, `insiders`.
 
+## Phase 5: Extension Integration Tests (P2)
+
+Extension-host tests run inside a real VS Code instance via `@vscode/test-electron`. These tests verify that the extension integrates correctly with VS Code APIs.
+
+### Test Layout
+
+```
+test/extension/
+├── suite/
+│   ├── index.ts           # Mocha test runner configuration
+│   ├── activation.test.ts # Extension activation tests
+│   ├── commands.test.ts   # Command registration and execution
+│   ├── treeViews.test.ts  # Tree view integration
+│   ├── decorations.test.ts# Editor decorations
+│   └── workspace.test.ts  # Workspace and file operations
+└── fixtures/
+    └── sample-workspace/  # Test workspace with sample files
+```
+
+### Extension Activation
+
+| Test | Type | Description |
+|------|------|-------------|
+| Extension activates on workspace open | + | `onStartupFinished` trigger |
+| Extension activates on view open | + | `onView:weAudit` trigger |
+| Extension exports public API | + | `activate()` returns expected API |
+| Extension registers all commands | + | All 30+ commands available |
+| Extension creates tree views | + | All 5 views registered |
+| Extension handles missing `.vscode` folder | + | Creates folder on first save |
+| Extension handles corrupt `.weaudit` file | - | Graceful degradation, shows warning |
+
+### Command Execution
+
+| Test | Type | Description |
+|------|------|-------------|
+| `weAudit.addFinding` creates finding at selection | + | Entry added to tree |
+| `weAudit.addFinding` prompts for label | + | Input box shown |
+| `weAudit.addFinding` cancels on escape | - | No entry created |
+| `weAudit.addNote` creates note at selection | + | Note entry added |
+| `weAudit.editEntryLabel` updates existing label | + | Label changed in tree |
+| `weAudit.deleteEntry` removes entry | + | Entry removed from tree |
+| `weAudit.deleteEntry` handles multi-location entry | + | All locations removed |
+| `weAudit.toggleAudited` marks file as reviewed | + | Decoration applied |
+| `weAudit.toggleAudited` unmarks reviewed file | + | Decoration removed |
+| `weAudit.addPartiallyAudited` marks region | + | Region decorated |
+| `weAudit.resolveFinding` moves to resolved tree | + | Entry in resolved view |
+| `weAudit.restoreFinding` moves back to active | + | Entry in main view |
+| `weAudit.copyPermalink` copies to clipboard | + | Clipboard contains URL |
+| `weAudit.copyClientPermalink` uses client remote | + | Different URL than audit |
+| `weAudit.openGitHubIssue` opens external URL | + | URL contains finding data |
+| `weAudit.exportFindings` creates markdown file | + | Valid markdown output |
+| `weAudit.showDayLog` displays log in output | + | Output channel shown |
+| `weAudit.navigateToNextPartiallyAuditedRegion` moves cursor | + | Selection changes |
+| `weAudit.setTreeViewMode` toggles view mode | + | Tree refreshes |
+
+### Tree View Integration
+
+| Test | Type | Description |
+|------|------|-------------|
+| Findings tree view shows entries | + | Tree populated |
+| Findings tree view updates on add | + | New entry appears |
+| Findings tree view updates on delete | + | Entry disappears |
+| Findings tree view click opens file | + | Editor opens at line |
+| Findings tree view context menu appears | + | Menu items available |
+| Resolved tree view shows resolved entries | + | Resolved entries visible |
+| Saved findings tree shows `.weaudit` files | + | Config files listed |
+| Saved findings tree toggles visibility | + | Eye icon toggles |
+| Tree view drag-and-drop reorders | + | Order persists |
+| Tree view refresh command works | + | Tree rebuilds |
+
+### Editor Decorations
+
+| Test | Type | Description |
+|------|------|-------------|
+| Finding decorations appear on marked lines | + | Background color visible |
+| Note decorations appear on marked lines | + | Different color than findings |
+| Audited file decoration covers all lines | + | Whole file decorated |
+| Partial audit decoration covers region only | + | Only selected lines |
+| Decorations update on file edit | + | Lines shift correctly |
+| Decorations clear on entry delete | + | No lingering decoration |
+| Gutter icons appear for findings | + | Icon in gutter |
+| Hover shows finding label | + | Hover message displayed |
+| Decoration colors respect configuration | + | Custom colors applied |
+| Theme change updates decorations | + | Colors adapt |
+
+### Webview Panels
+
+| Test | Type | Description |
+|------|------|-------------|
+| Finding details panel opens | + | Webview visible |
+| Finding details panel shows entry data | + | Fields populated |
+| Finding details panel updates on selection | + | Data changes |
+| Finding details panel saves changes | + | Persisted to file |
+| Git config panel opens | + | Webview visible |
+| Git config panel shows repository URLs | + | Fields populated |
+| Git config panel saves changes | + | Config updated |
+| Webview survives editor close/reopen | + | State preserved |
+
+### Workspace Operations
+
+| Test | Type | Description |
+|------|------|-------------|
+| Single-root workspace loads findings | + | Tree populated |
+| Multi-root workspace loads all roots | + | All roots visible |
+| Adding workspace folder updates tree | + | New root appears |
+| Removing workspace folder updates tree | + | Root removed |
+| File rename updates entry locations | + | Paths corrected |
+| File delete prompts for entry removal | + | User prompted |
+| External `.weaudit` change reloads | + | File watcher triggers |
+| Configuration change updates behavior | + | Settings respected |
+
+### File Decorations (Explorer)
+
+| Test | Type | Description |
+|------|------|-------------|
+| Audited files show badge in explorer | + | Badge visible |
+| Partially audited files show different badge | + | Distinct indicator |
+| Badge updates on audit toggle | + | Real-time update |
+| Badge respects file filter | + | Hidden files excluded |
+
+### Error Handling
+
+| Test | Type | Description |
+|------|------|-------------|
+| Invalid selection shows error message | - | User-friendly error |
+| Missing workspace shows warning | - | Prompts to open folder |
+| Git remote not configured shows warning | - | Guidance message |
+| Concurrent saves handled correctly | + | No data corruption |
+| Large file handling doesn't freeze UI | + | Responsive during operation |
+
+### Performance
+
+| Test | Type | Description |
+|------|------|-------------|
+| Extension activates under 500ms | + | Startup time acceptable |
+| Tree view renders 100 entries under 100ms | + | No visible lag |
+| File decoration applies under 50ms | + | Immediate visual feedback |
+| Large `.weaudit` file (1000 entries) loads | + | No timeout |
+
+---
+
+## Extension Test Setup
+
+### Test Runner Configuration
+
+Create `test/extension/suite/index.ts`:
+
+```typescript
+import * as path from "path";
+import Mocha from "mocha";
+import { glob } from "glob";
+
+export async function run(): Promise<void> {
+    const mocha = new Mocha({
+        ui: "bdd",
+        color: true,
+        timeout: 60000,
+    });
+
+    const testsRoot = path.resolve(__dirname, "..");
+    const files = await glob("**/**.test.js", { cwd: testsRoot });
+
+    files.forEach((f) => mocha.addFile(path.resolve(testsRoot, f)));
+
+    return new Promise((resolve, reject) => {
+        mocha.run((failures) => {
+            if (failures > 0) {
+                reject(new Error(`${failures} tests failed.`));
+            } else {
+                resolve();
+            }
+        });
+    });
+}
+```
+
+### Sample Test File
+
+Create `test/extension/suite/activation.test.ts`:
+
+```typescript
+import * as assert from "assert";
+import * as vscode from "vscode";
+
+suite("Extension Activation", () => {
+    test("Extension should be present", () => {
+        const extension = vscode.extensions.getExtension("trailofbits.weaudit");
+        assert.ok(extension, "Extension not found");
+    });
+
+    test("Extension should activate", async () => {
+        const extension = vscode.extensions.getExtension("trailofbits.weaudit");
+        await extension?.activate();
+        assert.strictEqual(extension?.isActive, true);
+    });
+
+    test("Commands should be registered", async () => {
+        const commands = await vscode.commands.getCommands(true);
+        assert.ok(commands.includes("weAudit.addFinding"));
+        assert.ok(commands.includes("weAudit.addNote"));
+        assert.ok(commands.includes("weAudit.toggleAudited"));
+    });
+});
+```
+
+### Test Workspace Fixture
+
+Create `test/extension/fixtures/sample-workspace/` with:
+- `.vscode/settings.json`
+- `src/sample.ts` (sample code file)
+- `.vscode/testuser.weaudit` (pre-populated findings)
+
+---
+
 ## Scripts
 
 ```json
