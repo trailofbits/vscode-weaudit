@@ -213,7 +213,8 @@ suite("Command Execution", () => {
 
         // First, mark a file as audited to ensure there's content in the day log
         await openTestFile();
-        const relativePath = "src/sample.ts";
+        // Use path.join for cross-platform compatibility (Windows uses backslashes)
+        const relativePath = path.join("src", "sample.ts");
 
         // Check if file is already audited
         const dataBefore = readWeauditData(workspaceFolder);
