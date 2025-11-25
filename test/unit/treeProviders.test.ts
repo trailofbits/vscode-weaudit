@@ -416,7 +416,7 @@ describe("Tree Data Providers", () => {
                 const entry = createFullEntry({ label: "Main Finding" });
 
                 // Simulate per-file mode label
-                const treeViewMode = TreeViewMode.PerFile;
+                const treeViewMode = TreeViewMode.GroupByFile;
                 let mainLabel: string;
                 if (treeViewMode === TreeViewMode.List) {
                     mainLabel = location.label;
@@ -531,7 +531,7 @@ describe("Tree Data Providers", () => {
                 const entry = createFullEntry({
                     locations: [createFullLocation({ path: "src/file1.ts" }), createFullLocation({ path: "src/file2.ts" })],
                 });
-                const treeViewMode = TreeViewMode.PerFile;
+                const treeViewMode = TreeViewMode.GroupByFile;
 
                 const isExpandable = entry.locations && entry.locations.length > 1 && treeViewMode === TreeViewMode.List;
 
@@ -839,15 +839,15 @@ describe("Tree Data Providers", () => {
             expect(defaultMode).to.equal(TreeViewMode.List);
         });
 
-        it("toggles between List and PerFile modes", () => {
+        it("toggles between List and GroupByFile modes", () => {
             let mode = TreeViewMode.List;
 
             // Toggle
-            mode = mode === TreeViewMode.List ? TreeViewMode.PerFile : TreeViewMode.List;
-            expect(mode).to.equal(TreeViewMode.PerFile);
+            mode = mode === TreeViewMode.List ? TreeViewMode.GroupByFile : TreeViewMode.List;
+            expect(mode).to.equal(TreeViewMode.GroupByFile);
 
             // Toggle again
-            mode = mode === TreeViewMode.List ? TreeViewMode.PerFile : TreeViewMode.List;
+            mode = mode === TreeViewMode.List ? TreeViewMode.GroupByFile : TreeViewMode.List;
             expect(mode).to.equal(TreeViewMode.List);
         });
 
