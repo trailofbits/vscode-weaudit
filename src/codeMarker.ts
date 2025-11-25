@@ -1046,7 +1046,7 @@ class WARoot {
             // Write file atomically with proper error handling
             // Using 'w+' flag: creates file if it doesn't exist, truncates if it does
             try {
-                fs.writeFileSync(fileName, data, { flag: "w+", mode: 0o600 });
+                fs.writeFileSync(fileName, data, { flag: "w+" });
             } catch (error: any) {
                 console.error(`Failed to write audit data to ${fileName}:`, error);
                 throw new Error(`Failed to save audit data: ${error.message}`);
