@@ -2014,6 +2014,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             void this.addRegionToAnEntry();
         });
 
+        vscode.commands.registerCommand("weAudit.addRegionToAnEntryWithLabel", () => {
+            this.addRegionToAnEntryWithLabel();
+        });
+
         vscode.commands.registerCommand("weAudit.deleteLocation", (entry: FullLocationEntry) => {
             this.deleteLocation(entry);
         });
@@ -3217,6 +3221,75 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             entry.locations.push(location);
         }
         void this.updateSavedData(entry.author);
+        this.decorateWithUri(editor.document.uri);
+        this.refresh(editor.document.uri);
+        // reveal the entry in the tree view if the treeview is visible,
+        // for some reason, it won't expand even if though it is created
+        // with an expanded state
+        if (treeView.visible) {
+            treeView.reveal(entry, { expand: 1, select: false });
+        }
+    }
+
+    /**
+     * Add the selected code region to an existing entry, prompting for a label
+     */
+    async addRegionToAnEntryWithLabel(): Promise<void> {
+        const editor = vscode.window.activeTextEditor;
+        if (editor === undefined) {
+            return;
+        }
+        const locations = this.getActiveSelectionLocation();
+        if (locations === undefined || locations.length === 0) {
+            return;
+        }
+
+        // create a quick pick to select the entry to add the region to
+        const items = this.treeEntries
+            .filter((entry) => {
+                if (entry.locations.length === 0 || entry.locations[0].rootPath !== locations[0].rootPath) {
+                    return false;
+                }
+                return true;
+            })
+            .map((entry) => {
+                return {
+                    label: entry.label,
+                    entry: entry,
+                };
+            });
+
+        // if we have no findings so far, create a new one
+        if (items.length === 0) {
+            this.addFinding();
+            return;
+        }
+
+        const pickItem = await vscode.window.showQuickPick(items, {
+            ignoreFocusOut: true,
+            title: "Select the finding to add the region to",
+        });
+
+        if (pickItem === undefined) {
+            return;
+        }
+
+        const label = await vscode.window.showInputBox({
+            title: "Enter a label for this location",
+            ignoreFocusOut: true,
+        });
+
+        if (label === undefined) {
+            return;
+        }
+
+        const entry = pickItem.entry;
+        // Add each selection as a separate region with the label
+        for (const location of locations) {
+            location.label = label;
+            entry.locations.push(location);
+        }
+        this.updateSavedData(entry.author);
         this.decorateWithUri(editor.document.uri);
         this.refresh(editor.document.uri);
         // reveal the entry in the tree view if the treeview is visible,
