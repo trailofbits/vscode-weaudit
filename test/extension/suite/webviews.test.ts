@@ -1,6 +1,8 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
 
+// NOTE: Command registration tests are consolidated in activation.test.ts
+
 suite("Webview Panels", () => {
     const extensionId = "trailofbits.weaudit";
 
@@ -9,7 +11,7 @@ suite("Webview Panels", () => {
         await extension?.activate();
     });
 
-    test("Finding details panel is registered", async function () {
+    test("All webview panels are registered in package.json", async function () {
         this.timeout(10000);
 
         const extension = vscode.extensions.getExtension(extensionId);
@@ -18,41 +20,29 @@ suite("Webview Panels", () => {
         const views = extension.packageJSON?.contributes?.views?.weAudit;
         assert.ok(Array.isArray(views), "weAudit views should be registered");
 
-        const findingDetailsView = views.find((v: { id: string }) => v.id === "findingDetails");
-        assert.ok(findingDetailsView, "Finding details panel should be registered");
+        // Verify all expected webview panels are registered
+        const viewIds = views.map((v: { id: string }) => v.id);
+        const expectedViews = ["findingDetails", "gitConfig"];
+
+        for (const viewId of expectedViews) {
+            assert.ok(viewIds.includes(viewId), `${viewId} panel should be registered`);
+        }
     });
 
-    test("Finding details panel can be focused", async function () {
+    test("Webview panels can be focused and their commands remain registered", async function () {
         this.timeout(10000);
 
-        await vscode.commands.executeCommand("findingDetails.focus");
-    });
+        const panels = ["findingDetails", "gitConfig"];
 
-    test("Git config panel is registered", async function () {
-        this.timeout(10000);
+        for (const panel of panels) {
+            // Focus the panel
+            await vscode.commands.executeCommand(`${panel}.focus`);
+            await new Promise((resolve) => setTimeout(resolve, 300));
 
-        const extension = vscode.extensions.getExtension(extensionId);
-        assert.ok(extension, "Extension should be present");
-
-        const views = extension.packageJSON?.contributes?.views?.weAudit;
-        assert.ok(Array.isArray(views), "weAudit views should be registered");
-
-        const gitConfigView = views.find((v: { id: string }) => v.id === "gitConfig");
-        assert.ok(gitConfigView, "Git config panel should be registered");
-    });
-
-    test("Git config panel can be focused", async function () {
-        this.timeout(10000);
-
-        await vscode.commands.executeCommand("gitConfig.focus");
-    });
-
-    test("Git config commands are registered", async function () {
-        this.timeout(10000);
-
-        const commands = await vscode.commands.getCommands(true);
-        assert.ok(commands.includes("weAudit.editClientRemote"), "editClientRemote command should exist");
-        assert.ok(commands.includes("weAudit.editAuditRemote"), "editAuditRemote command should exist");
+            // Verify the focus command is still registered (panel exists)
+            const allCommands = await vscode.commands.getCommands(true);
+            assert.ok(allCommands.includes(`${panel}.focus`), `${panel}.focus command should be registered`);
+        }
     });
 
     test("Extension remains active after closing editors", async function () {

@@ -37,6 +37,7 @@ suite("Extension Activation", () => {
         const allCommands = await vscode.commands.getCommands(true);
 
         // List of commands the extension should register
+        // This is the consolidated test for command registration - don't duplicate elsewhere
         const expectedCommands = [
             "weAudit.addFinding",
             "weAudit.addNote",
@@ -53,6 +54,12 @@ suite("Extension Activation", () => {
             "weAudit.exportFindingsInMarkdown",
             "weAudit.showMarkedFilesDayLog",
             "weAudit.navigateToNextPartiallyAuditedRegion",
+            // Git config commands
+            "weAudit.editClientRemote",
+            "weAudit.editAuditRemote",
+            // Multi-root workspace commands
+            "weAudit.nextGitConfig",
+            "weAudit.prevGitConfig",
         ];
 
         for (const cmd of expectedCommands) {
