@@ -1,0 +1,14 @@
+{
+    "clientRemote": "",
+    "gitRemote": "",
+    "gitSha": "",
+    "treeEntries": [
+        {
+            "label": "Missing required fields",
+            "entryType": 0,
+            "author": "alice"
+        }
+    ],
+    "auditedFiles": [],
+    "resolvedEntries": []
+}
