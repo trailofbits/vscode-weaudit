@@ -29,6 +29,8 @@ suite("Editor Decorations", () => {
     const extensionId = "trailofbits.weaudit";
     let testFileUri: vscode.Uri;
     let workspaceFolder: vscode.WorkspaceFolder;
+    let originalWeauditContent: string | null = null;
+    let weauditFilePath: string;
 
     suiteSetup(async () => {
         const extension = vscode.extensions.getExtension(extensionId);
@@ -38,6 +40,26 @@ suite("Editor Decorations", () => {
         if (workspaceFolders && workspaceFolders.length > 0) {
             workspaceFolder = workspaceFolders[0];
             testFileUri = vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, "src", "sample.ts"));
+
+            // Save original weaudit file content for restoration after tests
+            weauditFilePath = getWeauditFilePath(workspaceFolder);
+            if (fs.existsSync(weauditFilePath)) {
+                originalWeauditContent = fs.readFileSync(weauditFilePath, "utf-8");
+            }
+        }
+    });
+
+    suiteTeardown(async () => {
+        // Restore original weaudit file content
+        if (weauditFilePath) {
+            if (originalWeauditContent !== null) {
+                fs.writeFileSync(weauditFilePath, originalWeauditContent);
+            } else if (fs.existsSync(weauditFilePath)) {
+                // If there was no original file, delete the one created by tests
+                fs.unlinkSync(weauditFilePath);
+            }
+            // Reload the extension's data
+            await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
         }
     });
 
@@ -72,6 +94,14 @@ suite("Editor Decorations", () => {
 
         const editor = await openTestFile();
         const relativePath = "src/sample.ts";
+
+        // Ensure the file is not fully audited (which would prevent partial auditing)
+        // The previous test may have marked it as fully audited
+        const dataCheck = readWeauditData(workspaceFolder);
+        if (dataCheck?.auditedFiles.some((f) => f.path === relativePath)) {
+            await vscode.commands.executeCommand("weAudit.toggleAudited");
+            await new Promise((resolve) => setTimeout(resolve, 500));
+        }
 
         // Use lines that are not already partially audited
         // Note: When selection ends at character 0, the extension decrements endLine by 1
