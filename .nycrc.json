@@ -1,22 +1,9 @@
 {
     "all": true,
-    "include": [
-        "src/**/*.ts"
-    ],
-    "exclude": [
-        "src/**/*.d.ts",
-        "src/webview/**/*.ts",
-        "test/**/*.ts"
-    ],
-    "extension": [
-        ".ts"
-    ],
-    "reporter": [
-        "text",
-        "text-summary",
-        "html",
-        "lcov"
-    ],
+    "include": ["src/**/*.ts"],
+    "exclude": ["src/**/*.d.ts", "src/webview/**/*.ts", "test/**/*.ts"],
+    "extension": [".ts"],
+    "reporter": ["text", "text-summary", "html", "lcov"],
     "report-dir": "coverage",
     "temp-dir": ".nyc_output",
     "check-coverage": true,
