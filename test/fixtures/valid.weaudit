@@ -1,0 +1,128 @@
+{
+    "clientRemote": "https://github.com/client/project",
+    "gitRemote": "https://github.com/auditor/project-audit",
+    "gitSha": "abc123def456",
+    "treeEntries": [
+        {
+            "label": "SQL Injection in user input",
+            "entryType": 0,
+            "author": "alice",
+            "details": {
+                "severity": "High",
+                "difficulty": "Low",
+                "type": "Data Validation",
+                "description": "User input is not properly sanitized before being used in SQL query.",
+                "exploit": "An attacker could inject malicious SQL to access or modify database records.",
+                "recommendation": "Short term, use parameterized queries.\nLong term, implement input validation layer."
+            },
+            "locations": [
+                {
+                    "path": "src/database/queries.ts",
+                    "startLine": 42,
+                    "endLine": 45,
+                    "label": "executeQuery function",
+                    "description": ""
+                }
+            ]
+        },
+        {
+            "label": "Hardcoded API key",
+            "entryType": 0,
+            "author": "bob",
+            "details": {
+                "severity": "Medium",
+                "difficulty": "Low",
+                "type": "Data Exposure",
+                "description": "API key is hardcoded in the source code.",
+                "exploit": "Anyone with access to the source code can extract the API key.",
+                "recommendation": "Short term, move to environment variables.\nLong term, use a secrets manager."
+            },
+            "locations": [
+                {
+                    "path": "src/config/api.ts",
+                    "startLine": 10,
+                    "endLine": 10,
+                    "label": "API_KEY constant",
+                    "description": ""
+                },
+                {
+                    "path": "src/services/external.ts",
+                    "startLine": 5,
+                    "endLine": 5,
+                    "label": "Another usage",
+                    "description": ""
+                }
+            ]
+        },
+        {
+            "label": "TODO: Review authentication flow",
+            "entryType": 1,
+            "author": "alice",
+            "details": {
+                "severity": "",
+                "difficulty": "",
+                "type": "",
+                "description": "Need to review the authentication flow for potential issues.",
+                "exploit": "",
+                "recommendation": ""
+            },
+            "locations": [
+                {
+                    "path": "src/auth/login.ts",
+                    "startLine": 1,
+                    "endLine": 50,
+                    "label": "Login handler",
+                    "description": ""
+                }
+            ]
+        }
+    ],
+    "auditedFiles": [
+        {
+            "path": "src/utils/helpers.ts",
+            "author": "alice"
+        },
+        {
+            "path": "src/utils/constants.ts",
+            "author": "bob"
+        }
+    ],
+    "partiallyAuditedFiles": [
+        {
+            "path": "src/database/connection.ts",
+            "author": "alice",
+            "startLine": 0,
+            "endLine": 25
+        },
+        {
+            "path": "src/database/connection.ts",
+            "author": "alice",
+            "startLine": 100,
+            "endLine": 150
+        }
+    ],
+    "resolvedEntries": [
+        {
+            "label": "Missing null check (fixed)",
+            "entryType": 0,
+            "author": "alice",
+            "details": {
+                "severity": "Low",
+                "difficulty": "Low",
+                "type": "Data Validation",
+                "description": "Null check was missing.",
+                "exploit": "Could cause null pointer exception.",
+                "recommendation": "Add null check."
+            },
+            "locations": [
+                {
+                    "path": "src/utils/parser.ts",
+                    "startLine": 20,
+                    "endLine": 22,
+                    "label": "parse function",
+                    "description": ""
+                }
+            ]
+        }
+    ]
+}
