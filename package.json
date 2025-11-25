@@ -78,6 +78,11 @@
                 "icon": "$(github)"
             },
             {
+                "command": "weAudit.openGithubIssueFromDetails",
+                "title": "Open Remote Issue",
+                "icon": "$(github)"
+            },
+            {
                 "command": "weAudit.copyEntryPermalink",
                 "title": "Copy Audit Permalink",
                 "icon": "$(link)"
@@ -377,6 +382,11 @@
                     "command": "weAudit.prevGitConfig",
                     "when": "view == gitConfig",
                     "group": "navigation@0"
+                },
+                {
+                    "command": "weAudit.openGithubIssueFromDetails",
+                    "when": "view == findingDetails && weAudit.findingDetailsHasEntry",
+                    "group": "navigation"
                 }
             ],
             "view/item/context": [
