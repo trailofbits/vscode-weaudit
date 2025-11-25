@@ -1,41 +1,8 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
-import * as path from "path";
 
-suite("File Decorations - Explorer", () => {
-    const extensionId = "trailofbits.weaudit";
-    let testFileUri: vscode.Uri;
-
-    suiteSetup(async () => {
-        const extension = vscode.extensions.getExtension(extensionId);
-        await extension?.activate();
-
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders && workspaceFolders.length > 0) {
-            testFileUri = vscode.Uri.file(path.join(workspaceFolders[0].uri.fsPath, "src", "sample.ts"));
-        }
-    });
-
-    test("Extension implements FileDecorationProvider", async function () {
-        this.timeout(10000);
-
-        const extension = vscode.extensions.getExtension(extensionId);
-        assert.ok(extension?.isActive, "Extension should be active");
-
-        // Verify the extension contributes to file decorations capability
-        // by checking that it doesn't throw when toggling audit status
-        await vscode.workspace.openTextDocument(testFileUri);
-        await vscode.commands.executeCommand("weAudit.toggleAudited");
-    });
-
-    test("toggleAudited command executes for open file", async function () {
-        this.timeout(10000);
-
-        await vscode.workspace.openTextDocument(testFileUri);
-        await vscode.commands.executeCommand("weAudit.toggleAudited");
-        // If no exception, command executed successfully
-    });
-});
+// NOTE: File decoration tests (toggleAudited, addPartiallyAudited) are in decorations.test.ts
+// NOTE: Command registration tests are consolidated in activation.test.ts
 
 suite("Error Handling", () => {
     const extensionId = "trailofbits.weaudit";
@@ -86,12 +53,5 @@ suite("Error Handling", () => {
 
         // Close the document
         await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
-    });
-
-    test("Copy permalink command is registered", async function () {
-        this.timeout(10000);
-
-        const commands = await vscode.commands.getCommands(true);
-        assert.ok(commands.includes("weAudit.copySelectedCodePermalink"), "copySelectedCodePermalink command should exist");
     });
 });

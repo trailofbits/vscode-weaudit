@@ -537,6 +537,7 @@
         "prettier": "prettier --write .",
         "test": "npm run test:unit && npm run test:ext",
         "test:unit": "mocha -r ts-node/register/transpile-only \"test/unit/**/*.test.ts\" \"test/webview/**/*.test.ts\"",
+        "pretest:ext": "npm run compile && tsc -p test/extension/tsconfig.json",
         "test:ext": "vscode-test --config .vscode-test.mjs",
         "coverage": "nyc npm run test:unit",
         "prepare": "husky"
