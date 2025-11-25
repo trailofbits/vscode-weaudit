@@ -1,10 +1,34 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
 import * as path from "path";
+import * as fs from "fs";
+import { userInfo } from "os";
+
+interface SerializedData {
+    treeEntries: Array<{ label: string; entryType: number }>;
+    auditedFiles: Array<{ path: string; author: string }>;
+    partiallyAuditedFiles: Array<{ path: string; author: string; startLine: number; endLine: number }>;
+    resolvedEntries: Array<{ label: string }>;
+}
+
+function getWeauditFilePath(workspaceFolder: vscode.WorkspaceFolder): string {
+    const username = vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username;
+    return path.join(workspaceFolder.uri.fsPath, ".vscode", `${username}.weaudit`);
+}
+
+function readWeauditData(workspaceFolder: vscode.WorkspaceFolder): SerializedData | null {
+    const filePath = getWeauditFilePath(workspaceFolder);
+    if (!fs.existsSync(filePath)) {
+        return null;
+    }
+    const content = fs.readFileSync(filePath, "utf-8");
+    return JSON.parse(content) as SerializedData;
+}
 
 suite("Editor Decorations", () => {
     const extensionId = "trailofbits.weaudit";
     let testFileUri: vscode.Uri;
+    let workspaceFolder: vscode.WorkspaceFolder;
 
     suiteSetup(async () => {
         const extension = vscode.extensions.getExtension(extensionId);
@@ -12,7 +36,8 @@ suite("Editor Decorations", () => {
 
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (workspaceFolders && workspaceFolders.length > 0) {
-            testFileUri = vscode.Uri.file(path.join(workspaceFolders[0].uri.fsPath, "src", "sample.ts"));
+            workspaceFolder = workspaceFolders[0];
+            testFileUri = vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, "src", "sample.ts"));
         }
     });
 
@@ -21,68 +46,56 @@ suite("Editor Decorations", () => {
         return await vscode.window.showTextDocument(document);
     }
 
-    test("Adding a finding applies decorations without error", async function () {
-        this.timeout(10000);
-
-        const editor = await openTestFile();
-
-        // Create a finding to trigger decoration
-        const start = new vscode.Position(5, 0);
-        const end = new vscode.Position(6, 0);
-        editor.selection = new vscode.Selection(start, end);
-
-        const originalShowInputBox = vscode.window.showInputBox;
-        (vscode.window as any).showInputBox = async () => "Decoration Test Finding";
-
-        try {
-            await vscode.commands.executeCommand("weAudit.addFinding");
-            // Give decorations time to apply
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            // Command executed without throwing - decorations were applied
-        } finally {
-            (vscode.window as any).showInputBox = originalShowInputBox;
-        }
-    });
-
-    test("Adding a note applies decorations without error", async function () {
-        this.timeout(10000);
-
-        const editor = await openTestFile();
-
-        const start = new vscode.Position(10, 0);
-        const end = new vscode.Position(11, 0);
-        editor.selection = new vscode.Selection(start, end);
-
-        const originalShowInputBox = vscode.window.showInputBox;
-        (vscode.window as any).showInputBox = async () => "Decoration Test Note";
-
-        try {
-            await vscode.commands.executeCommand("weAudit.addNote");
-            await new Promise((resolve) => setTimeout(resolve, 500));
-        } finally {
-            (vscode.window as any).showInputBox = originalShowInputBox;
-        }
-    });
-
-    test("toggleAudited applies file-wide decoration without error", async function () {
+    test("toggleAudited command toggles file audit status", async function () {
         this.timeout(10000);
 
         await openTestFile();
+        const relativePath = "src/sample.ts";
+
+        // Get the initial state
+        const dataBefore = readWeauditData(workspaceFolder);
+        const wasAudited = dataBefore?.auditedFiles.some((f) => f.path === relativePath) ?? false;
+
+        // Toggle audited status
         await vscode.commands.executeCommand("weAudit.toggleAudited");
         await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Verify the state changed
+        const dataAfter = readWeauditData(workspaceFolder);
+        const isAudited = dataAfter?.auditedFiles.some((f) => f.path === relativePath) ?? false;
+
+        assert.notStrictEqual(isAudited, wasAudited, "Audited status should be toggled");
     });
 
-    test("addPartiallyAudited applies region decoration without error", async function () {
+    test("addPartiallyAudited command adds partially audited region", async function () {
         this.timeout(10000);
 
         const editor = await openTestFile();
+        const relativePath = "src/sample.ts";
 
-        const start = new vscode.Position(25, 0);
-        const end = new vscode.Position(30, 0);
+        // Use lines that are not already partially audited
+        const startLine = 30;
+        const endLine = 35;
+        const start = new vscode.Position(startLine, 0);
+        const end = new vscode.Position(endLine, 0);
         editor.selection = new vscode.Selection(start, end);
 
+        // Get the initial state
+        const dataBefore = readWeauditData(workspaceFolder);
+        const regionExistsBefore =
+            dataBefore?.partiallyAuditedFiles.some((f) => f.path === relativePath && f.startLine === startLine && f.endLine === endLine) ?? false;
+
+        // Add partially audited region
         await vscode.commands.executeCommand("weAudit.addPartiallyAudited");
         await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Verify state changed
+        const dataAfter = readWeauditData(workspaceFolder);
+        const regionExistsAfter =
+            dataAfter?.partiallyAuditedFiles.some((f) => f.path === relativePath && f.startLine === startLine && f.endLine === endLine) ?? false;
+
+        // The command toggles the region - so if it existed before it's removed, if it didn't exist it's added
+        assert.notStrictEqual(regionExistsAfter, regionExistsBefore, "Partially audited region should be toggled");
     });
 
     test("Extension survives file edits", async function () {

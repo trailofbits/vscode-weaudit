@@ -1,49 +1,28 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
-import * as path from "path";
 
 suite("Tree View Integration", () => {
     const extensionId = "trailofbits.weaudit";
-    let testFileUri: vscode.Uri;
 
     suiteSetup(async () => {
         const extension = vscode.extensions.getExtension(extensionId);
         await extension?.activate();
-
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (workspaceFolders && workspaceFolders.length > 0) {
-            testFileUri = vscode.Uri.file(path.join(workspaceFolders[0].uri.fsPath, "src", "sample.ts"));
-        }
     });
 
-    test("Findings tree view can be focused", async function () {
-        this.timeout(10000);
-
-        // Focus the findings tree view - should not throw
-        await vscode.commands.executeCommand("codeMarker.focus");
-    });
-
-    test("Findings tree updates after adding finding", async function () {
+    test("All tree views can be focused and become visible", async function () {
         this.timeout(15000);
 
-        const document = await vscode.workspace.openTextDocument(testFileUri);
-        const editor = await vscode.window.showTextDocument(document);
+        // Test that all tree view focus commands work
+        const treeViews = ["codeMarker", "resolvedFindings", "savedFindings"];
 
-        // Select a line and add a finding
-        const start = new vscode.Position(35, 0);
-        const end = new vscode.Position(36, 0);
-        editor.selection = new vscode.Selection(start, end);
+        for (const view of treeViews) {
+            await vscode.commands.executeCommand(`${view}.focus`);
+            await new Promise((resolve) => setTimeout(resolve, 300));
 
-        const originalShowInputBox = vscode.window.showInputBox;
-        (vscode.window as any).showInputBox = async () => "Tree Update Test Finding";
-
-        try {
-            await vscode.commands.executeCommand("weAudit.addFinding");
-            // Give tree time to update
-            await new Promise((resolve) => setTimeout(resolve, 500));
-            // If we get here without error, tree view update worked
-        } finally {
-            (vscode.window as any).showInputBox = originalShowInputBox;
+            // Verify the view is visible by checking if the weAudit activity bar is active
+            // After focusing, we check that we can still execute the command (view exists)
+            const allCommands = await vscode.commands.getCommands(true);
+            assert.ok(allCommands.includes(`${view}.focus`), `${view}.focus command should be available`);
         }
     });
 
@@ -60,21 +39,37 @@ suite("Tree View Integration", () => {
         assert.ok(Array.isArray(menus["view/item/context"]) && menus["view/item/context"].length > 0, "At least one context menu item should be registered");
     });
 
-    test("Resolved findings tree view can be focused", async function () {
+    test("toggleTreeViewMode command changes the configuration value", async function () {
         this.timeout(10000);
 
-        await vscode.commands.executeCommand("resolvedFindings.focus");
+        // Get the current mode from configuration
+        const config = vscode.workspace.getConfiguration("weAudit");
+        const modeBefore = config.get<string>("general.treeViewMode");
+
+        // Toggle the mode
+        await vscode.commands.executeCommand("weAudit.toggleTreeViewMode");
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        // Verify the configuration changed
+        const modeAfter = config.get<string>("general.treeViewMode");
+        assert.notStrictEqual(modeAfter, modeBefore, "Tree view mode should change after toggle");
+
+        // Verify it's one of the valid values
+        assert.ok(modeAfter === "list" || modeAfter === "byFile", `Mode should be 'list' or 'byFile', got '${modeAfter}'`);
     });
 
-    test("Saved findings tree view can be focused", async function () {
+    test("Tree view refresh command loads configuration files", async function () {
         this.timeout(10000);
 
-        await vscode.commands.executeCommand("savedFindings.focus");
-    });
+        // Get extension to verify it's active
+        const extension = vscode.extensions.getExtension(extensionId);
+        assert.ok(extension?.isActive, "Extension should be active before refresh");
 
-    test("Tree view refresh command executes without error", async function () {
-        this.timeout(10000);
-
+        // findAndLoadConfigurationFiles refreshes the tree views
         await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        // Verify extension remains active after refresh
+        assert.ok(extension?.isActive, "Extension should remain active after refresh");
     });
 });

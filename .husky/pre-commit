@@ -1,8 +1,8 @@
 #!/bin/sh
 
-# Run ESLint on src/
+# Run ESLint on src/ (fail on warnings too)
 echo "Running ESLint..."
-npm run lint
+npm run lint -- --max-warnings 0
 if [ $? -ne 0 ]; then
     echo "ESLint failed. Please fix the errors before committing."
     exit 1
