@@ -87,7 +87,8 @@ suite("Editor Decorations", () => {
         this.timeout(10000);
 
         await openTestFile();
-        const relativePath = "src/sample.ts";
+        // Use path.join for cross-platform compatibility (Windows uses backslashes)
+        const relativePath = path.join("src", "sample.ts");
 
         // Get the initial state
         const dataBefore = readWeauditData(workspaceFolder);
@@ -110,7 +111,8 @@ suite("Editor Decorations", () => {
         this.timeout(10000);
 
         const editor = await openTestFile();
-        const relativePath = "src/sample.ts";
+        // Use path.join for cross-platform compatibility (Windows uses backslashes)
+        const relativePath = path.join("src", "sample.ts");
 
         // Ensure the file is not fully audited (which would prevent partial auditing)
         // The previous test may have marked it as fully audited
