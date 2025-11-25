@@ -32,6 +32,21 @@ function readWeauditData(workspaceFolder: vscode.WorkspaceFolder): SerializedDat
     return JSON.parse(content) as SerializedData;
 }
 
+/**
+ * Poll for a condition to become true, with timeout.
+ * Returns true if condition was met, false if timed out.
+ */
+async function waitForCondition(condition: () => boolean, timeoutMs: number = 5000, pollIntervalMs: number = 100): Promise<boolean> {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeoutMs) {
+        if (condition()) {
+            return true;
+        }
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+    return condition(); // Final check
+}
+
 suite("Command Execution", () => {
     const extensionId = "trailofbits.weaudit";
     let testFileUri: vscode.Uri;
@@ -207,21 +222,26 @@ suite("Command Execution", () => {
         // If not audited, mark it as audited
         if (!wasAudited) {
             await vscode.commands.executeCommand("weAudit.toggleAudited");
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            // Wait for the audit to complete
+            await waitForCondition(() => {
+                const data = readWeauditData(workspaceFolder);
+                return data?.auditedFiles.some((f) => f.path === relativePath) ?? false;
+            });
         }
 
         // Close all editors first to get a clean slate
         await vscode.commands.executeCommand("workbench.action.closeAllEditors");
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        // Wait for editors to close
+        await waitForCondition(() => vscode.window.visibleTextEditors.length === 0, 2000);
 
         const editorsBefore = vscode.window.visibleTextEditors.length;
 
         // Now call the day log command - it should open a markdown document
         await vscode.commands.executeCommand("weAudit.showMarkedFilesDayLog");
-        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        const editorsAfter = vscode.window.visibleTextEditors.length;
-        assert.ok(editorsAfter > editorsBefore, "A new document should be opened with the day log");
+        // Wait for a new editor to appear (poll instead of fixed delay)
+        const editorOpened = await waitForCondition(() => vscode.window.visibleTextEditors.length > editorsBefore, 5000);
+        assert.ok(editorOpened, "A new document should be opened with the day log");
 
         // Verify the opened document contains expected content
         const activeEditor = vscode.window.activeTextEditor;
@@ -235,7 +255,11 @@ suite("Command Execution", () => {
             await vscode.commands.executeCommand("workbench.action.closeActiveEditor");
             await openTestFile();
             await vscode.commands.executeCommand("weAudit.toggleAudited");
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            // Wait for the unaudit to complete
+            await waitForCondition(() => {
+                const data = readWeauditData(workspaceFolder);
+                return !data?.auditedFiles.some((f) => f.path === relativePath);
+            });
         }
     });
 });
