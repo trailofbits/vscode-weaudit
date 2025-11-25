@@ -6,3 +6,7 @@ node_modules
 *.mov
 *.vsix
 *.sarif*
+
+# Test coverage
+coverage/
+.nyc_output/

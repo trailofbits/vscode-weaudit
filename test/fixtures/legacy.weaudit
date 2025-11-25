@@ -1,0 +1,36 @@
+{
+    "clientRemote": "https://github.com/client/legacy-project",
+    "gitRemote": "https://github.com/auditor/legacy-audit",
+    "gitSha": "legacy123",
+    "treeEntries": [
+        {
+            "label": "Legacy finding",
+            "entryType": 0,
+            "author": "olduser",
+            "details": {
+                "severity": "Medium",
+                "difficulty": "Medium",
+                "type": "Configuration",
+                "description": "A finding from an older version of weAudit.",
+                "exploit": "Example exploit scenario.",
+                "recommendation": "Short term, fix it.\nLong term, prevent it."
+            },
+            "locations": [
+                {
+                    "path": "src/old/module.ts",
+                    "startLine": 10,
+                    "endLine": 15,
+                    "label": "oldFunction",
+                    "description": ""
+                }
+            ]
+        }
+    ],
+    "auditedFiles": [
+        {
+            "path": "src/old/reviewed.ts",
+            "author": "olduser"
+        }
+    ],
+    "resolvedEntries": []
+}
