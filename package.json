@@ -520,7 +520,8 @@
         "test": "npm run test:unit && npm run test:ext",
         "test:unit": "mocha -r ts-node/register/transpile-only \"test/unit/**/*.test.ts\"",
         "test:ext": "vscode-test",
-        "coverage": "nyc npm run test:unit"
+        "coverage": "nyc npm run test:unit",
+        "prepare": "husky"
     },
     "devDependencies": {
         "@microsoft/eslint-formatter-sarif": "^3.0.0",
@@ -542,6 +543,7 @@
         "esbuild": "^0.25.9",
         "eslint": "^8.18.0",
         "glob": "^8.0.3",
+        "husky": "^9.1.7",
         "jsdom": "^27.2.0",
         "mocha": "^10.0.0",
         "nyc": "^17.1.0",
