@@ -16,4 +16,12 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+# Run unit tests
+echo "Running unit tests..."
+npm run test:unit
+if [ $? -ne 0 ]; then
+    echo "Unit tests failed. Please fix the failing tests before committing."
+    exit 1
+fi
+
 echo "Pre-commit checks passed!"
