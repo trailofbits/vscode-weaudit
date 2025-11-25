@@ -29,9 +29,23 @@ suite("Workspace Operations", () => {
         assert.ok(extension, "Extension should be present");
 
         const packageJson = extension.packageJSON;
-        const configProps = packageJson?.contributes?.configuration?.properties;
+        const configuration = packageJson?.contributes?.configuration;
 
-        assert.ok(configProps, "Configuration properties should be defined");
+        assert.ok(configuration, "Configuration should be defined");
+
+        // Configuration can be an array or an object - combine all properties
+        let configProps: Record<string, unknown> = {};
+        if (Array.isArray(configuration)) {
+            for (const section of configuration) {
+                if (section.properties) {
+                    configProps = { ...configProps, ...section.properties };
+                }
+            }
+        } else if (configuration?.properties) {
+            configProps = configuration.properties;
+        }
+
+        assert.ok(Object.keys(configProps).length > 0, "Configuration properties should be defined");
 
         // Verify essential configuration properties exist
         const requiredProps = ["weAudit.general.treeViewMode", "weAudit.general.username"];

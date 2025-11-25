@@ -89,6 +89,10 @@ suite("Performance", () => {
         const perfTestFile = path.join(vscodeDir, "perftest.weaudit");
 
         try {
+            // Ensure the .vscode directory exists
+            if (!fs.existsSync(vscodeDir)) {
+                fs.mkdirSync(vscodeDir, { recursive: true });
+            }
             fs.writeFileSync(perfTestFile, JSON.stringify(testData, null, 2));
 
             const startTime = Date.now();
