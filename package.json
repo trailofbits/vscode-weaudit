@@ -518,8 +518,8 @@
         "lint": "eslint --ext ts --color -c .eslintrc.json src",
         "prettier": "prettier --write .",
         "test": "npm run test:unit && npm run test:ext",
-        "test:unit": "mocha -r ts-node/register/transpile-only \"test/unit/**/*.test.ts\"",
-        "test:ext": "vscode-test",
+        "test:unit": "mocha -r ts-node/register/transpile-only \"test/unit/**/*.test.ts\" \"test/webview/**/*.test.ts\"",
+        "test:ext": "vscode-test --config .vscode-test.mjs",
         "coverage": "nyc npm run test:unit",
         "prepare": "husky"
     },
@@ -538,6 +538,7 @@
         "@types/vscode-webview": "^1.57.1",
         "@typescript-eslint/eslint-plugin": "^5.30.0",
         "@typescript-eslint/parser": "^5.30.0",
+        "@vscode/test-cli": "^0.0.10",
         "@vscode/test-electron": "^2.1.5",
         "chai": "^4.4.1",
         "esbuild": "^0.25.9",
