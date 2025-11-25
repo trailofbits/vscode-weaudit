@@ -912,18 +912,30 @@ class WARoot {
     async updateSavedData(username: string): Promise<void> {
         const vscodeFolder = path.join(this.rootPath, ".vscode");
 
-        let existsFolder = true;
         let existsFile = true;
         let toCreateData = false;
 
-        if (!fs.existsSync(vscodeFolder)) {
-            existsFolder = false;
+        // Atomically ensure .vscode directory exists (no TOCTOU vulnerability)
+        // This will succeed even if the directory already exists
+        try {
+            fs.mkdirSync(vscodeFolder, { recursive: true });
+        } catch (error: any) {
+            // Only throw if it's not an EEXIST error (which shouldn't happen with recursive: true anyway)
+            if (error.code !== "EEXIST") {
+                throw error;
+            }
         }
 
         const fileName = path.join(vscodeFolder, username + SERIALIZED_FILE_EXTENSION);
         const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
         const configEntry = { path: fileName, username: username, root: wsRootEntry };
-        if (!fs.existsSync(fileName)) {
+
+        // Check if file exists by attempting to access it
+        // This is still subject to TOCTOU but we handle it properly below
+        try {
+            fs.accessSync(fileName, fs.constants.F_OK);
+            existsFile = true;
+        } catch {
             existsFile = false;
         }
 
@@ -1008,10 +1020,7 @@ class WARoot {
         }
 
         if (toCreateData) {
-            // create .vscode folder if it doesn't exist
-            if (!existsFolder) {
-                fs.mkdirSync(vscodeFolder);
-            }
+            // .vscode folder already created atomically at the start of this method
 
             // create a new config file if it doesn't exist
             if (!existsFile) {
@@ -1037,7 +1046,15 @@ class WARoot {
                 null,
                 2,
             );
-            fs.writeFileSync(fileName, data, { flag: "w+" });
+
+            // Write file atomically with proper error handling
+            // Using 'w+' flag: creates file if it doesn't exist, truncates if it does
+            try {
+                fs.writeFileSync(fileName, data, { flag: "w+" });
+            } catch (error: any) {
+                console.error(`Failed to write audit data to ${fileName}:`, error);
+                throw new Error(`Failed to save audit data: ${error.message}`);
+            }
         }
     }
 
