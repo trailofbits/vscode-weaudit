@@ -25,6 +25,21 @@ function readWeauditData(workspaceFolder: vscode.WorkspaceFolder): SerializedDat
     return JSON.parse(content) as SerializedData;
 }
 
+/**
+ * Poll for a condition to become true, with timeout.
+ * Returns true if condition was met, false if timed out.
+ */
+async function waitForCondition(condition: () => boolean, timeoutMs: number = 5000, pollIntervalMs: number = 100): Promise<boolean> {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeoutMs) {
+        if (condition()) {
+            return true;
+        }
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    }
+    return condition(); // Final check
+}
+
 suite("Editor Decorations", () => {
     const extensionId = "trailofbits.weaudit";
     let testFileUri: vscode.Uri;
@@ -80,13 +95,15 @@ suite("Editor Decorations", () => {
 
         // Toggle audited status
         await vscode.commands.executeCommand("weAudit.toggleAudited");
-        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        // Verify the state changed
-        const dataAfter = readWeauditData(workspaceFolder);
-        const isAudited = dataAfter?.auditedFiles.some((f) => f.path === relativePath) ?? false;
+        // Wait for the state to actually change (poll instead of fixed delay)
+        const stateChanged = await waitForCondition(() => {
+            const dataAfter = readWeauditData(workspaceFolder);
+            const isAudited = dataAfter?.auditedFiles.some((f) => f.path === relativePath) ?? false;
+            return isAudited !== wasAudited;
+        });
 
-        assert.notStrictEqual(isAudited, wasAudited, "Audited status should be toggled");
+        assert.ok(stateChanged, "Audited status should be toggled");
     });
 
     test("addPartiallyAudited command adds partially audited region", async function () {
@@ -100,7 +117,11 @@ suite("Editor Decorations", () => {
         const dataCheck = readWeauditData(workspaceFolder);
         if (dataCheck?.auditedFiles.some((f) => f.path === relativePath)) {
             await vscode.commands.executeCommand("weAudit.toggleAudited");
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            // Wait for the unaudit to complete
+            await waitForCondition(() => {
+                const data = readWeauditData(workspaceFolder);
+                return !data?.auditedFiles.some((f) => f.path === relativePath);
+            });
         }
 
         // Use lines that are not already partially audited
@@ -119,15 +140,17 @@ suite("Editor Decorations", () => {
 
         // Add partially audited region
         await vscode.commands.executeCommand("weAudit.addPartiallyAudited");
-        await new Promise((resolve) => setTimeout(resolve, 500));
 
-        // Verify state changed
-        const dataAfter = readWeauditData(workspaceFolder);
-        const regionExistsAfter =
-            dataAfter?.partiallyAuditedFiles.some((f) => f.path === relativePath && f.startLine === startLine && f.endLine === endLine) ?? false;
+        // Wait for the state to actually change (poll instead of fixed delay)
+        const stateChanged = await waitForCondition(() => {
+            const dataAfter = readWeauditData(workspaceFolder);
+            const regionExistsAfter =
+                dataAfter?.partiallyAuditedFiles.some((f) => f.path === relativePath && f.startLine === startLine && f.endLine === endLine) ?? false;
+            return regionExistsAfter !== regionExistsBefore;
+        });
 
         // The command toggles the region - so if it existed before it's removed, if it didn't exist it's added
-        assert.notStrictEqual(regionExistsAfter, regionExistsBefore, "Partially audited region should be toggled");
+        assert.ok(stateChanged, "Partially audited region should be toggled");
     });
 
     test("Extension survives file edits", async function () {
