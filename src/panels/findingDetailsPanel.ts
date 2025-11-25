@@ -69,6 +69,10 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                 recommendation: entry.recommendation,
                 title: title,
             });
+
+            // Set context to show the "Open Remote Issue" button in the view title
+            // https://code.visualstudio.com/api/references/when-clause-contexts#add-a-custom-when-clause-context
+            vscode.commands.executeCommand("setContext", "weAudit.findingDetailsHasEntry", true);
         }
     }
 
@@ -80,6 +84,10 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
             this._view.webview.postMessage({
                 command: "hide-finding-details",
             });
+
+            // Set context to show the "Open Remote Issue" button in the view title
+            // https://code.visualstudio.com/api/references/when-clause-contexts#add-a-custom-when-clause-context
+            vscode.commands.executeCommand("setContext", "weAudit.findingDetailsHasEntry", false);
         }
     }
 

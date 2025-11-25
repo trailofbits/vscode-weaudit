@@ -4278,6 +4278,14 @@ export class AuditMarker {
             const entry = treeView.selection[0];
             this.showEntryInFindingDetails(entry);
         });
+
+        vscode.commands.registerCommand("weAudit.openGithubIssueFromDetails", () => {
+            const entry = this.getCurrentlySelectedFullEntry();
+            if (entry === undefined) {
+                return;
+            }
+            treeDataProvider.openGithubIssue(entry);
+        });
     }
 
     private showEntryInFindingDetails(entry: TreeEntry): void {
@@ -4297,6 +4305,28 @@ export class AuditMarker {
 
         // Fills the Finding details webview with the currently selected entry details
         vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details, entry.label);
+    }
+
+    /**
+     * Returns the currently selected tree entry as a FullEntry, ignoring grouping and location-only nodes.
+     */
+    private getCurrentlySelectedFullEntry(): FullEntry | undefined {
+        if (treeView.selection.length === 0) {
+            return;
+        }
+
+        let entry = treeView.selection[0];
+        if (isPathOrganizerEntry(entry)) {
+            return;
+        }
+        if (isLocationEntry(entry)) {
+            entry = entry.parentEntry;
+        }
+        if (!isEntry(entry)) {
+            return;
+        }
+
+        return entry;
     }
 
     /**
