@@ -74,10 +74,12 @@ suite("Editor Decorations", () => {
         const relativePath = "src/sample.ts";
 
         // Use lines that are not already partially audited
+        // Note: When selection ends at character 0, the extension decrements endLine by 1
+        // So we set the end position with a non-zero character to preserve the exact line
         const startLine = 30;
         const endLine = 35;
         const start = new vscode.Position(startLine, 0);
-        const end = new vscode.Position(endLine, 0);
+        const end = new vscode.Position(endLine, 1);
         editor.selection = new vscode.Selection(start, end);
 
         // Get the initial state
@@ -126,9 +128,23 @@ suite("Editor Decorations", () => {
         assert.ok(extension, "Extension should be present");
 
         const packageJson = extension.packageJSON;
-        const configProps = packageJson?.contributes?.configuration?.properties;
+        const configuration = packageJson?.contributes?.configuration;
 
-        assert.ok(configProps, "Configuration properties should exist");
+        assert.ok(configuration, "Configuration should exist");
+
+        // Configuration can be an array or an object - combine all properties
+        let configProps: Record<string, unknown> = {};
+        if (Array.isArray(configuration)) {
+            for (const section of configuration) {
+                if (section.properties) {
+                    configProps = { ...configProps, ...section.properties };
+                }
+            }
+        } else if (configuration?.properties) {
+            configProps = configuration.properties;
+        }
+
+        assert.ok(Object.keys(configProps).length > 0, "Configuration properties should exist");
         assert.ok(configProps["weAudit.ownFindingColor"], "ownFindingColor should be configured");
         assert.ok(configProps["weAudit.otherFindingColor"], "otherFindingColor should be configured");
         assert.ok(configProps["weAudit.ownNoteColor"], "ownNoteColor should be configured");
