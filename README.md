@@ -4,6 +4,9 @@
   <img alt="weAudit banner" src="https://raw.githubusercontent.com/trailofbits/vscode-weaudit/main/media/banner-dark-mode.png">
 </picture>
 
+[![Tests](https://github.com/trailofbits/vscode-weaudit/actions/workflows/test.yml/badge.svg)](https://github.com/trailofbits/vscode-weaudit/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/trailofbits/vscode-weaudit/branch/main/graph/badge.svg)](https://codecov.io/gh/trailofbits/vscode-weaudit)
+
 # weAudit - A collaborative code review tool for VSCode
 
 ### [Release Blogpost](https://blog.trailofbits.com/2024/03/19/read-code-like-a-pro-with-our-weaudit-vscode-extension/) | [Installation](#installation) | [Features](#features)

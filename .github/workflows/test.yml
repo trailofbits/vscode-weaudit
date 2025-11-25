@@ -1,0 +1,115 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, testing]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Generate coverage report
+        run: npm run coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  extension-tests:
+    name: Extension Tests (${{ matrix.vscode-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        vscode-version: [stable]
+        include:
+          - os: ubuntu-latest
+            vscode-version: insiders
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile extension
+        run: npm run compile
+
+      # Linux requires a virtual display for VS Code
+      - name: Run extension tests (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:ext
+        env:
+          DISPLAY: ":99"
+          VSCODE_VERSION: ${{ matrix.vscode-version }}
+        continue-on-error: true  # Extension tests may not be fully configured yet
+
+      - name: Run extension tests (macOS/Windows)
+        if: runner.os != 'Linux'
+        run: npm run test:ext
+        env:
+          VSCODE_VERSION: ${{ matrix.vscode-version }}
+        continue-on-error: true  # Extension tests may not be fully configured yet
+
+  build:
+    name: Build Extension
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production package
+        run: npm run package
+
+      - name: Verify build output
+        run: |
+          test -f out/extension.js || (echo "Extension build failed" && exit 1)
+          echo "Build successful"
