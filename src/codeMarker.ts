@@ -47,6 +47,7 @@ import {
     configEntryEquals,
     RootPathAndLabel,
 } from "./types";
+import { normalizePathForOS } from "./utilities/normalizePath";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
@@ -3314,6 +3315,28 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     }) as FullEntry,
             ),
         } as FullSerializedData;
+
+        // Normalize all the paths from loaded files. These can come from different OSes with different path
+        // conventions. We do a best effort to match them to the current OS format.
+        fullParsedEntries.treeEntries.forEach((entry) => {
+            entry.locations.forEach((loc) => {
+                loc.path = normalizePathForOS(rootPath, loc.path);
+            });
+        });
+
+        fullParsedEntries.resolvedEntries.forEach((entry) => {
+            entry.locations.forEach((loc) => {
+                loc.path = normalizePathForOS(rootPath, loc.path);
+            });
+        });
+
+        fullParsedEntries.auditedFiles.forEach((auditedFile) => {
+            auditedFile.path = normalizePathForOS(rootPath, auditedFile.path);
+        });
+
+        fullParsedEntries.partiallyAuditedFiles?.forEach((partiallyAuditedFile) => {
+            partiallyAuditedFile.path = normalizePathForOS(rootPath, partiallyAuditedFile.path);
+        });
 
         if (update) {
             if (add) {
