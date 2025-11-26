@@ -533,7 +533,7 @@
         "@types/vscode-webview": "^1.57.1",
         "@typescript-eslint/eslint-plugin": "^5.30.0",
         "@typescript-eslint/parser": "^5.30.0",
-        "@vscode/test-electron": "^2.1.5",
+        "@vscode/test-electron": "^2.5.2",
         "esbuild": "^0.25.9",
         "eslint": "^8.18.0",
         "glob": "^8.0.3",
