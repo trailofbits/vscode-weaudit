@@ -362,7 +362,7 @@
                 "mac": "cmd+shift+numpad5",
                 "when": "weAudit.boundaryEditing && editorTextFocus"
             },
-                        {
+            {
                 "command": "weAudit.editFindingBoundary",
                 "key": "ctrl+shift+numpad5",
                 "mac": "cmd+shift+numpad5",
