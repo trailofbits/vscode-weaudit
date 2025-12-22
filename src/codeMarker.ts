@@ -3938,15 +3938,14 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
             return;
         }
 
-        const data = dataTransfer.get(this.LOCATION_MIME_TYPE);
+        let data = dataTransfer.get(this.LOCATION_MIME_TYPE);
         if (data === undefined) {
             return;
         }
 
-        const value = data.value as TreeEntry;
-        if (isLocationEntry(value)) {
+        if (isLocationEntry(data.value as TreeEntry)) {
             // A LocationEntry is being dragged
-            const locationEntry = value;
+            const locationEntry = data.value as FullLocationEntry;
 
             if (target === undefined) {
                 // dragged a location entry into the empty space
