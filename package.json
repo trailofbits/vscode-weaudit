@@ -324,37 +324,49 @@
                 "command": "weAudit.boundaryExpandUp",
                 "key": "ctrl+shift+numpad7",
                 "mac": "cmd+shift+numpad7",
-                "when": "weAudit.boundaryEditing"
+                "when": "editorTextFocus"
             },
             {
                 "command": "weAudit.boundaryMoveUp",
                 "key": "ctrl+shift+numpad8",
                 "mac": "cmd+shift+numpad8",
-                "when": "weAudit.boundaryEditing"
+                "when": "editorTextFocus"
             },
             {
                 "command": "weAudit.boundaryShrinkTop",
                 "key": "ctrl+shift+numpad9",
                 "mac": "cmd+shift+numpad9",
-                "when": "weAudit.boundaryEditing"
+                "when": "editorTextFocus"
             },
             {
                 "command": "weAudit.boundaryExpandDown",
                 "key": "ctrl+shift+numpad1",
                 "mac": "cmd+shift+numpad1",
-                "when": "weAudit.boundaryEditing"
+                "when": "editorTextFocus"
             },
             {
                 "command": "weAudit.boundaryMoveDown",
                 "key": "ctrl+shift+numpad2",
                 "mac": "cmd+shift+numpad2",
-                "when": "weAudit.boundaryEditing"
+                "when": "editorTextFocus"
             },
             {
                 "command": "weAudit.boundaryShrinkBottom",
                 "key": "ctrl+shift+numpad3",
                 "mac": "cmd+shift+numpad3",
-                "when": "weAudit.boundaryEditing"
+                "when": "editorTextFocus"
+            },
+            {
+                "command": "weAudit.stopEditingBoundary",
+                "key": "ctrl+shift+numpad5",
+                "mac": "cmd+shift+numpad5",
+                "when": "weAudit.boundaryEditing && editorTextFocus"
+            },
+                        {
+                "command": "weAudit.editFindingBoundary",
+                "key": "ctrl+shift+numpad5",
+                "mac": "cmd+shift+numpad5",
+                "when": "!weAudit.boundaryEditing && editorTextFocus"
             }
         ],
         "menus": {
