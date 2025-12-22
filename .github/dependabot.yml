@@ -1,22 +1,30 @@
 version: 2
 updates:
-  # npm for TypeScript/JavaScript dependencies
-  - package-ecosystem: "npm"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 10
-    labels:
-      - "dependencies"
-      - "npm"
-    versioning-strategy: increase
+    # npm for TypeScript/JavaScript dependencies
+    - package-ecosystem: "npm"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+      open-pull-requests-limit: 10
+      labels:
+          - "dependencies"
+          - "npm"
+      versioning-strategy: increase
+      groups:
+          npm-dependencies:
+              patterns:
+                  - "*"
 
-  # GitHub Actions
-  - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-    labels:
-      - "dependencies"
-      - "github-actions"
+    # GitHub Actions
+    - package-ecosystem: "github-actions"
+      directory: "/"
+      schedule:
+          interval: "weekly"
+      open-pull-requests-limit: 5
+      labels:
+          - "dependencies"
+          - "github-actions"
+      groups:
+          github-actions:
+              patterns:
+                  - "*"
