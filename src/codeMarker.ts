@@ -2014,6 +2014,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             void this.addRegionToAnEntry();
         });
 
+        vscode.commands.registerCommand("weAudit.addRegionToAnEntryWithLabel", () => {
+            void this.addRegionToAnEntryWithLabel();
+        });
+
         vscode.commands.registerCommand("weAudit.deleteLocation", (entry: FullLocationEntry) => {
             this.deleteLocation(entry);
         });
@@ -3169,9 +3173,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     /**
-     * Add the selected code region to an existing entry
+     * Shared helper that adds the current editor selection(s) to an existing entry.
+     * Optionally prompts for a label that is applied to each new location.
+     * @param getLabel function that resolves to the label to assign, or undefined to skip labeling
      */
-    async addRegionToAnEntry(): Promise<void> {
+    private async addRegionToEntryWithOptionalLabel(getLabel?: () => Promise<string | undefined>): Promise<void> {
         const editor = vscode.window.activeTextEditor;
         if (editor === undefined) {
             return;
@@ -3211,12 +3217,23 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
+        let label: string | undefined;
+        if (getLabel) {
+            label = await getLabel();
+            if (label === undefined) {
+                return;
+            }
+        }
+
         const entry = pickItem.entry;
-        // Add each selection as a separate region
+        // Add each selection as a separate region, optionally tagging with the provided label
         for (const location of locations) {
+            if (label !== undefined) {
+                location.label = label;
+            }
             entry.locations.push(location);
         }
-        void this.updateSavedData(entry.author);
+        this.updateSavedData(entry.author);
         this.decorateWithUri(editor.document.uri);
         this.refresh(editor.document.uri);
         // reveal the entry in the tree view if the treeview is visible,
@@ -3225,6 +3242,25 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (treeView.visible) {
             treeView.reveal(entry, { expand: 1, select: false });
         }
+    }
+
+    /**
+     * Add the selected code region to an existing entry
+     */
+    async addRegionToAnEntry(): Promise<void> {
+        await this.addRegionToEntryWithOptionalLabel();
+    }
+
+    /**
+     * Add the selected code region to an existing entry, prompting for a label
+     */
+    async addRegionToAnEntryWithLabel(): Promise<void> {
+        await this.addRegionToEntryWithOptionalLabel(async () =>
+            vscode.window.showInputBox({
+                title: "Enter a label for this location",
+                ignoreFocusOut: true,
+            }),
+        );
     }
 
     /**

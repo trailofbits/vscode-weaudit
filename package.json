@@ -221,6 +221,10 @@
                 "title": "weAudit: Add Region to a Finding"
             },
             {
+                "command": "weAudit.addRegionToAnEntryWithLabel",
+                "title": "weAudit: Add Region to a Finding with Label"
+            },
+            {
                 "command": "weAudit.showFindingsSearchBar",
                 "title": "weAudit: Search and Filter Findings"
             },
