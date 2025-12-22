@@ -23,7 +23,6 @@ import {
     isEntry,
     isOldEntry,
     Repository,
-    PathOrganizerEntry,
     createDefaultEntryDetails,
     createDefaultSerializedData,
     createLocationEntry,
@@ -137,7 +136,8 @@ class WARoot {
         }
 
         const dayLogPath = path.join(vscodeFolder, DAY_LOG_FILENAME);
-        this.markedFilesDayLog = new Map(JSON.parse(fs.readFileSync(dayLogPath, "utf8")));
+        const data = JSON.parse(fs.readFileSync(dayLogPath, "utf8")) as Iterable<readonly [string, string[]]>;
+        this.markedFilesDayLog = new Map(data);
     }
 
     /**
@@ -277,7 +277,7 @@ class WARoot {
             this.currentlySelectedConfigs.push(configEntry);
         } else {
             const data = fs.readFileSync(filename).toString();
-            const parsedEntries: SerializedData = JSON.parse(data);
+            const parsedEntries = JSON.parse(data) as SerializedData;
             parsedEntries.clientRemote = this.clientRemote;
             newData = JSON.stringify(parsedEntries, null, 2);
         }
@@ -315,7 +315,7 @@ class WARoot {
             this.currentlySelectedConfigs.push(configEntry);
         } else {
             const data = fs.readFileSync(filename).toString();
-            const parsedEntries: SerializedData = JSON.parse(data);
+            const parsedEntries = JSON.parse(data) as SerializedData;
             parsedEntries.gitRemote = this.gitRemote;
             newData = JSON.stringify(parsedEntries, null, 2);
         }
@@ -353,7 +353,7 @@ class WARoot {
             this.currentlySelectedConfigs.push(configEntry);
         } else {
             const data = fs.readFileSync(filename).toString();
-            const parsedEntries: SerializedData = JSON.parse(data);
+            const parsedEntries = JSON.parse(data) as SerializedData;
             parsedEntries.gitSha = this.gitSha;
             newData = JSON.stringify(parsedEntries, null, 2);
         }
@@ -394,7 +394,6 @@ class WARoot {
         }
 
         // try to find a githubOrganizationName remote
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const githubOrganizationName: string = vscode.workspace.getConfiguration("weAudit").get("general.githubOrganizationName")!;
         for (const remote of remoteUrl) {
             if (!remote.includes(githubOrganizationName)) {
@@ -416,7 +415,7 @@ class WARoot {
         }
 
         if (remoteUrl.length === 0) {
-            this.editAuditRemote();
+            await this.editAuditRemote();
             return this.gitRemote;
         }
 
@@ -436,7 +435,7 @@ class WARoot {
         // it means that the client remote is probably the same as the git remote
         this.clientRemote = remotePath;
 
-        this.updateSavedData(this.username);
+        void this.updateSavedData(this.username);
         return this.gitRemote;
     }
 
@@ -543,7 +542,7 @@ class WARoot {
         await this.editGitHash();
 
         // persist the data
-        this.updateSavedData(this.username);
+        void this.updateSavedData(this.username);
     }
 
     /**
@@ -866,7 +865,7 @@ class WARoot {
             return;
         }
         const data = fs.readFileSync(config.path).toString();
-        const parsedEntries: SerializedData = JSON.parse(data);
+        const parsedEntries = JSON.parse(data) as SerializedData;
 
         if (!validateSerializedData(parsedEntries)) {
             vscode.window.showErrorMessage(`weAudit: Error loading serialized data for ${config.username}. Filepath: ${config.path}`);
@@ -913,30 +912,18 @@ class WARoot {
     async updateSavedData(username: string): Promise<void> {
         const vscodeFolder = path.join(this.rootPath, ".vscode");
 
+        let existsFolder = true;
         let existsFile = true;
         let toCreateData = false;
 
-        // Atomically ensure .vscode directory exists (no TOCTOU vulnerability)
-        // This will succeed even if the directory already exists
-        try {
-            fs.mkdirSync(vscodeFolder, { recursive: true });
-        } catch (error: any) {
-            // Only throw if it's not an EEXIST error (which shouldn't happen with recursive: true anyway)
-            if (error.code !== "EEXIST") {
-                throw error;
-            }
+        if (!fs.existsSync(vscodeFolder)) {
+            existsFolder = false;
         }
 
         const fileName = path.join(vscodeFolder, username + SERIALIZED_FILE_EXTENSION);
         const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
         const configEntry = { path: fileName, username: username, root: wsRootEntry };
-
-        // Check if file exists by attempting to access it
-        // This is still subject to TOCTOU but we handle it properly below
-        try {
-            fs.accessSync(fileName, fs.constants.F_OK);
-            existsFile = true;
-        } catch {
+        if (!fs.existsSync(fileName)) {
             existsFile = false;
         }
 
@@ -1021,7 +1008,10 @@ class WARoot {
         }
 
         if (toCreateData) {
-            // .vscode folder already created atomically at the start of this method
+            // create .vscode folder if it doesn't exist
+            if (!existsFolder) {
+                fs.mkdirSync(vscodeFolder);
+            }
 
             // create a new config file if it doesn't exist
             if (!existsFile) {
@@ -1048,14 +1038,7 @@ class WARoot {
                 2,
             );
 
-            // Write file atomically with proper error handling
-            // Using 'w+' flag: creates file if it doesn't exist, truncates if it does
-            try {
-                fs.writeFileSync(fileName, data, { flag: "w+" });
-            } catch (error: any) {
-                console.error(`Failed to write audit data to ${fileName}:`, error);
-                throw new Error(`Failed to save audit data: ${error.message}`);
-            }
+            fs.writeFileSync(fileName, data, { flag: "w+" });
         }
     }
 
@@ -1071,7 +1054,7 @@ class WARoot {
         this.gitSha = gitSha;
 
         // persist the data
-        this.updateSavedData(this.username);
+        void this.updateSavedData(this.username);
     }
 }
 
@@ -1292,7 +1275,7 @@ class MultiRootManager {
             for (const config of root.getConfigs()) {
                 if (root.manageConfiguration(config, false)) {
                     // Remove the findings of outgoing roots from the MultiConfig and remove them from the tree
-                    vscode.commands.executeCommand("weAudit.toggleSavedFindings", config);
+                    await vscode.commands.executeCommand("weAudit.toggleSavedFindings", config);
                 }
             }
         }
@@ -1565,7 +1548,7 @@ class MultiRootManager {
     updateSavedData(username: string): void {
         //Iterate over all workspace roots
         for (const root of this.roots) {
-            root.updateSavedData(username);
+            void root.updateSavedData(username);
         }
     }
 
@@ -1768,11 +1751,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         });
 
         vscode.commands.registerCommand("weAudit.editEntryTitle", (node: FullEntry) => {
-            this.editEntryTitle(node);
+            void this.editEntryTitle(node);
         });
 
         vscode.commands.registerCommand("weAudit.editLocationEntry", (node: FullLocationEntry) => {
-            this.editLocationEntryDescription(node);
+            void this.editLocationEntryDescription(node);
         });
 
         vscode.commands.registerCommand("weAudit.restoreFinding", (node: FullEntry) => {
@@ -1795,7 +1778,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             const entry = this.getLocationUnderCursor();
             if (entry) {
                 const toEdit = isLocationEntry(entry) ? entry.parentEntry : entry;
-                this.editEntryTitle(toEdit);
+                void this.editEntryTitle(toEdit);
             }
         });
 
@@ -1808,31 +1791,31 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         });
 
         vscode.commands.registerCommand("weAudit.copyEntryPermalink", (entry: FullEntry | FullLocationEntry) => {
-            this.copyEntryPermalink(entry);
+            void this.copyEntryPermalink(entry);
         });
 
         vscode.commands.registerCommand("weAudit.copyEntryPermalinks", (entry: FullEntry) => {
-            this.copyEntryPermalinks(entry);
+            void this.copyEntryPermalinks(entry);
         });
 
         vscode.commands.registerTextEditorCommand("weAudit.copySelectedCodePermalink", () => {
-            this.copySelectedCodePermalink(Repository.Audit);
+            void this.copySelectedCodePermalink(Repository.Audit);
         });
 
         vscode.commands.registerTextEditorCommand("weAudit.copySelectedCodeClientPermalink", () => {
-            this.copySelectedCodePermalink(Repository.Client);
+            void this.copySelectedCodePermalink(Repository.Client);
         });
 
         vscode.commands.registerCommand("weAudit.editClientRemote", () => {
-            this.workspaces.editClientRemote();
+            void this.workspaces.editClientRemote();
         });
 
         vscode.commands.registerCommand("weAudit.editAuditRemote", () => {
-            this.workspaces.editAuditRemote();
+            void this.workspaces.editAuditRemote();
         });
 
         vscode.commands.registerCommand("weAudit.editGitHash", () => {
-            this.workspaces.editGitHash();
+            void this.workspaces.editGitHash();
         });
 
         // Set up the repositories for one workspace root specified by its path
@@ -1847,7 +1830,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // Set up the repositories for all workspace roots
         vscode.commands.registerCommand("weAudit.setupRepositoriesAll", () => {
-            this.workspaces.setupRepositories();
+            void this.workspaces.setupRepositories();
         });
 
         /**
@@ -1908,7 +1891,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
 
             for (const actualEntry of actualEntries) {
-                this.openGithubIssue(actualEntry);
+                void this.openGithubIssue(actualEntry);
             }
         });
 
@@ -2028,7 +2011,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         });
 
         vscode.commands.registerCommand("weAudit.addRegionToAnEntry", () => {
-            this.addRegionToAnEntry();
+            void this.addRegionToAnEntry();
         });
 
         vscode.commands.registerCommand("weAudit.deleteLocation", (entry: FullLocationEntry) => {
@@ -2036,11 +2019,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         });
 
         vscode.commands.registerCommand("weAudit.showFindingsSearchBar", () => {
-            this.showFindingsSearchBar();
+            void this.showFindingsSearchBar();
         });
 
         vscode.commands.registerCommand("weAudit.exportFindingsInMarkdown", () => {
-            this.exportFindingsInMarkdown();
+            void this.exportFindingsInMarkdown();
         });
 
         // Gets the filtered entries from the current tree that correspond to a specific username and workspace root
@@ -2094,7 +2077,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         let markdown = "";
         for (const entry of selectedEntries) {
-            const entryMarkdown = await this.getEntryMarkdown(entry.entry);
+            let entryMarkdown = await this.getEntryMarkdown(entry.entry);
+            if (entryMarkdown === undefined) {
+                entryMarkdown = "";
+            }
             markdown += `---\n---\n---\n${entryMarkdown}\n\n`;
         }
 
@@ -2235,7 +2221,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         if (authors.size > 0) {
             for (const author of authors) {
-                this.updateSavedData(author);
+                void this.updateSavedData(author);
             }
             // call findAndLoadConfigurationFiles to refresh the Saved Finding Files list
             vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
@@ -2288,7 +2274,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
         }
         if (isPersistent) {
-            this.updateSavedData(entry.author);
+            void this.updateSavedData(entry.author);
         }
     }
 
@@ -2322,7 +2308,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.treeViewMode = TreeViewMode.List;
         }
         const label = treeViewModeLabel(this.treeViewMode);
-        vscode.workspace.getConfiguration("weAudit").update("general.treeViewMode", label, true)!;
+        vscode.workspace.getConfiguration("weAudit").update("general.treeViewMode", label, true);
         this.refreshTree();
     }
 
@@ -2358,7 +2344,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // update decorations
         this.decorateWithUri(uri);
         for (const relevantUsername of relevantUsernames) {
-            this.updateSavedData(relevantUsername);
+            void this.updateSavedData(relevantUsername);
         }
         this.refresh(uri);
     }
@@ -2374,7 +2360,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.workspaces.addPartiallyAudited(uri);
         // update decorations
         this.decorateWithUri(uri);
-        this.updateSavedData(this.username);
+        void this.updateSavedData(this.username);
     }
 
     private navigateToNextPartiallyAuditedRegion(): void {
@@ -2506,7 +2492,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         treeView.reveal(entry);
         this.refreshTree();
         this.decorate();
-        this.updateSavedData(entry.author);
+        void this.updateSavedData(entry.author);
     }
 
     async editLocationEntryDescription(locationEntry: FullLocationEntry): Promise<void> {
@@ -2522,7 +2508,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         this.refreshTree();
         this.decorate();
-        this.updateSavedData(locationEntry.parentEntry.author);
+        void this.updateSavedData(locationEntry.parentEntry.author);
     }
 
     /**
@@ -2563,10 +2549,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     }
                     switch (repository) {
                         case Repository.Audit:
-                            wsRoot.editAuditRemote();
+                            void wsRoot.editAuditRemote();
                             break;
                         case Repository.Client:
-                            wsRoot.editClientRemote();
+                            void wsRoot.editClientRemote();
                             break;
                     }
                 });
@@ -2579,7 +2565,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 if (config === undefined) {
                     return;
                 }
-                wsRoot.editGitHash();
+                void wsRoot.editGitHash();
             });
             return;
         }
@@ -2896,7 +2882,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.resolvedEntriesTree.refresh();
         }
 
-        this.updateSavedData(removed.author);
+        void this.updateSavedData(removed.author);
         this.refreshAndDecorateEntry(removed);
     }
 
@@ -2924,7 +2910,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      *
      */
     addFinding(): void {
-        this.createOrEditEntry(EntryType.Finding);
+        void this.createOrEditEntry(EntryType.Finding);
     }
 
     /**
@@ -2932,7 +2918,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * or edits the entry if it already exists.
      */
     addNote(): void {
-        this.createOrEditEntry(EntryType.Note);
+        void this.createOrEditEntry(EntryType.Note);
     }
 
     /**
@@ -2956,7 +2942,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.resolvedEntriesTree.refresh();
 
         this.refreshAndDecorateEntry(entry);
-        this.updateSavedData(entry.author);
+        void this.updateSavedData(entry.author);
     }
 
     /**
@@ -2971,7 +2957,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
         this.resolvedEntries.splice(idx, 1);
         this.resolvedEntriesTree.refresh();
-        this.updateSavedData(entry.author);
+        void this.updateSavedData(entry.author);
     }
 
     /**
@@ -2987,7 +2973,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         this.resolvedEntries.splice(0, this.resolvedEntries.length);
         for (const author of authors) {
-            this.updateSavedData(author);
+            void this.updateSavedData(author);
         }
         this.resolvedEntriesTree.refresh();
     }
@@ -3011,7 +2997,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // we share the same array as the resolvedFindings array, so we can't do `this.resolvedEntries = []`
         const spliced = this.resolvedEntries.splice(0, this.resolvedEntries.length);
         for (const author of authorSet) {
-            this.updateSavedData(author);
+            void this.updateSavedData(author);
         }
 
         for (const entry of spliced) {
@@ -3052,7 +3038,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (intersectedIdx !== -1) {
             const entry = this.treeEntries[intersectedIdx];
             // editEntryTitle calls updateSavedData so we don't need to call it here
-            this.editEntryTitle(entry);
+            await this.editEntryTitle(entry);
         } else {
             // otherwise, add it to the tree entries
             // create title depending on the entry type
@@ -3070,7 +3056,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 details: createDefaultEntryDetails(),
             };
             this.treeEntries.push(entry);
-            this.updateSavedData(this.username);
+            void this.updateSavedData(this.username);
         }
 
         this.decorateWithUri(uri);
@@ -3086,7 +3072,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             details: createDefaultEntryDetails(),
         };
         this.treeEntries.push(entry);
-        this.updateSavedData(this.username);
+        void this.updateSavedData(this.username);
 
         const uri = vscode.Uri.file(path.join(locationEntry.location.rootPath, locationEntry.location.path));
         this.decorateWithUri(uri);
@@ -3134,7 +3120,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     return;
                 }
 
-                this.updateSavedData(parentEntry.author);
+                void this.updateSavedData(parentEntry.author);
                 // we only need to refresh the URI for the deleted location
                 this.refreshAndDecorateFromPath(entry.location);
                 return;
@@ -3216,30 +3202,29 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        vscode.window
-            .showQuickPick(items, {
-                ignoreFocusOut: true,
-                title: "Select the finding to add the region to",
-            })
-            .then((pickItem) => {
-                if (pickItem === undefined) {
-                    return;
-                }
-                const entry = pickItem.entry;
-                // Add each selection as a separate region
-                for (const location of locations) {
-                    entry.locations.push(location);
-                }
-                this.updateSavedData(entry.author);
-                this.decorateWithUri(editor.document.uri);
-                this.refresh(editor.document.uri);
-                // reveal the entry in the tree view if the treeview is visible,
-                // for some reason, it won't expand even if though it is created
-                // with an expanded state
-                if (treeView.visible) {
-                    treeView.reveal(entry, { expand: 1, select: false });
-                }
-            });
+        const pickItem = await vscode.window.showQuickPick(items, {
+            ignoreFocusOut: true,
+            title: "Select the finding to add the region to",
+        });
+
+        if (pickItem === undefined) {
+            return;
+        }
+
+        const entry = pickItem.entry;
+        // Add each selection as a separate region
+        for (const location of locations) {
+            entry.locations.push(location);
+        }
+        void this.updateSavedData(entry.author);
+        this.decorateWithUri(editor.document.uri);
+        this.refresh(editor.document.uri);
+        // reveal the entry in the tree view if the treeview is visible,
+        // for some reason, it won't expand even if though it is created
+        // with an expanded state
+        if (treeView.visible) {
+            treeView.reveal(entry, { expand: 1, select: false });
+        }
     }
 
     /**
@@ -3954,7 +3939,11 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
         }
 
         let data = dataTransfer.get(this.LOCATION_MIME_TYPE);
-        if (data !== undefined && isLocationEntry(data.value)) {
+        if (data === undefined) {
+            return;
+        }
+
+        if (isLocationEntry(data.value as TreeEntry)) {
             // A LocationEntry is being dragged
             const locationEntry = data.value as FullLocationEntry;
 
@@ -3993,7 +3982,7 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                 }
 
                 // Prevent mixing findings that belong to different workspace roots, because it is a headache to synchronize this.
-                if (target!.locations[0].rootPath !== locationEntry.location.rootPath) {
+                if (target.locations[0].rootPath !== locationEntry.location.rootPath) {
                     vscode.window.showErrorMessage(
                         "weAudit: Error moving a location to a different finding, as this finding is in a different workspace root.",
                     );
@@ -4084,9 +4073,10 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
 
         // if the data is not a location, check if it is an entry
         data = dataTransfer.get(this.ENTRY_MIME_TYPE);
-        if (data !== undefined && isEntry(data.value)) {
+        const value = data?.value as TreeEntry;
+        if (data !== undefined && isEntry(value)) {
             // An Entry is being dragged
-            const entry = data.value as FullEntry;
+            const entry = value;
 
             // an undefined target means we dragged an Entry to the empty space
             // that would move it to the bottom.
@@ -4207,7 +4197,7 @@ export class AuditMarker {
         treeView = vscode.window.createTreeView("codeMarker", { treeDataProvider, dragAndDropController: new DragAndDropController() });
         context.subscriptions.push(treeView);
 
-        vscode.window.onDidChangeTextEditorSelection(this.checkSelectionEventAndRevealEntryUnderCursor, this);
+        vscode.window.onDidChangeTextEditorSelection((e) => this.checkSelectionEventAndRevealEntryUnderCursor(e));
 
         // call revealEntryUnderCursor when the extension separator becomes visible
         treeView.onDidChangeVisibility((e: vscode.TreeViewVisibilityChangeEvent) => {
@@ -4215,7 +4205,7 @@ export class AuditMarker {
                 return;
             }
 
-            this.revealEntryUnderCursor();
+            void this.revealEntryUnderCursor();
         });
 
         treeView.onDidChangeSelection((e: vscode.TreeViewSelectionChangeEvent<TreeEntry>) => {
@@ -4243,7 +4233,7 @@ export class AuditMarker {
         });
 
         vscode.window.registerFileDecorationProvider(treeDataProvider);
-        vscode.window.onDidChangeActiveColorTheme(this.decorationManager.reloadAllDecorationConfigurations, this.decorationManager);
+        vscode.window.onDidChangeActiveColorTheme(() => this.decorationManager.reloadAllDecorationConfigurations());
         vscode.workspace.onDidChangeConfiguration((e: vscode.ConfigurationChangeEvent) => {
             this.selectivelyReloadConfigurations(e);
         });
@@ -4297,7 +4287,7 @@ export class AuditMarker {
             if (entry === undefined) {
                 return;
             }
-            treeDataProvider.openGithubIssue(entry);
+            void treeDataProvider.openGithubIssue(entry);
         });
     }
 
@@ -4394,7 +4384,7 @@ export class AuditMarker {
             return;
         }
 
-        this.revealEntryUnderCursor();
+        void this.revealEntryUnderCursor();
     }
 
     /**

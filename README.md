@@ -225,7 +225,7 @@ We use ESLint and Prettier to enforce a consistent code style.
 
 ```bash
 # run ESLint
-npx eslint -c .eslintrc.json .
+npx eslint -c .eslintrc.cjs .
 
 # run Prettier
 npx prettier --write .

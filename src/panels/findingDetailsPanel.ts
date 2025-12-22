@@ -4,6 +4,7 @@ import * as crypto from "crypto";
 import { getUri } from "../utilities/getUri";
 import { EntryDetails } from "../types";
 import { WebviewMessage } from "../webview/webviewMessageTypes";
+import htmlBody from "./findingDetails.html";
 
 export function activateFindingDetailsWebview(context: vscode.ExtensionContext): void {
     const provider = new FindingDetailsProvider(context.extensionUri);
@@ -99,24 +100,21 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         // Use a nonce to only allow a specific script to be run.
         const nonce = getNonce();
 
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const htmlBody = require("./findingDetails.html");
-
         return /*html*/ `
           <!DOCTYPE html>
           <html lang="en">
             <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-              <link rel="stylesheet" href="${styleUri}">
+              <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; connect-src ${webview.cspSource};">
+              <link rel="stylesheet" href="${styleUri.toString()}">
               <title>Finding Details</title>
             </head>
             <body>
               <section class="component-row">
                 ${htmlBody}
               </section>
-              <script type="module" nonce="${nonce}" src="${webviewUri}"></script>
+              <script type="module" nonce="${nonce}" src="${webviewUri.toString()}"></script>
             </body>
           </html>
         `;

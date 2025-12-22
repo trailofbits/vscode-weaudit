@@ -14,8 +14,10 @@ export function activate(context: vscode.ExtensionContext): void {
         return;
     }
 
-    vscode.commands.registerCommand("weAudit.openFileLines", (resource, startLine, endLine) => openResource(resource, startLine, endLine));
-    vscode.commands.registerCommand("weAudit.openFile", (resource) => vscode.window.showTextDocument(resource));
+    vscode.commands.registerCommand("weAudit.openFileLines", (resource: vscode.Uri, startLine: number, endLine: number) =>
+        openResource(resource, startLine, endLine),
+    );
+    vscode.commands.registerCommand("weAudit.openFile", (resource: vscode.TextDocument) => vscode.window.showTextDocument(resource));
 
     new AuditMarker(context);
     new MultipleSavedFindings(context);
