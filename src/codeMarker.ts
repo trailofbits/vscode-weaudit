@@ -8,6 +8,7 @@ import { plot } from "asciichart";
 
 import { ResolvedEntries } from "./resolvedFindings";
 import { labelAfterFirstLineTextDecoration, hoverOnLabel, DecorationManager } from "./decorationManager";
+import { activateFindingBoundaryCodeLens } from "./findingBoundaryCodeLens";
 import {
     Entry,
     FullEntry,
@@ -3982,6 +3983,47 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.decorateWithUri(uri);
         this.refresh(uri);
     }
+
+    /**
+     * Modifies the boundary (startLine and/or endLine) of a specific location within an entry.
+     * Used by the boundary editing CodeLens feature.
+     * @param entry the entry containing the location to modify
+     * @param locationIndex the index of the location within entry.locations
+     * @param startLineDelta the change to apply to startLine (negative = expand up, positive = shrink from top)
+     * @param endLineDelta the change to apply to endLine (negative = shrink from bottom, positive = expand down)
+     * @param document the document to validate line bounds against
+     * @returns true if the modification was successful, false otherwise
+     */
+    modifyLocationBoundary(entry: FullEntry, locationIndex: number, startLineDelta: number, endLineDelta: number, document: vscode.TextDocument): boolean {
+        if (locationIndex < 0 || locationIndex >= entry.locations.length) {
+            return false;
+        }
+
+        const location = entry.locations[locationIndex];
+        const newStartLine = location.startLine + startLineDelta;
+        const newEndLine = location.endLine + endLineDelta;
+
+        // Validate bounds
+        if (newStartLine < 0) {
+            return false;
+        }
+        if (newEndLine >= document.lineCount) {
+            return false;
+        }
+        if (newStartLine > newEndLine) {
+            return false;
+        }
+
+        // Apply the changes
+        location.startLine = newStartLine;
+        location.endLine = newEndLine;
+
+        // Update decorations and save
+        this.refreshAndDecorateFromPath(location);
+        this.updateSavedData(entry.author);
+
+        return true;
+    }
 }
 
 let treeView: vscode.TreeView<TreeEntry>;
@@ -4375,6 +4417,14 @@ export class AuditMarker {
             }
             void treeDataProvider.openGithubIssue(entry);
         });
+
+        // Activate the finding boundary CodeLens feature
+        activateFindingBoundaryCodeLens(
+            context,
+            () => treeDataProvider.getLocationUnderCursor(),
+            (entry, locationIndex, startLineDelta, endLineDelta, document) =>
+                treeDataProvider.modifyLocationBoundary(entry, locationIndex, startLineDelta, endLineDelta, document),
+        );
     }
 
     private showEntryInFindingDetails(entry: TreeEntry): void {
