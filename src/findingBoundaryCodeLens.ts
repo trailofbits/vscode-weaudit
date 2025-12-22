@@ -15,6 +15,7 @@ interface BoundaryEditSession {
 }
 
 const BOUNDARY_COMMANDS = {
+    /* eslint-disable @typescript-eslint/naming-convention */
     "weAudit.boundaryExpandUp": {
         title: "$(arrow-up) Expand",
         tooltip: "Expand finding boundary up by one line",
@@ -43,6 +44,7 @@ const BOUNDARY_COMMANDS = {
         title: "$(check) Done",
         tooltip: "Finish editing finding boundary",
     },
+    /* eslint-enable @typescript-eslint/naming-convention */
 } as const;
 
 type BoundaryCommandId = keyof typeof BOUNDARY_COMMANDS;
@@ -351,9 +353,7 @@ export function activateFindingBoundaryCodeLens(
      * @param locationOrEntry the entry or specific location entry under the cursor
      * @returns the concrete entry and the index of the location being edited
      */
-    const resolveEntrySelection = (
-        locationOrEntry: FullEntry | FullLocationEntry | undefined,
-    ): { entry: FullEntry; locationIndex: number } | undefined => {
+    const resolveEntrySelection = (locationOrEntry: FullEntry | FullLocationEntry | undefined): { entry: FullEntry; locationIndex: number } | undefined => {
         if (!locationOrEntry) {
             return undefined;
         }
