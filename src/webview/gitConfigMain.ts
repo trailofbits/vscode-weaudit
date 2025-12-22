@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import { provideVSCodeDesignSystem, vsCodeTextField, vsCodeDropdown, vsCodeOption, Dropdown } from "@vscode/webview-ui-toolkit";
 import { TextField } from "@vscode/webview-ui-toolkit";
 import { WebviewIsReadyMessage, UpdateRepositoryMessage, ChooseWorkspaceRootMessage } from "./webviewMessageTypes";
@@ -7,7 +8,6 @@ import { WebviewIsReadyMessage, UpdateRepositoryMessage, ChooseWorkspaceRootMess
 // syntax below.
 provideVSCodeDesignSystem().register(vsCodeTextField(), vsCodeDropdown(), vsCodeOption());
 
-// @ts-ignore
 const vscode = acquireVsCodeApi();
 
 // Just like a regular webpage we need to wait for the webview

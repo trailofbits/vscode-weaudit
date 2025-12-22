@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import { provideVSCodeDesignSystem, vsCodeDropdown, vsCodeTextArea, vsCodeOption, vsCodeTextField } from "@vscode/webview-ui-toolkit";
 import { TextArea, Dropdown, TextField } from "@vscode/webview-ui-toolkit";
 import { UpdateEntryMessage } from "./webviewMessageTypes";
@@ -8,7 +9,6 @@ import { UpdateEntryMessage } from "./webviewMessageTypes";
 // provideVSCodeDesignSystem().register(allComponents);
 provideVSCodeDesignSystem().register(vsCodeDropdown(), vsCodeTextArea(), vsCodeOption(), vsCodeTextField());
 
-// @ts-ignore
 const vscode = acquireVsCodeApi();
 
 // Just like a regular webpage we need to wait for the webview
@@ -89,7 +89,7 @@ function handlePersistentFieldChange(e: Event): void {
 }
 
 function handleFieldChange(e: Event, isPersistent: boolean): void {
-    const element = e!.target! as HTMLInputElement;
+    const element = e.target! as HTMLInputElement;
     const value = element.value;
     const field = element.id.split("-")[0];
 
