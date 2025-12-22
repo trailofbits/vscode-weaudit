@@ -1,7 +1,7 @@
 const js = require("@eslint/js");
 const tseslint = require("@typescript-eslint/eslint-plugin");
 const tsParser = require("@typescript-eslint/parser");
-const stylistic = require('@stylistic/eslint-plugin');
+const stylistic = require("@stylistic/eslint-plugin");
 
 const tsFiles = ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"];
 
@@ -11,7 +11,7 @@ module.exports = [
     },
     js.configs.recommended,
     ...tseslint.configs["flat/recommended-type-checked"],
-    stylistic.configs['disable-legacy'],
+    stylistic.configs["disable-legacy"],
     {
         files: tsFiles,
         languageOptions: {
