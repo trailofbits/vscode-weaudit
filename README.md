@@ -92,7 +92,7 @@ You can fill detailed information about a finding by clicking on it in the _List
 
 ### GitHub/Gitlab Issues
 
-You can create a GitHub/Gitlab issue with the detailed findings information by clicking on the corresponding `Open Remote Issue` button in the _List of Findings_ panel. A browser window in will open prompting you to open the issue with the prefilled information from the _Finding Details_ panel.
+You can create a GitHub/Gitlab issue with the detailed findings information by clicking on the corresponding `Open Remote Issue` button in the _List of Findings_ panel or the same button in the _Finding Details_ view. A browser window will open prompting you to open the issue with the prefilled information from the _Finding Details_ panel.
 
 ![Open Remote Issue](media/readme/gifs/create_gh_issue.gif)
 
