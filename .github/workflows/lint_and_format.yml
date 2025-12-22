@@ -23,7 +23,7 @@ jobs:
               run: npx prettier --check .
 
             - name: Run ESLint
-              run: npx eslint --ext ts --color -c .eslintrc.json src
+              run: npx eslint --ext ts --color -c .eslintrc.cjs src
 
             # GH's SARIF viewer does not support suppression directives so we get too many false positives
             # - name: SARIF
