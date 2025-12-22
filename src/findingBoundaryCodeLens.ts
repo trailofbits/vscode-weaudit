@@ -14,6 +14,40 @@ interface BoundaryEditSession {
     uri: vscode.Uri;
 }
 
+const BOUNDARY_COMMANDS = {
+    "weAudit.boundaryExpandUp": {
+        title: "$(arrow-up) Expand",
+        tooltip: "Expand finding boundary up by one line",
+    },
+    "weAudit.boundaryShrinkTop": {
+        title: "$(arrow-down) Shrink",
+        tooltip: "Shrink finding boundary from top by one line",
+    },
+    "weAudit.boundaryMoveUp": {
+        title: "$(triangle-up) Move",
+        tooltip: "Move entire finding up by one line",
+    },
+    "weAudit.boundaryShrinkBottom": {
+        title: "$(arrow-up) Shrink",
+        tooltip: "Shrink finding boundary from bottom by one line",
+    },
+    "weAudit.boundaryExpandDown": {
+        title: "$(arrow-down) Expand",
+        tooltip: "Expand finding boundary down by one line",
+    },
+    "weAudit.boundaryMoveDown": {
+        title: "$(triangle-down) Move",
+        tooltip: "Move entire finding down by one line",
+    },
+    "weAudit.stopEditingBoundary": {
+        title: "$(check) Done",
+        tooltip: "Finish editing finding boundary",
+    },
+} as const;
+
+type BoundaryCommandId = keyof typeof BOUNDARY_COMMANDS;
+type BoundaryCommandMetadata = (typeof BOUNDARY_COMMANDS)[BoundaryCommandId];
+
 /**
  * CodeLens provider that displays boundary adjustment controls for findings.
  * This provider is only active when a user explicitly enters boundary editing mode
@@ -214,55 +248,24 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
 
         // Create a unique identifier for the location
         const locationId = `${this.activeSession.entry.label}:${this.activeSession.locationIndex}`;
+        const locationArgs: readonly [string] = [locationId];
 
         // === TOP BOUNDARY CONTROLS (at startLine) ===
         const topRange = new vscode.Range(location.startLine, 0, location.startLine, 0);
 
-        // Expand up (move startLine up by 1)
-        if (location.startLine > 0) {
-            lenses.push(
-                new vscode.CodeLens(topRange, {
-                    title: "$(arrow-up) Expand",
-                    command: "weAudit.boundaryExpandUp",
-                    tooltip: "Expand finding boundary up by one line",
-                    arguments: [locationId],
-                }),
-            );
+        const topControls: Array<{ condition: boolean; commandId: BoundaryCommandId }> = [
+            { condition: location.startLine > 0, commandId: "weAudit.boundaryExpandUp" },
+            { condition: location.startLine < location.endLine, commandId: "weAudit.boundaryShrinkTop" },
+            { condition: location.startLine > 0, commandId: "weAudit.boundaryMoveUp" },
+        ];
+
+        for (const control of topControls) {
+            if (control.condition) {
+                lenses.push(this.createBoundaryCommandLens(topRange, control.commandId, locationArgs));
+            }
         }
 
-        // Shrink from top (move startLine down by 1)
-        if (location.startLine < location.endLine) {
-            lenses.push(
-                new vscode.CodeLens(topRange, {
-                    title: "$(arrow-down) Shrink",
-                    command: "weAudit.boundaryShrinkTop",
-                    tooltip: "Shrink finding boundary from top by one line",
-                    arguments: [locationId],
-                }),
-            );
-        }
-
-        // Move up (shift entire region up by 1)
-        if (location.startLine > 0) {
-            lenses.push(
-                new vscode.CodeLens(topRange, {
-                    title: "$(triangle-up) Move",
-                    command: "weAudit.boundaryMoveUp",
-                    tooltip: "Move entire finding up by one line",
-                    arguments: [locationId],
-                }),
-            );
-        }
-
-        // Done button at the top
-        lenses.push(
-            new vscode.CodeLens(topRange, {
-                title: "$(check) Done",
-                command: "weAudit.stopEditingBoundary",
-                tooltip: "Finish editing finding boundary",
-                arguments: [],
-            }),
-        );
+        lenses.push(this.createBoundaryCommandLens(topRange, "weAudit.stopEditingBoundary"));
 
         // === BOTTOM BOUNDARY CONTROLS (at endLine) ===
         // Only show bottom controls if endLine is different from startLine
@@ -270,50 +273,49 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
             const bottomLine = Math.min(location.endLine + 1, document.lineCount - 1);
             const bottomRange = new vscode.Range(bottomLine, 0, bottomLine, 0);
 
-            // Shrink from bottom (move endLine up by 1)
-            if (location.endLine > location.startLine) {
-                lenses.push(
-                    new vscode.CodeLens(bottomRange, {
-                        title: "$(arrow-up) Shrink",
-                        command: "weAudit.boundaryShrinkBottom",
-                        tooltip: "Shrink finding boundary from bottom by one line",
-                        arguments: [locationId],
-                    }),
-                );
+            const bottomControls: Array<{ condition: boolean; commandId: BoundaryCommandId }> = [
+                { condition: location.endLine > location.startLine, commandId: "weAudit.boundaryShrinkBottom" },
+                { condition: true, commandId: "weAudit.boundaryExpandDown" },
+                { condition: true, commandId: "weAudit.boundaryMoveDown" },
+            ];
+
+            for (const control of bottomControls) {
+                if (control.condition) {
+                    lenses.push(this.createBoundaryCommandLens(bottomRange, control.commandId, locationArgs));
+                }
             }
-
-            // Expand down (move endLine down by 1)
-            lenses.push(
-                new vscode.CodeLens(bottomRange, {
-                    title: "$(arrow-down) Expand",
-                    command: "weAudit.boundaryExpandDown",
-                    tooltip: "Expand finding boundary down by one line",
-                    arguments: [locationId],
-                }),
-            );
-
-            // Move down (shift entire region down by 1)
-            lenses.push(
-                new vscode.CodeLens(bottomRange, {
-                    title: "$(triangle-down) Move",
-                    command: "weAudit.boundaryMoveDown",
-                    tooltip: "Move entire finding down by one line",
-                    arguments: [locationId],
-                }),
-            );
         } else {
             // Single-line finding: show expand down on the same line
             lenses.push(
-                new vscode.CodeLens(topRange, {
+                this.createBoundaryCommandLens(topRange, "weAudit.boundaryExpandDown", locationArgs, {
                     title: "$(arrow-down) Expand Down",
-                    command: "weAudit.boundaryExpandDown",
-                    tooltip: "Expand finding boundary down by one line",
-                    arguments: [locationId],
                 }),
             );
         }
 
         return lenses;
+    }
+
+    /**
+     * Creates a CodeLens for the provided boundary command, reusing shared metadata.
+     * @param range the document range where the CodeLens should appear
+     * @param commandId the VS Code command to invoke
+     * @param args arguments forwarded to the command
+     * @param overrides optional overrides for the command title or tooltip
+     */
+    private createBoundaryCommandLens(
+        range: vscode.Range,
+        commandId: BoundaryCommandId,
+        args: readonly unknown[] = [],
+        overrides?: Partial<BoundaryCommandMetadata>,
+    ): vscode.CodeLens {
+        const commandMeta = BOUNDARY_COMMANDS[commandId];
+        return new vscode.CodeLens(range, {
+            title: overrides?.title ?? commandMeta.title,
+            tooltip: overrides?.tooltip ?? commandMeta.tooltip,
+            command: commandId,
+            arguments: [...args],
+        });
     }
 }
 
