@@ -288,7 +288,7 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
             // Single-line finding: show expand down on the same line
             lenses.push(
                 this.createBoundaryCommandLens(topRange, "weAudit.boundaryExpandDown", locationArgs, {
-                    title: "$(arrow-down) Expand Down",
+                    title: "$(arrow-down) Expand",
                 }),
             );
         }
@@ -346,6 +346,59 @@ export function activateFindingBoundaryCodeLens(
     modifyLocationBoundary: (entry: FullEntry, locationIndex: number, startLineDelta: number, endLineDelta: number, document: vscode.TextDocument) => boolean,
 ): void {
     const provider = getCodeLensProvider();
+    /**
+     * Resolves the entry and location index from the provided tree item.
+     * @param locationOrEntry the entry or specific location entry under the cursor
+     * @returns the concrete entry and the index of the location being edited
+     */
+    const resolveEntrySelection = (
+        locationOrEntry: FullEntry | FullLocationEntry | undefined,
+    ): { entry: FullEntry; locationIndex: number } | undefined => {
+        if (!locationOrEntry) {
+            return undefined;
+        }
+
+        if (isLocationEntry(locationOrEntry)) {
+            const entry = locationOrEntry.parentEntry;
+            const locationIndex = entry.locations.indexOf(locationOrEntry.location);
+            if (locationIndex === -1) {
+                vscode.window.showErrorMessage("weAudit: Could not find location in entry.");
+                return undefined;
+            }
+            return { entry, locationIndex };
+        }
+
+        if (isEntry(locationOrEntry)) {
+            const entry = locationOrEntry;
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                return undefined;
+            }
+            const cursorLine = editor.selection.active.line;
+            const locationIndex = entry.locations.findIndex((loc) => cursorLine >= loc.startLine && cursorLine <= loc.endLine);
+            return { entry, locationIndex: locationIndex === -1 ? 0 : locationIndex };
+        }
+
+        return undefined;
+    };
+
+    /**
+     * Ensures there is an active boundary editing session, creating one from the cursor location if needed.
+     * @returns the active boundary edit session, or undefined if none could be established
+     */
+    const ensureActiveBoundarySession = (): BoundaryEditSession | undefined => {
+        const existingSession = provider.getActiveSession();
+        if (existingSession) {
+            return existingSession;
+        }
+
+        const selection = resolveEntrySelection(getLocationUnderCursor());
+        if (!selection) {
+            return undefined;
+        }
+        provider.startEditing(selection.entry, selection.locationIndex);
+        return provider.getActiveSession();
+    };
 
     // Register the CodeLens provider for all text documents (file + untitled)
     // Use a glob pattern so the provider also works in remote scenarios (where the scheme isn't "file")
@@ -355,40 +408,11 @@ export function activateFindingBoundaryCodeLens(
     // Command: Start editing finding boundary
     context.subscriptions.push(
         vscode.commands.registerCommand("weAudit.editFindingBoundary", () => {
-            const locationOrEntry = getLocationUnderCursor();
-            if (!locationOrEntry) {
+            const selection = resolveEntrySelection(getLocationUnderCursor());
+            if (!selection) {
                 return;
             }
-
-            let entry: FullEntry;
-            let locationIndex: number;
-
-            if (isLocationEntry(locationOrEntry)) {
-                entry = locationOrEntry.parentEntry;
-                // Find the index of this location in the parent entry
-                locationIndex = entry.locations.indexOf(locationOrEntry.location);
-                if (locationIndex === -1) {
-                    vscode.window.showErrorMessage("weAudit: Could not find location in entry.");
-                    return;
-                }
-            } else if (isEntry(locationOrEntry)) {
-                entry = locationOrEntry;
-                // For a FullEntry, we edit the first location by default
-                // But we need to find which location the cursor is actually in
-                const editor = vscode.window.activeTextEditor;
-                if (!editor) {
-                    return;
-                }
-                const cursorLine = editor.selection.active.line;
-                locationIndex = entry.locations.findIndex((loc) => cursorLine >= loc.startLine && cursorLine <= loc.endLine);
-                if (locationIndex === -1) {
-                    locationIndex = 0; // Default to first location
-                }
-            } else {
-                return;
-            }
-
-            provider.startEditing(entry, locationIndex);
+            provider.startEditing(selection.entry, selection.locationIndex);
         }),
     );
 
@@ -407,9 +431,13 @@ export function activateFindingBoundaryCodeLens(
     const registerBoundaryCommand = (commandId: string, startDelta: number, endDelta: number): void => {
         context.subscriptions.push(
             vscode.commands.registerCommand(commandId, () => {
-                const session = provider.getActiveSession();
                 const document = getActiveDocument();
-                if (!session || !document) {
+                if (!document) {
+                    return;
+                }
+
+                const session = ensureActiveBoundarySession();
+                if (!session) {
                     return;
                 }
                 if (modifyLocationBoundary(session.entry, session.locationIndex, startDelta, endDelta, document)) {
