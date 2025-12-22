@@ -240,6 +240,38 @@
             {
                 "command": "weAudit.toggleFindingsHighlighting",
                 "title": "weAudit: Toggle Findings Highlighting"
+            },
+            {
+                "command": "weAudit.editFindingBoundary",
+                "title": "weAudit: Edit Finding Boundary"
+            },
+            {
+                "command": "weAudit.stopEditingBoundary",
+                "title": "weAudit: Stop Editing Finding Boundary"
+            },
+            {
+                "command": "weAudit.boundaryExpandUp",
+                "title": "weAudit: Expand Finding Boundary Up"
+            },
+            {
+                "command": "weAudit.boundaryShrinkTop",
+                "title": "weAudit: Shrink Finding Boundary from Top"
+            },
+            {
+                "command": "weAudit.boundaryExpandDown",
+                "title": "weAudit: Expand Finding Boundary Down"
+            },
+            {
+                "command": "weAudit.boundaryShrinkBottom",
+                "title": "weAudit: Shrink Finding Boundary from Bottom"
+            },
+            {
+                "command": "weAudit.boundaryMoveUp",
+                "title": "weAudit: Move Finding Up"
+            },
+            {
+                "command": "weAudit.boundaryMoveDown",
+                "title": "weAudit: Move Finding Down"
             }
         ],
         "keybindings": [
@@ -287,6 +319,42 @@
                 "command": "weAudit.navigateToNextPartiallyAuditedRegion",
                 "key": "ctrl+alt+0",
                 "mac": "cmd+0"
+            },
+            {
+                "command": "weAudit.boundaryExpandUp",
+                "key": "ctrl+shift+numpad7",
+                "mac": "cmd+shift+numpad7",
+                "when": "weAudit.boundaryEditing"
+            },
+            {
+                "command": "weAudit.boundaryMoveUp",
+                "key": "ctrl+shift+numpad8",
+                "mac": "cmd+shift+numpad8",
+                "when": "weAudit.boundaryEditing"
+            },
+            {
+                "command": "weAudit.boundaryShrinkTop",
+                "key": "ctrl+shift+numpad9",
+                "mac": "cmd+shift+numpad9",
+                "when": "weAudit.boundaryEditing"
+            },
+            {
+                "command": "weAudit.boundaryExpandDown",
+                "key": "ctrl+shift+numpad1",
+                "mac": "cmd+shift+numpad1",
+                "when": "weAudit.boundaryEditing"
+            },
+            {
+                "command": "weAudit.boundaryMoveDown",
+                "key": "ctrl+shift+numpad2",
+                "mac": "cmd+shift+numpad2",
+                "when": "weAudit.boundaryEditing"
+            },
+            {
+                "command": "weAudit.boundaryShrinkBottom",
+                "key": "ctrl+shift+numpad3",
+                "mac": "cmd+shift+numpad3",
+                "when": "weAudit.boundaryEditing"
             }
         ],
         "menus": {
@@ -333,6 +401,30 @@
                 },
                 {
                     "command": "weAudit.deleteAllResolvedFinding",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.boundaryExpandUp",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.boundaryShrinkTop",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.boundaryExpandDown",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.boundaryShrinkBottom",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.boundaryMoveUp",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.boundaryMoveDown",
                     "when": "false"
                 }
             ],
