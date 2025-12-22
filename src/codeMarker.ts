@@ -1624,8 +1624,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     private workspaces: MultiRootManager;
     private username: string;
 
-    // locationEntries contains a map associating a file path to an array of additional locations
-    private pathToEntryMap: Map<string, TreeEntry[]>;
+    // pathToEntryMap associates a path label with the actual tree entries (location entries) rendered for that file
+    private pathToEntryMap: Map<string, FullLocationEntry[]>;
+    private pathToEntryMapDirty = true;
+    private locationEntryCache = new WeakMap<FullLocation, FullLocationEntry>();
 
     private treeViewMode: TreeViewMode;
 
@@ -1651,7 +1653,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         this.decorationManager = decorationManager;
 
-        this.pathToEntryMap = new Map<string, TreeEntry[]>();
+        this.pathToEntryMap = new Map<string, FullLocationEntry[]>();
 
         this.treeViewMode = TreeViewMode.List;
         this.loadTreeViewModeConfiguration();
@@ -3394,6 +3396,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
         }
 
+        this.markPathMapDirty();
+
         return fullParsedEntries;
     }
 
@@ -3585,70 +3589,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @returns the children of the element
      */
     getChildrenPerFile(element?: TreeEntry): TreeEntry[] {
+        this.ensurePathToEntryMap();
+
         if (element === undefined) {
-            // get all unique entry file paths
-            const pathSet: Set<string> = new Set();
-            // clear the map on the root element
-            this.pathToEntryMap.clear();
-
-            for (const entry of this.treeEntries) {
-                for (const location of entry.locations) {
-                    const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(path.join(location.rootPath, location.path));
-
-                    // Check whether the config file is selected based on author and label
-                    if (
-                        wsRoot === undefined || // The root is not currently added as a workspace
-                        this.workspaces
-                            .getSelectedConfigurations()
-                            .findIndex((config) => config.username === entry.author && config.root.label === wsRoot.getRootLabel()) === -1 // The corresponding config file is not selected
-                    ) {
-                        continue;
-                    }
-
-                    if (this.workspaces.moreThanOneRoot()) {
-                        // If there is more than one root, we can have collisions in the relative paths across roots
-                        const uniquePath = this.workspaces.createUniquePath(location.rootPath, location.path);
-                        if (uniquePath !== undefined) {
-                            pathSet.add(uniquePath);
-                        }
-                    } else {
-                        pathSet.add(location.path);
-                    }
-                }
-            }
-
-            const uniquePaths = Array.from(pathSet);
-            uniquePaths.sort();
-            const pathOrganizerEntries: PathOrganizerEntry[] = [];
-            for (const path of uniquePaths) {
-                const entry = createPathOrganizer(path);
-                pathOrganizerEntries.push(entry);
-            }
-
-            return pathOrganizerEntries;
+            const pathLabels = Array.from(this.pathToEntryMap.keys()).sort();
+            return pathLabels.map((label) => createPathOrganizer(label));
         } else {
             // get entries with same path as element
             if (isPathOrganizerEntry(element)) {
-                const entriesWithSamePath: FullLocationEntry[] = [];
-                for (const entry of this.treeEntries) {
-                    for (const location of entry.locations) {
-                        if (this.workspaces.moreThanOneRoot()) {
-                            // If there is more than one root, we can have collisions in the relative paths across roots
-                            if (this.workspaces.createUniquePath(location.rootPath, location.path) === element.pathLabel) {
-                                const locationEntry = createLocationEntry(location, entry);
-                                entriesWithSamePath.push(locationEntry);
-                            }
-                        } else {
-                            if (location.path === element.pathLabel) {
-                                const locationEntry = createLocationEntry(location, entry);
-                                entriesWithSamePath.push(locationEntry);
-                            }
-                        }
-                    }
-                }
-                entriesWithSamePath.sort((a, b) => a.location.startLine - b.location.startLine);
-                this.pathToEntryMap.set(element.pathLabel, entriesWithSamePath);
-                return entriesWithSamePath;
+                return this.pathToEntryMap.get(element.pathLabel) ?? [];
             } else {
                 return [];
             }
@@ -3666,44 +3615,16 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @returns the children of the element
      */
     getChildrenLinear(entry?: TreeEntry): TreeEntry[] {
+        this.ensurePathToEntryMap();
+
         if (entry !== undefined) {
             if (isLocationEntry(entry) || isPathOrganizerEntry(entry) || !entry.locations) {
                 return [];
             }
 
             return entry.locations
-                .filter((location) => {
-                    const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(location.rootPath);
-                    // Check whether the config file is selected based on author and label
-                    if (
-                        wsRoot === undefined || // The location's root is not a current workspace root
-                        this.workspaces
-                            .getSelectedConfigurations()
-                            .findIndex((config) => config.username === entry.author && config.root.label === wsRoot.getRootLabel()) === -1 // The corresponding config file is not selected
-                    ) {
-                        return false;
-                    }
-                    return true;
-                })
-                .map((location) => {
-                    const childEntry = createLocationEntry(location, entry);
-                    let pathLabel: string;
-                    if (this.workspaces.moreThanOneRoot()) {
-                        // We know that the unique path creation will succeed, because the preceding
-                        // filter has removed all locations that do not correspond to workspace roots
-                        pathLabel = this.workspaces.createUniquePath(location.rootPath, location.path)!;
-                    } else {
-                        pathLabel = location.path;
-                    }
-
-                    const lis = this.pathToEntryMap.get(pathLabel);
-                    if (lis === undefined) {
-                        this.pathToEntryMap.set(location.path, [childEntry]);
-                    } else {
-                        lis.push(childEntry);
-                    }
-                    return childEntry;
-                });
+                .filter((location) => this.isLocationVisible(entry, location))
+                .map((location) => this.getOrCreateLocationEntry(entry, location));
         }
 
         const entries: FullEntry[] = [];
@@ -3715,35 +3636,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 notes.push(entry);
             }
         }
-        const result = entries.concat(notes);
-
-        // clear the map on the root element
-        this.pathToEntryMap.clear();
-        for (const entry of result) {
-            // if the entry has only one location, add it to the map
-            // otherwise, we will add all the locations to the map when we get the children of the entry
-            if (entry.locations.length === 1) {
-                let pathLabel: string;
-                if (this.workspaces.moreThanOneRoot()) {
-                    const uniquePath = this.workspaces.createUniquePath(entry.locations[0].rootPath, entry.locations[0].path);
-                    if (uniquePath === undefined) {
-                        // Remove this entry from the tree
-                        result.splice(result.indexOf(entry), 1);
-                        continue;
-                    }
-                    pathLabel = uniquePath;
-                } else {
-                    pathLabel = entry.locations[0].path;
-                }
-                const lis = this.pathToEntryMap.get(pathLabel);
-                if (lis === undefined) {
-                    this.pathToEntryMap.set(pathLabel, [entry]);
-                } else {
-                    lis.push(entry);
-                }
-            }
-        }
-        return result;
+        return entries.concat(notes).filter((entry) => this.hasVisibleLocation(entry));
     }
 
     /**
@@ -3867,25 +3760,103 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             pathLabel = relativePath;
         }
 
+        this.ensurePathToEntryMap();
+
         const locationEntries = this.pathToEntryMap.get(pathLabel);
         if (locationEntries === undefined) {
             return;
         }
 
-        for (const entry of locationEntries) {
-            let location;
-            if (isLocationEntry(entry)) {
-                location = entry.location;
-            } else if (isEntry(entry)) {
-                location = entry.locations[0];
-            } else {
-                continue;
-            }
-            const region = new vscode.Range(location.startLine, 0, location.endLine, Number.MAX_SAFE_INTEGER);
+        for (const locationEntry of locationEntries) {
+            const region = new vscode.Range(locationEntry.location.startLine, 0, locationEntry.location.endLine, Number.MAX_SAFE_INTEGER);
             if (editor.selection.intersection(region) !== undefined) {
-                return entry;
+                if (locationEntry.parentEntry.locations.length === 1) {
+                    return locationEntry.parentEntry;
+                }
+                return locationEntry;
             }
         }
+    }
+
+    private ensurePathToEntryMap(): void {
+        if (!this.pathToEntryMapDirty) {
+            return;
+        }
+        this.rebuildPathToEntryMap();
+    }
+
+    private rebuildPathToEntryMap(): void {
+        this.pathToEntryMap.clear();
+
+        for (const entry of this.treeEntries) {
+            for (const location of entry.locations) {
+                if (!this.isLocationVisible(entry, location)) {
+                    continue;
+                }
+
+                const pathLabel = this.getPathLabelForLocation(location);
+                if (pathLabel === undefined) {
+                    continue;
+                }
+
+                const locationEntry = this.getOrCreateLocationEntry(entry, location);
+                const entriesForPath = this.pathToEntryMap.get(pathLabel);
+                if (entriesForPath === undefined) {
+                    this.pathToEntryMap.set(pathLabel, [locationEntry]);
+                } else {
+                    entriesForPath.push(locationEntry);
+                }
+            }
+        }
+
+        for (const entries of this.pathToEntryMap.values()) {
+            entries.sort((a, b) => a.location.startLine - b.location.startLine);
+        }
+
+        this.pathToEntryMapDirty = false;
+    }
+
+    private getOrCreateLocationEntry(entry: FullEntry, location: FullLocation): FullLocationEntry {
+        const cached = this.locationEntryCache.get(location);
+        if (cached !== undefined && cached.parentEntry === entry) {
+            return cached;
+        }
+        const locationEntry = createLocationEntry(location, entry);
+        this.locationEntryCache.set(location, locationEntry);
+        return locationEntry;
+    }
+
+    private isLocationVisible(entry: FullEntry, location: FullLocation): boolean {
+        const absolutePath = path.join(location.rootPath, location.path);
+        const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(absolutePath);
+        if (wsRoot === undefined) {
+            return false;
+        }
+        return (
+            this.workspaces
+                .getSelectedConfigurations()
+                .findIndex((config) => config.username === entry.author && config.root.label === wsRoot.getRootLabel()) !== -1
+        );
+    }
+
+    private getPathLabelForLocation(location: FullLocation): string | undefined {
+        if (this.workspaces.moreThanOneRoot()) {
+            return this.workspaces.createUniquePath(location.rootPath, location.path) ?? undefined;
+        }
+        return location.path;
+    }
+
+    private hasVisibleLocation(entry: FullEntry): boolean {
+        for (const location of entry.locations) {
+            if (this.isLocationVisible(entry, location)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private markPathMapDirty(): void {
+        this.pathToEntryMapDirty = true;
     }
 
     /**
@@ -3894,6 +3865,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param uri the URI of the file to refresh
      */
     refresh(uri: vscode.Uri): void {
+        this.markPathMapDirty();
         this._onDidChangeFileDecorationsEmitter.fire(uri);
         this._onDidChangeTreeDataEmitter.fire();
     }
@@ -3918,6 +3890,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      *  - when the user changes the list of usernames to show.
      */
     refreshTree(): void {
+        this.markPathMapDirty();
         this._onDidChangeTreeDataEmitter.fire();
     }
 
