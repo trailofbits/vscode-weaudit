@@ -8,6 +8,7 @@ import { UpdateEntryMessage } from "./webviewMessageTypes";
 // provideVSCodeDesignSystem().register(allComponents);
 provideVSCodeDesignSystem().register(vsCodeDropdown(), vsCodeTextArea(), vsCodeOption(), vsCodeTextField());
 
+// @ts-ignore
 const vscode = acquireVsCodeApi();
 
 // Just like a regular webpage we need to wait for the webview

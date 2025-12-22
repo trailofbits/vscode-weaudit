@@ -7,6 +7,7 @@ import { WebviewIsReadyMessage, UpdateRepositoryMessage, ChooseWorkspaceRootMess
 // syntax below.
 provideVSCodeDesignSystem().register(vsCodeTextField(), vsCodeDropdown(), vsCodeOption());
 
+// @ts-ignore
 const vscode = acquireVsCodeApi();
 
 // Just like a regular webpage we need to wait for the webview

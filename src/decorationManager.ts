@@ -62,25 +62,21 @@ export class DecorationManager {
     }
 
     private loadOwnDecorationConfiguration(): vscode.TextEditorDecorationType {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const color: string = vscode.workspace.getConfiguration("weAudit").get("ownFindingColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
     private loadOtherDecorationConfiguration(): vscode.TextEditorDecorationType {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const color: string = vscode.workspace.getConfiguration("weAudit").get("otherFindingColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
     private loadOwnNoteDecorationConfiguration(): vscode.TextEditorDecorationType {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const color: string = vscode.workspace.getConfiguration("weAudit").get("ownNoteColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
     private loadOtherNoteDecorationConfiguration(): vscode.TextEditorDecorationType {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const color: string = vscode.workspace.getConfiguration("weAudit").get("otherNoteColor")!;
         return this.createDecorationTypeWithString(color);
     }

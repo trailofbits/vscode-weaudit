@@ -23,7 +23,6 @@ import {
     isEntry,
     isOldEntry,
     Repository,
-    PathOrganizerEntry,
     createDefaultEntryDetails,
     createDefaultSerializedData,
     createLocationEntry,

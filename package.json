@@ -529,16 +529,16 @@
         "compile": "node ./esbuild.js",
         "package": "NODE_ENV=production node ./esbuild.js",
         "watch": "node ./esbuild.js --watch",
-        "lint": "eslint --ext ts --color -c .eslintrc.json src",
+        "lint": "eslint --ext ts --color -c .eslintrc.cjs src",
         "prettier": "prettier --write ."
     },
     "devDependencies": {
         "@microsoft/eslint-formatter-sarif": "^3.1.0",
+        "@stylistic/eslint-plugin": "^5.6.1",
         "@types/asciichart": "^1.5.6",
         "@types/glob": "^7.2.0",
         "@types/mocha": "^9.1.1",
         "@types/node": "25.x",
-        "@types/rimraf": "^4.0.5",
         "@types/vscode": "^1.107.0",
         "@types/vscode-webview": "^1.57.1",
         "@typescript-eslint/eslint-plugin": "^8.50.0",
