@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "module": "Node16",
+        "target": "ES2022",
+        "lib": ["ES2022"],
+        "outDir": "../../out/test/ui",
+        "rootDir": ".",
+        "sourceMap": true,
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "moduleResolution": "Node16"
+    },
+    "include": ["**/*.ts"],
+    "exclude": ["node_modules"]
+}

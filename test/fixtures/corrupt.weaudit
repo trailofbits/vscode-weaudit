@@ -1,0 +1,9 @@
+{
+    "clientRemote": "https://github.com/client/project",
+    "gitRemote": "https://github.com/auditor/project-audit",
+    "treeEntries": [
+        {
+            "label": "incomplete entry
+            "entryType": 0,
+        }
+    // missing closing brackets and invalid JSON

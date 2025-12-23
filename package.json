@@ -22,7 +22,7 @@
     },
     "icon": "media/icon.png",
     "engines": {
-        "vscode": "^1.107.0"
+        "vscode": "^1.105.0"
     },
     "activationEvents": [
         "onStartupFinished",
@@ -534,26 +534,44 @@
         "package": "NODE_ENV=production node ./esbuild.js",
         "watch": "node ./esbuild.js --watch",
         "lint": "eslint --ext ts --color -c .eslintrc.cjs src",
-        "prettier": "prettier --write ."
+        "prettier": "prettier --write .",
+        "test": "npm run test:unit && npm run test:ext",
+        "test:all": "npm run test:unit && npm run test:ext && npm run test:ui",
+        "test:unit": "mocha -r ts-node/register/transpile-only \"test/unit/**/*.test.ts\" \"test/webview/**/*.test.ts\"",
+        "pretest:ext": "npm run compile && tsc -p test/extension/tsconfig.json",
+        "test:ext": "vscode-test --config .vscode-test.mjs",
+        "pretest:ui": "npm run compile && tsc -p test/ui/tsconfig.json",
+        "test:ui": "extest setup-and-run './out/test/ui/**/*.test.js' --code_version max --storage .test-extensions --extensions_dir .test-extensions/extensions --mocha_config test/ui/.mocharc.json -- --disable-extensions",
+        "test:ui-setup": "extest setup-tests --code_version max --storage .test-extensions --extensions_dir .test-extensions/extensions",
+        "coverage": "nyc npm run test:unit",
+        "prepare": "husky"
     },
     "devDependencies": {
         "@microsoft/eslint-formatter-sarif": "^3.1.0",
         "@stylistic/eslint-plugin": "^5.6.1",
         "@types/asciichart": "^1.5.6",
-        "@types/glob": "^7.2.0",
-        "@types/mocha": "^9.1.1",
+        "@types/chai": "^4.3.11",
+        "@types/mocha": "^10.0.10",
         "@types/node": "25.x",
-        "@types/vscode": "^1.107.0",
+        "@types/sinon": "^17.0.3",
+        "@types/vscode": "^1.105.0",
         "@types/vscode-webview": "^1.57.1",
         "@typescript-eslint/eslint-plugin": "^8.50.0",
         "@typescript-eslint/parser": "^8.50.0",
+        "@vscode/test-cli": "^0.0.10",
         "@vscode/test-electron": "^2.5.2",
+        "chai": "^4.4.1",
         "esbuild": "^0.27.2",
         "eslint": "^9.39.2",
         "glob": "^13.0.0",
+        "husky": "^9.1.7",
         "mocha": "^11.7.5",
+        "nyc": "^17.1.0",
         "prettier": "^3.7.4",
-        "typescript": "^5.9.3"
+        "sinon": "^17.0.1",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.9.3",
+        "vscode-extension-tester": "^8.19.0"
     },
     "dependencies": {
         "@vscode/webview-ui-toolkit": "^1.4.0",

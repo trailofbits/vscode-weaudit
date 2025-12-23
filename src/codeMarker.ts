@@ -1868,7 +1868,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                     endLine: loc.endLine,
                                     label: loc.label,
                                     description: loc.description,
-                                    rootPath: wsRoot!.rootPath, // We checked this in the earlier for loop
+                                    rootPath: wsRoot!.rootPath,
                                 } as FullLocation;
                             }),
                         }) as FullEntry,
@@ -1977,7 +1977,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                 endLine: loc.endLine,
                                 label: loc.label,
                                 description: loc.description,
-                                rootPath: wsRoot!.rootPath, // We checked this in the earlier for loop
+                                rootPath: wsRoot!.rootPath,
                             } as FullLocation;
                         }),
                     }) as FullEntry,
@@ -2312,7 +2312,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.treeViewMode = TreeViewMode.List;
         }
         const label = treeViewModeLabel(this.treeViewMode);
-        vscode.workspace.getConfiguration("weAudit").update("general.treeViewMode", label, true);
+        void vscode.workspace.getConfiguration("weAudit").update("general.treeViewMode", label, true);
         this.refreshTree();
     }
 
@@ -2686,7 +2686,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             location.startLine,
             location.endLine,
         );
-        const document = vscode.window.activeTextEditor!.document;
+        const editor = vscode.window.activeTextEditor;
+        if (editor === undefined) {
+            return "";
+        }
+        const document = editor.document;
         const startLine = location.startLine;
         const endLine = location.endLine;
         let code = "";
@@ -3085,7 +3089,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     getActiveSelectionLocation(): FullLocation[] | undefined {
         // the null assertion is never undefined because we check if the editor is undefined
-        const editor = vscode.window.activeTextEditor!;
+        const editor = vscode.window.activeTextEditor;
+        if (editor === undefined) {
+            return undefined;
+        }
         const uri = editor.document.uri;
         const locations = this.workspaces.getActiveSelectionLocation(uri);
 

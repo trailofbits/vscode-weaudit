@@ -1,0 +1,32 @@
+{
+    "clientRemote": "",
+    "gitRemote": "",
+    "gitSha": "",
+    "treeEntries": [
+        {
+            "label": "Invalid entry type",
+            "entryType": 99,
+            "author": "alice",
+            "details": {
+                "severity": "High",
+                "difficulty": "Low",
+                "type": "Data Validation",
+                "description": "Test",
+                "exploit": "Test",
+                "recommendation": "Test"
+            },
+            "locations": [
+                {
+                    "path": "src/test.ts",
+                    "startLine": 1,
+                    "endLine": 2,
+                    "label": "test",
+                    "description": ""
+                }
+            ]
+        }
+    ],
+    "auditedFiles": [],
+    "partiallyAuditedFiles": [],
+    "resolvedEntries": []
+}
