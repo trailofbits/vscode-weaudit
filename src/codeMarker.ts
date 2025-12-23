@@ -1166,7 +1166,6 @@ class MultiRootManager {
             }
 
             const duplicates = rootPathsAndLabels.filter(
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Guarded by !== undefined check
                 (rootPathAndLabel) => duplicateMap.get(rootPathAndLabel.rootLabel) !== undefined && duplicateMap.get(rootPathAndLabel.rootLabel)!.length > 1,
             );
 
@@ -1205,7 +1204,6 @@ class MultiRootManager {
 
             // Second pass over the array to process duplicates
             const duplicates = rootPathsAndLabels.filter(
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Guarded by !== undefined check
                 (rootPathAndLabel) => duplicateMap.get(rootPathAndLabel.rootLabel) !== undefined && duplicateMap.get(rootPathAndLabel.rootLabel)!.length > 1,
             );
             for (const duplicateEntry of duplicates) {
@@ -1870,7 +1868,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                     endLine: loc.endLine,
                                     label: loc.label,
                                     description: loc.description,
-                                    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Checked in earlier for loop (lines 1840-1843)
                                     rootPath: wsRoot!.rootPath,
                                 } as FullLocation;
                             }),
@@ -1980,7 +1977,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                 endLine: loc.endLine,
                                 label: loc.label,
                                 description: loc.description,
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Checked in earlier for loop (lines 1928-1936)
                                 rootPath: wsRoot!.rootPath,
                             } as FullLocation;
                         }),
@@ -2156,7 +2152,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const allRoots: Set<WARoot> = new Set(
             entry.locations.map((loc) => {
                 const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(loc.path);
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Callers ensure paths are within workspace roots
                 return wsRoot!;
             }),
         );
@@ -2292,7 +2287,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * refreshing the tree.
      */
     loadTreeViewModeConfiguration(): void {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Configuration has default value in package.json
         const mode: string = vscode.workspace.getConfiguration("weAudit").get("general.treeViewMode")!;
         if (mode === "list") {
             this.treeViewMode = TreeViewMode.List;
@@ -2435,7 +2429,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 // count the LOC per day
                 const fullPaths = files.map(([fullPath]) => path.join(fullPath.rootPath, fullPath.path));
                 const wcProc = spawnSync("wc", ["-l", ...fullPaths]);
-                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- spawnSync always populates output[1] (stdout)
                 const output = wcProc.output[1]!;
                 // wc outputs a final total line.
                 // We get the LOC from that line by finding the first newline from the end.
@@ -3790,7 +3783,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // Therefore, we create unique paths by prepending the workspace root directory name
         if (this.workspaces.moreThanOneRoot()) {
             // We know that the unique path creation succeeds, because we are calling it directly on a WARoot's path
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
             pathLabel = this.workspaces.createUniquePath(wsRoot.rootPath, relativePath)!;
         } else {
             pathLabel = relativePath;
