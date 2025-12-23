@@ -240,23 +240,27 @@ describe("weAudit Command UI Tests", () => {
             expect(updated).to.equal(true);
         });
 
-        // still broken
-        // it("adds an additional region using the quick pick", async function () {
-        //     const title = `Multi-region Finding ${Date.now()}`;
-        //     await createTestFinding(workbench, title, DEFAULT_FINDING_RANGE);
-        //     await selectLines(20, 22);
-        //     await workbench.executeCommand("weAudit: Add Region to a Finding");
+        it("adds an additional region using the quick pick", async function () {
+            const title = `Multi-region Finding ${Date.now()}`;
+            // Avoid reusing line ranges from other tests so this selection never intersects
+            // an existing finding (intersection triggers an edit flow instead of creation).
+            await createTestFinding(workbench, title, { start: 28, end: 30 });
 
-        //     const picker = await InputBox.create();
-        //     await picker.selectQuickPick(title);
-        //     await picker.confirm();
+            await selectLines(20, 22);
+            await workbench.executeCommand("weAudit: Add Region to a Finding");
 
-        //     const hasSecondRegion = await waitForCondition(async () => {
-        //         const entries = await readSerializedEntries();
-        //         const entry = entries?.find((candidate) => candidate.label === title);
-        //         return (entry?.locations.length ?? 0) === 2;
-        //     });
-        //     expect(hasSecondRegion).to.equal(true);
-        // });
+            const picker = await InputBox.create();
+            await picker.selectQuickPick(title);
+            // `selectQuickPick` clicks the item; for single-select quick picks VS Code often
+            // accepts immediately and closes the input. Calling `confirm()` after that can
+            // throw ElementNotInteractableError on a closed input.
+
+            const hasSecondRegion = await waitForCondition(async () => {
+                const entries = await readSerializedEntries();
+                const entry = entries?.find((candidate) => candidate.label === title);
+                return (entry?.locations.length ?? 0) >= 2;
+            });
+            expect(hasSecondRegion).to.equal(true);
+        });
     });
 });
