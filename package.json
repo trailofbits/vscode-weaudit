@@ -22,7 +22,7 @@
     },
     "icon": "media/icon.png",
     "engines": {
-        "vscode": "^1.107.0"
+        "vscode": "^1.105.0"
     },
     "activationEvents": [
         "onStartupFinished",
@@ -536,9 +536,13 @@
         "lint": "eslint --ext ts --color -c .eslintrc.cjs src",
         "prettier": "prettier --write .",
         "test": "npm run test:unit && npm run test:ext",
+        "test:all": "npm run test:unit && npm run test:ext && npm run test:ui",
         "test:unit": "mocha -r ts-node/register/transpile-only \"test/unit/**/*.test.ts\" \"test/webview/**/*.test.ts\"",
         "pretest:ext": "npm run compile && tsc -p test/extension/tsconfig.json",
         "test:ext": "vscode-test --config .vscode-test.mjs",
+        "pretest:ui": "npm run compile && tsc -p test/ui/tsconfig.json",
+        "test:ui": "extest setup-and-run './out/test/ui/**/*.test.js' --code_version max --storage .test-extensions --extensions_dir .test-extensions/extensions --mocha_config test/ui/.mocharc.json -- --disable-extensions",
+        "test:ui-setup": "extest setup-tests --code_version max --storage .test-extensions --extensions_dir .test-extensions/extensions",
         "coverage": "nyc npm run test:unit",
         "prepare": "husky"
     },
@@ -550,7 +554,7 @@
         "@types/mocha": "^10.0.10",
         "@types/node": "25.x",
         "@types/sinon": "^17.0.3",
-        "@types/vscode": "^1.107.0",
+        "@types/vscode": "^1.105.0",
         "@types/vscode-webview": "^1.57.1",
         "@typescript-eslint/eslint-plugin": "^8.50.0",
         "@typescript-eslint/parser": "^8.50.0",
@@ -566,7 +570,8 @@
         "prettier": "^3.7.4",
         "sinon": "^17.0.1",
         "ts-node": "^10.9.2",
-        "typescript": "^5.9.3"
+        "typescript": "^5.9.3",
+        "vscode-extension-tester": "^8.19.0"
     },
     "dependencies": {
         "@vscode/webview-ui-toolkit": "^1.4.0",

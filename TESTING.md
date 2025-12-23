@@ -7,6 +7,7 @@
 | `mocha` + `chai` | Unit test runner and assertions |
 | `sinon` | Stubs and mocks |
 | `@vscode/test-electron` | Extension-host tests with real VS Code APIs |
+| `vscode-extension-tester` | **NEW**: UI automation with Selenium WebDriver |
 | `jsdom` | Webview DOM simulation |
 | `nyc` | Coverage reporting (target: 80% for `types.ts`, 60% overall) |
 
@@ -16,10 +17,68 @@
 test/
 ├── unit/           # Pure logic, no VS Code host (fast)
 ├── extension/      # Extension-host tests via @vscode/test-electron
+├── ui/             # **NEW**: UI tests with vscode-extension-tester
+│   └── suite/      # UI automation tests (InputBox, QuickPick, TreeView)
 ├── webview/        # DOM tests with jsdom
 ├── mocks/          # Shared mock factories
 └── fixtures/       # Sample workspaces and .weaudit files
 ```
+
+## UI Testing with vscode-extension-tester
+
+**NEW**: We use [vscode-extension-tester](https://github.com/redhat-developer/vscode-extension-tester) (ExTester) for full UI automation. This allows us to:
+- Type into InputBox and QuickPick elements programmatically
+- Interact with tree views (click, expand, verify content)
+- Test the actual user experience, not just the API
+
+### Key Capabilities
+
+- **InputBox Interaction**: Can type custom titles for findings/notes
+- **TreeView Testing**: Can click items, verify labels, test drag-and-drop
+- **Command Palette**: Can invoke commands via UI
+- **Full User Experience**: Tests what users actually see and interact with
+
+### Running UI Tests
+
+```bash
+# Run all tests (unit + integration + UI)
+npm run test:all
+
+# Run only UI tests
+npm run test:ui
+
+# Setup UI test environment (download VS Code + ChromeDriver)
+npm run test:ui-setup
+```
+
+### Example UI Test
+
+```typescript
+import { InputBox, Workbench } from 'vscode-extension-tester';
+
+it("should create finding with custom title", async () => {
+    const workbench = new Workbench();
+
+    // Execute command
+    await workbench.executeCommand("weAudit: New Finding from Selection");
+
+    // Type into input box (impossible with @vscode/test-electron!)
+    const input = await InputBox.create();
+    await input.setText("SQL Injection Vulnerability");
+    await input.confirm();
+
+    // Verify in tree view
+    // ... assertions
+});
+```
+
+### Hybrid Testing Strategy
+
+We use **both** testing frameworks:
+- `@vscode/test-electron` - Fast integration tests for API-level operations
+- `vscode-extension-tester` - UI tests for InputBox, QuickPick, TreeView interactions
+
+This gives us the best of both worlds: speed + comprehensive coverage.
 
 ---
 
