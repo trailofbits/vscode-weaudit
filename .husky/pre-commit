@@ -10,7 +10,7 @@ fi
 
 # Run Prettier check
 echo "Checking Prettier formatting..."
-npx prettier --check .
+npm run prettier --check .
 if [ $? -ne 0 ]; then
     echo "Prettier check failed. Run 'npm run prettier' to fix formatting."
     exit 1
