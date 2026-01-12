@@ -80,6 +80,73 @@ We use **both** testing frameworks:
 
 This gives us the best of both worlds: speed + comprehensive coverage.
 
+### Current UI Coverage (ExTester)
+
+UI tests live in `test/ui/suite/` and are run via `npm run test:ui`.
+
+**Added UI tests**
+
+Implemented in `test/ui/suite/commands.ui.test.ts`:
+- Create finding with a custom title (`weAudit: New Finding from Selection`)
+- Cancel finding creation (Escape in QuickInput)
+- Create note with a custom title (`weAudit: New Note from Selection`)
+- Edit finding under cursor (`weAudit: Edit Finding Under Cursor`)
+- Add an additional region via QuickPick (`weAudit: Add Region to a Finding`)
+
+**Added extension-host tests (non-UI)**
+
+Implemented under `test/extension/suite/`:
+- Command registration and activation (`test/extension/suite/activation.test.ts`)
+- Basic command execution and persistence (`test/extension/suite/commands.test.ts`)
+  - `weAudit.addFinding` / `weAudit.addNote` (accepts empty title due to QuickInput limitations)
+  - `weAudit.showMarkedFilesDayLog`
+- Tree view integration (`test/extension/suite/treeViews.test.ts`)
+  - `weAudit.toggleTreeViewMode`
+  - `weAudit.findAndLoadConfigurationFiles`
+- Decoration integration (`test/extension/suite/decorations.test.ts`)
+  - `weAudit.toggleAudited`
+  - `weAudit.addPartiallyAudited`
+
+**Not yet added (UI candidates)**
+
+From `package.json` and `src/codeMarker.ts`, the remaining UI-heavy commands worth adding coverage for:
+- QuickPick / QuickInput flows:
+  - `weAudit: Export Findings as Markdown` (`weAudit.exportFindingsInMarkdown`) – multi-select quick pick and opens markdown editor
+  - `weAudit: Add Region to a Finding with Label` (`weAudit.addRegionToAnEntryWithLabel`) – quick pick + label input box
+  - `weAudit: Edit Repository URL (Client)` (`weAudit.editClientRemote`) – input box
+  - `weAudit: Edit Repository URL (Audit)` (`weAudit.editAuditRemote`) – input box
+  - `weAudit: Edit Git Commit Hash` (`weAudit.editGitHash`) – input box
+- Tree view / command palette UX:
+  - `weAudit: Search and Filter Findings` (`weAudit.showFindingsSearchBar`) – triggers `list.find` on the tree view
+  - `Toggle View Mode` (`weAudit.toggleTreeViewMode`) – already covered in extension-host tests; UI coverage would verify the actual tree structure changes
+- Context menu & multi-step flows:
+  - `Resolve Finding` / `Restore Finding` / delete flows (`weAudit.resolveFinding`, `weAudit.restoreFinding`, `weAudit.deleteFinding`, `weAudit.deleteLocationUnderCursor`, `weAudit.deleteLocation`)
+
+**Not yet added (other command candidates)**
+
+These are typically better suited to extension-host tests (stubbing VS Code APIs) or webview tests:
+- Clipboard/external actions:
+  - `weAudit.openGithubIssue`, `weAudit.openGithubIssueFromDetails` (stub `vscode.env.openExternal`)
+  - `weAudit.copyEntryPermalink`, `weAudit.copyEntryPermalinks`, `weAudit.copySelectedCodePermalink`, `weAudit.copySelectedCodeClientPermalink` (stub `vscode.env.clipboard`)
+- Navigation and toggles:
+  - `weAudit.navigateToNextPartiallyAuditedRegion` (assert cursor position changes)
+  - `weAudit.toggleFindingsHighlighting` (assert decorations/visibility changes)
+- Resolved findings lifecycle:
+  - `weAudit.resolveFinding`, `weAudit.restoreFinding`, `weAudit.deleteResolvedFinding`, `weAudit.deleteAllResolvedFinding`, `weAudit.restoreAllResolvedFindings`
+- Webview wiring (from `src/codeMarker.ts` command registrations not exposed as palette commands):
+  - `weAudit.updateCurrentSelectedEntry`, `weAudit.updateGitConfig`, `weAudit.showSelectedEntryInFindingDetails`
+
+**How we use ExTester successfully**
+
+Key patterns that made the UI tests stable:
+- Prefer `VSBrowser.instance.openResources(...)` over `vscode.open` to open the fixture workspace and files without extra QuickInput interactions.
+- Avoid polling tree view contents during waits (it opens the weAudit view repeatedly and causes unnecessary UI churn). Instead, assert via the persisted `.vscode/<username>.weaudit` file when possible.
+- QuickPick tip: `InputBox.selectQuickPick(...)` often auto-accepts single-select quick picks; calling `confirm()` afterwards can throw `ElementNotInteractableError`.
+- Editor selection tip: `TextEditor.getTextAtLine()` selects the whole file internally (it uses a copy-to-clipboard implementation). Avoid it for selection logic.
+- Cursor positioning tip: `TextEditor.setCursor(line, column)` uses 1-based columns (it drives the `:Ln,Col` UI); column `0` will time out.
+- Timeouts: UI tests should use a suite-level Mocha timeout instead of scattered `this.timeout(...)` calls. This repo uses `test/ui/.mocharc.json` and passes it via `--mocha_config` in `package.json`.
+- Extension isolation: UI tests run with `--disable-extensions` and an isolated `--extensions_dir` (`.test-extensions/extensions`) to prevent local VS Code extensions from affecting runs.
+
 ---
 
 ## Phase 1: Data Integrity (P0)
