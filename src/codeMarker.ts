@@ -3549,7 +3549,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const otherNoteDecorations: vscode.Range[] = [];
         const labelDecorations: vscode.DecorationOptions[] = [];
 
-        const sortedTreeEntries = this.treeEntries.sort((a, b) =>
+        const sortedTreeEntries = [...this.treeEntries].sort((a, b) =>
             a.entryType === b.entryType ? a.label.localeCompare(b.label) : a.entryType === EntryType.Finding ? -1 : 1,
         );
 
