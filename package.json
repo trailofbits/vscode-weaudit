@@ -495,7 +495,7 @@
                     },
                     "weAudit.general.sortEntriesAlphabetically": {
                         "type": "boolean",
-                        "default": true,
+                        "default": false,
                         "description": "Sort findings and notes alphabetically by name in the tree view."
                     }
                 }
