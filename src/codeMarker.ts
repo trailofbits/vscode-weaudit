@@ -3549,11 +3549,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const otherNoteDecorations: vscode.Range[] = [];
         const labelDecorations: vscode.DecorationOptions[] = [];
 
-        const sortedTreeEntries = [...this.treeEntries].sort((a, b) =>
-            a.entryType === b.entryType ? a.label.localeCompare(b.label) : a.entryType === EntryType.Finding ? -1 : 1,
-        );
-
-        for (const treeItem of sortedTreeEntries) {
+        for (const treeItem of this.treeEntries) {
             const isOwnEntry = this.username === treeItem.author;
             const findingDecoration = isOwnEntry ? ownDecorations : otherDecorations;
             const noteDecoration = isOwnEntry ? ownNoteDecorations : otherNoteDecorations;
@@ -3625,7 +3621,18 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         } else {
             // get entries with same path as element
             if (isPathOrganizerEntry(element)) {
-                return this.pathToEntryMap.get(element.pathLabel) ?? [];
+                const entries = this.pathToEntryMap.get(element.pathLabel) ?? [];
+                const sortAlphabetically = vscode.workspace.getConfiguration("weAudit").get<boolean>("general.sortEntriesAlphabetically", true);
+                if (sortAlphabetically) {
+                    return [...entries].sort((a, b) => {
+                        // Sort by entry type first (findings before notes), then by label
+                        if (a.parentEntry.entryType !== b.parentEntry.entryType) {
+                            return a.parentEntry.entryType === EntryType.Finding ? -1 : 1;
+                        }
+                        return a.parentEntry.label.localeCompare(b.parentEntry.label);
+                    });
+                }
+                return entries;
             } else {
                 return [];
             }
@@ -3664,10 +3671,14 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 notes.push(entry);
             }
         }
-        return entries
-            .concat(notes)
-            .filter((entry) => this.hasVisibleLocation(entry))
-            .sort((a, b) => a.label.localeCompare(b.label));
+
+        const sortAlphabetically = vscode.workspace.getConfiguration("weAudit").get<boolean>("general.sortEntriesAlphabetically", true);
+        if (sortAlphabetically) {
+            entries.sort((a, b) => a.label.localeCompare(b.label));
+            notes.sort((a, b) => a.label.localeCompare(b.label));
+        }
+
+        return entries.concat(notes).filter((entry) => this.hasVisibleLocation(entry));
     }
 
     /**

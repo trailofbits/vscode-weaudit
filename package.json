@@ -492,6 +492,11 @@
                         "type": "string",
                         "default": "\\n",
                         "description": "The separator to use in permalinks. (Note that \\n is interpreted as a newline)"
+                    },
+                    "weAudit.general.sortEntriesAlphabetically": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Sort findings and notes alphabetically by name in the tree view."
                     }
                 }
             },
