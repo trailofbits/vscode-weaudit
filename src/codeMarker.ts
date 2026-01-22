@@ -32,7 +32,6 @@ import {
     FindingType,
     EntryType,
     RemoteAndPermalink,
-    validateSerializedData,
     createPathOrganizer,
     getEntryIndexFromArray,
     treeViewModeLabel,
@@ -47,6 +46,7 @@ import {
     RootPathAndLabel,
 } from "./types";
 import { normalizePathForOS } from "./utilities/normalizePath";
+import { parseDayLogJson, parseWeauditFile, serializeDayLog } from "./persistenceUtils";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
@@ -131,13 +131,16 @@ class WARoot {
         if (!fs.existsSync(vscodeFolder)) {
             return;
         }
-        if (!fs.existsSync(path.join(vscodeFolder, DAY_LOG_FILENAME))) {
+        const dayLogPath = path.join(vscodeFolder, DAY_LOG_FILENAME);
+        if (!fs.existsSync(dayLogPath)) {
             return;
         }
 
-        const dayLogPath = path.join(vscodeFolder, DAY_LOG_FILENAME);
-        const data = JSON.parse(fs.readFileSync(dayLogPath, "utf8")) as Iterable<readonly [string, string[]]>;
-        this.markedFilesDayLog = new Map(data);
+        const fileContent = fs.readFileSync(dayLogPath, "utf8");
+        const parsed = parseDayLogJson(fileContent);
+        if (parsed !== null) {
+            this.markedFilesDayLog = parsed;
+        }
     }
 
     /**
@@ -711,7 +714,7 @@ class WARoot {
             fs.mkdirSync(vscodeFolder);
         }
         const dayLogPath = path.join(vscodeFolder, DAY_LOG_FILENAME);
-        fs.writeFileSync(dayLogPath, JSON.stringify(Array.from(this.markedFilesDayLog), null, 2));
+        fs.writeFileSync(dayLogPath, serializeDayLog(this.markedFilesDayLog));
     }
 
     /**
@@ -865,9 +868,9 @@ class WARoot {
             return;
         }
         const data = fs.readFileSync(config.path).toString();
-        const parsedEntries = JSON.parse(data) as SerializedData;
+        const parsedEntries = parseWeauditFile(data);
 
-        if (!validateSerializedData(parsedEntries)) {
+        if (parsedEntries === null) {
             vscode.window.showErrorMessage(`weAudit: Error loading serialized data for ${config.username}. Filepath: ${config.path}`);
             return;
         }
