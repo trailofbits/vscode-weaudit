@@ -11,13 +11,7 @@ describe("Permalink Generation Logic", () => {
      * Generates a permalink based on the remote URL, SHA, and location.
      * This mirrors the logic in codeMarker.ts:2577-2587
      */
-    function generatePermalink(
-        gitRemote: string,
-        sha: string,
-        filePath: string,
-        startLine: number,
-        endLine: number,
-    ): string {
+    function generatePermalink(gitRemote: string, sha: string, filePath: string, startLine: number, endLine: number): string {
         // Parse hostname - mirrors URL.parse(gitRemote)?.hostname in codeMarker.ts:2577
         let remoteHost: string | null = null;
         try {
@@ -43,10 +37,7 @@ describe("Permalink Generation Logic", () => {
 
         it("should generate correct GitHub permalink", () => {
             const permalink = generatePermalink(gitRemote, sha, "src/codeMarker.ts", 10, 20);
-            assert.strictEqual(
-                permalink,
-                "https://github.com/trailofbits/vscode-weaudit/blob/abc123def456/src/codeMarker.ts#L11-L21",
-            );
+            assert.strictEqual(permalink, "https://github.com/trailofbits/vscode-weaudit/blob/abc123def456/src/codeMarker.ts#L11-L21");
         });
 
         it("should convert 0-indexed lines to 1-indexed", () => {
@@ -72,10 +63,7 @@ describe("Permalink Generation Logic", () => {
 
         it("should generate correct Bitbucket permalink", () => {
             const permalink = generatePermalink(gitRemote, sha, "src/file.ts", 10, 20);
-            assert.strictEqual(
-                permalink,
-                "https://bitbucket.org/team/repo/src/abc123def456/src/file.ts#lines-11:21",
-            );
+            assert.strictEqual(permalink, "https://bitbucket.org/team/repo/src/abc123def456/src/file.ts#lines-11:21");
         });
 
         it("should use /src/ instead of /blob/ for Bitbucket", () => {

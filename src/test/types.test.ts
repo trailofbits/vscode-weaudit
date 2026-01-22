@@ -188,9 +188,7 @@ describe("types.ts", () => {
         it("should reject partially audited file missing startLine", () => {
             const data = createDefaultSerializedData();
             // Create a partially audited file missing startLine - should be invalid
-            data.partiallyAuditedFiles = [
-                { path: "test.ts", author: "user", endLine: 10 } as unknown as PartiallyAuditedFile,
-            ];
+            data.partiallyAuditedFiles = [{ path: "test.ts", author: "user", endLine: 10 } as unknown as PartiallyAuditedFile];
 
             // This test FAILS - validateSerializedData returns true due to the || bug
             assert.strictEqual(validateSerializedData(data), false);
@@ -199,9 +197,7 @@ describe("types.ts", () => {
         // BUG TEST: Similar test for missing endLine
         it("should reject partially audited file missing endLine", () => {
             const data = createDefaultSerializedData();
-            data.partiallyAuditedFiles = [
-                { path: "test.ts", author: "user", startLine: 1 } as unknown as PartiallyAuditedFile,
-            ];
+            data.partiallyAuditedFiles = [{ path: "test.ts", author: "user", startLine: 1 } as unknown as PartiallyAuditedFile];
 
             // This test FAILS - validateSerializedData returns true due to the || bug
             assert.strictEqual(validateSerializedData(data), false);

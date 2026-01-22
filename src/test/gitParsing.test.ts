@@ -193,10 +193,7 @@ describe("Git Config Parsing Logic", () => {
         }
 
         it("should find remote matching organization name", () => {
-            const remotes = [
-                "url = https://github.com/trailofbits/vscode-weaudit.git",
-                "url = https://github.com/client/original-repo.git",
-            ];
+            const remotes = ["url = https://github.com/trailofbits/vscode-weaudit.git", "url = https://github.com/client/original-repo.git"];
             const result = findOrgRemote(remotes, "trailofbits");
             assert.strictEqual(result, "https://github.com/trailofbits/vscode-weaudit");
         });
