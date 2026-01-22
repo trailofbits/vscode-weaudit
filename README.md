@@ -221,12 +221,12 @@ npm install
 
 ### Linting and Formatting
 
-We use ESLint and Prettier to enforce a consistent code style.
+We use ESLint and Biome to enforce a consistent code style.
 
 ```bash
 # run ESLint
 npx eslint -c .eslintrc.cjs .
 
-# run Prettier
-npx prettier --write .
+# run Biome formatter
+npx biome format --write .
 ```
