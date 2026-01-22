@@ -47,10 +47,21 @@ suite("Tree View Integration", () => {
 
         // Toggle the mode
         await vscode.commands.executeCommand("weAudit.toggleTreeViewMode");
-        await new Promise((resolve) => setTimeout(resolve, 300));
 
-        // Get a fresh configuration object to see the updated value
-        const modeAfter = vscode.workspace.getConfiguration("weAudit").get<string>("general.treeViewMode");
+        // Poll for configuration change (the command updates config asynchronously)
+        const maxWaitMs = 5000;
+        const pollIntervalMs = 100;
+        let modeAfter = modeBefore;
+        const startTime = Date.now();
+
+        while (Date.now() - startTime < maxWaitMs) {
+            modeAfter = vscode.workspace.getConfiguration("weAudit").get<string>("general.treeViewMode");
+            if (modeAfter !== modeBefore) {
+                break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+        }
+
         assert.notStrictEqual(modeAfter, modeBefore, "Tree view mode should change after toggle");
 
         // Verify it's one of the valid values
