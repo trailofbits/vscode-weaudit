@@ -89,7 +89,7 @@ function handlePersistentFieldChange(e: Event): void {
 }
 
 function handleFieldChange(e: Event, isPersistent: boolean): void {
-    const element = e.target! as HTMLInputElement;
+    const element = e.target as HTMLInputElement;
     const value = element.value;
     const field = element.id.split("-")[0];
 

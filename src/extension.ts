@@ -55,7 +55,9 @@ async function openResource(resource: vscode.Uri, startLine: number, endLine: nu
             const tabInput = tab.input;
             if (tabInput instanceof vscode.TabInputText) {
                 if (tabInput.uri.fsPath === resource.fsPath) {
-                    await vscode.window.showTextDocument(tabInput.uri, { selection: range });
+                    await vscode.window.showTextDocument(tabInput.uri, {
+                        selection: range,
+                    });
                     return;
                 }
             }
@@ -63,5 +65,9 @@ async function openResource(resource: vscode.Uri, startLine: number, endLine: nu
     }
 
     // open the file in the active column
-    await vscode.window.showTextDocument(resource, { selection: range, preview: false, viewColumn: vscode.ViewColumn.One });
+    await vscode.window.showTextDocument(resource, {
+        selection: range,
+        preview: false,
+        viewColumn: vscode.ViewColumn.One,
+    });
 }

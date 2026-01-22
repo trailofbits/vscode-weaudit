@@ -252,7 +252,10 @@ class WARoot {
     persistClientRemote(): void {
         vscode.commands.executeCommand(
             "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            {
+                rootPath: this.rootPath,
+                rootLabel: this.rootLabel,
+            } as RootPathAndLabel,
             this.clientRemote,
             this.gitRemote,
             this.gitSha,
@@ -272,7 +275,11 @@ class WARoot {
 
             // We are creating a new config file
             const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
+            const configEntry = {
+                path: filename,
+                username: this.username,
+                root: wsRootEntry,
+            } as ConfigurationEntry;
             this.configs.push(configEntry);
             this.currentlySelectedConfigs.push(configEntry);
         } else {
@@ -290,7 +297,10 @@ class WARoot {
     persistAuditRemote(): void {
         vscode.commands.executeCommand(
             "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            {
+                rootPath: this.rootPath,
+                rootLabel: this.rootLabel,
+            } as RootPathAndLabel,
             this.clientRemote,
             this.gitRemote,
             this.gitSha,
@@ -310,7 +320,11 @@ class WARoot {
 
             // We are creating a new config file
             const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
+            const configEntry = {
+                path: filename,
+                username: this.username,
+                root: wsRootEntry,
+            } as ConfigurationEntry;
             this.configs.push(configEntry);
             this.currentlySelectedConfigs.push(configEntry);
         } else {
@@ -328,7 +342,10 @@ class WARoot {
     persistGitHash(): void {
         vscode.commands.executeCommand(
             "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            {
+                rootPath: this.rootPath,
+                rootLabel: this.rootLabel,
+            } as RootPathAndLabel,
             this.clientRemote,
             this.gitRemote,
             this.gitSha,
@@ -348,7 +365,11 @@ class WARoot {
 
             // We are creating a new config file
             const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
+            const configEntry = {
+                path: filename,
+                username: this.username,
+                root: wsRootEntry,
+            } as ConfigurationEntry;
             this.configs.push(configEntry);
             this.currentlySelectedConfigs.push(configEntry);
         } else {
@@ -521,7 +542,11 @@ class WARoot {
      * Edit the git sha
      */
     async editGitHash(): Promise<void> {
-        const gitSha = await vscode.window.showInputBox({ title: `Edit Git Commit Hash for ${this.rootLabel}:`, value: this.gitSha, ignoreFocusOut: true });
+        const gitSha = await vscode.window.showInputBox({
+            title: `Edit Git Commit Hash for ${this.rootLabel}:`,
+            value: this.gitSha,
+            ignoreFocusOut: true,
+        });
         if (gitSha === undefined) {
             return;
         }
@@ -655,7 +680,10 @@ class WARoot {
 
         // if all files are audited, add the folder to the list of audited files
         if (allFilesAudited) {
-            this.auditedFiles.push({ path: path.relative(this.rootPath, folder), author: this.username });
+            this.auditedFiles.push({
+                path: path.relative(this.rootPath, folder),
+                author: this.username,
+            });
             urisToDecorate.push(folderUri);
             // additionally, call checkIfAllSiblingFilesAreAudited on the parent folder
             urisToDecorate.push(...this.checkIfAllSiblingFilesAreAudited(folderUri));
@@ -810,7 +838,14 @@ class WARoot {
             }
 
             // TODO: error if not in this workspace root?
-            return { path: relativePath, startLine, endLine, label: "", description: "", rootPath: this.rootPath };
+            return {
+                path: relativePath,
+                startLine,
+                endLine,
+                label: "",
+                description: "",
+                rootPath: this.rootPath,
+            };
         });
     }
 
@@ -922,7 +957,11 @@ class WARoot {
 
         const fileName = path.join(vscodeFolder, username + SERIALIZED_FILE_EXTENSION);
         const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-        const configEntry = { path: fileName, username: username, root: wsRootEntry };
+        const configEntry = {
+            path: fileName,
+            username: username,
+            root: wsRootEntry,
+        };
         if (!fs.existsSync(fileName)) {
             existsFile = false;
         }
@@ -1082,7 +1121,13 @@ class MultiRootManager {
         // weAudit.findAndLoadConfigurationFiles is executed by the CodeMarker
         vscode.commands.executeCommand(
             "weAudit.setGitConfigRoots",
-            this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
+            this.roots.map(
+                (root) =>
+                    ({
+                        rootPath: root.rootPath,
+                        rootLabel: root.getRootLabel(),
+                    }) as RootPathAndLabel,
+            ),
         );
         // Add a listener for changes to the roots
         const listener = async (event: vscode.WorkspaceFoldersChangeEvent): Promise<void> => {
@@ -1124,7 +1169,13 @@ class MultiRootManager {
             // Tell the git Config WebView that there are new roots
             await vscode.commands.executeCommand(
                 "weAudit.setGitConfigRoots",
-                this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
+                this.roots.map(
+                    (root) =>
+                        ({
+                            rootPath: root.rootPath,
+                            rootLabel: root.getRootLabel(),
+                        }) as RootPathAndLabel,
+                ),
             );
         };
         const disposable = vscode.workspace.onDidChangeWorkspaceFolders(listener);
@@ -1181,7 +1232,11 @@ class MultiRootManager {
      */
     private createUniqueLabels(rootPaths: string[]): RootPathAndLabel[] {
         const rootPathsAndLabels: RootPathAndLabel[] = rootPaths.map(
-            (rootPath) => ({ rootPath: rootPath, rootLabel: path.basename(rootPath) }) as RootPathAndLabel,
+            (rootPath) =>
+                ({
+                    rootPath: rootPath,
+                    rootLabel: path.basename(rootPath),
+                }) as RootPathAndLabel,
         );
         const rootLabels = rootPathsAndLabels.map((rootPathAndLabel) => rootPathAndLabel.rootLabel);
 
@@ -1675,7 +1730,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 }
                 vscode.commands.executeCommand(
                     "weAudit.setGitConfigView",
-                    { rootPath: wsRoot.rootPath, rootLabel: wsRoot.getRootLabel() } as RootPathAndLabel,
+                    {
+                        rootPath: wsRoot.rootPath,
+                        rootLabel: wsRoot.getRootLabel(),
+                    } as RootPathAndLabel,
                     wsRoot.clientRemote,
                     wsRoot.gitRemote,
                     wsRoot.gitSha,
@@ -1688,7 +1746,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.getGitConfigRoots", () => {
             vscode.commands.executeCommand(
                 "weAudit.setGitConfigRoots",
-                this.workspaces.getRoots().map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
+                this.workspaces.getRoots().map(
+                    (root) =>
+                        ({
+                            rootPath: root.rootPath,
+                            rootLabel: root.getRootLabel(),
+                        }) as RootPathAndLabel,
+                ),
             );
         });
 
@@ -1711,9 +1775,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // Pushes the roots and currently selected configurations to the MultiConfig
         vscode.commands.registerCommand("weAudit.getMultiConfigRoots", () => {
-            const rootPathsAndLabels = this.workspaces
-                .getRoots()
-                .map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel);
+            const rootPathsAndLabels = this.workspaces.getRoots().map(
+                (root) =>
+                    ({
+                        rootPath: root.rootPath,
+                        rootLabel: root.getRootLabel(),
+                    }) as RootPathAndLabel,
+            );
             vscode.commands.executeCommand("weAudit.setMultiConfigRoots", rootPathsAndLabels);
             vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
         });
@@ -1873,7 +1941,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                     endLine: loc.endLine,
                                     label: loc.label,
                                     description: loc.description,
-                                    rootPath: wsRoot!.rootPath, // We checked this in the earlier for loop
+                                    rootPath: wsRoot!.rootPath,
                                 } as FullLocation;
                             }),
                         }) as FullEntry,
@@ -1982,7 +2050,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                 endLine: loc.endLine,
                                 label: loc.label,
                                 description: loc.description,
-                                rootPath: wsRoot!.rootPath, // We checked this in the earlier for loop
+                                rootPath: wsRoot!.rootPath,
                             } as FullLocation;
                         }),
                     }) as FullEntry,
@@ -2326,7 +2394,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.treeViewMode = TreeViewMode.List;
         }
         const label = treeViewModeLabel(this.treeViewMode);
-        vscode.workspace.getConfiguration("weAudit").update("general.treeViewMode", label, true);
+        void vscode.workspace.getConfiguration("weAudit").update("general.treeViewMode", label, true);
         this.refreshTree();
     }
 
@@ -2383,7 +2451,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     private navigateToNextPartiallyAuditedRegion(): void {
         // Collect all partially audited regions from all workspace roots
-        const allPartiallyAuditedRegions: { file: PartiallyAuditedFile; rootPath: string }[] = [];
+        const allPartiallyAuditedRegions: {
+            file: PartiallyAuditedFile;
+            rootPath: string;
+        }[] = [];
 
         for (const wsRoot of this.workspaces.getRoots()) {
             const partiallyAuditedFiles = wsRoot.getPartiallyAudited();
@@ -2700,7 +2771,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             location.startLine,
             location.endLine,
         );
-        const document = vscode.window.activeTextEditor!.document;
+        const editor = vscode.window.activeTextEditor;
+        if (editor === undefined) {
+            return "";
+        }
+        const document = editor.document;
         const startLine = location.startLine;
         const endLine = location.endLine;
         let code = "";
@@ -3064,7 +3139,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             // otherwise, add it to the tree entries
             // create title depending on the entry type
             const inputBoxTitle = entryType === EntryType.Finding ? "Add Finding Title" : "Add Note Title";
-            const title = await vscode.window.showInputBox({ title: inputBoxTitle, ignoreFocusOut: true });
+            const title = await vscode.window.showInputBox({
+                title: inputBoxTitle,
+                ignoreFocusOut: true,
+            });
             if (title === undefined) {
                 return;
             }
@@ -3102,7 +3180,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     getActiveSelectionLocation(): FullLocation[] | undefined {
         // the null assertion is never undefined because we check if the editor is undefined
-        const editor = vscode.window.activeTextEditor!;
+        const editor = vscode.window.activeTextEditor;
+        if (editor === undefined) {
+            return undefined;
+        }
         const uri = editor.document.uri;
         const locations = this.workspaces.getActiveSelectionLocation(uri);
 
@@ -4271,7 +4352,10 @@ export class AuditMarker {
         this.decorationManager = new DecorationManager(context);
 
         treeDataProvider = new CodeMarker(context, this.decorationManager);
-        treeView = vscode.window.createTreeView("codeMarker", { treeDataProvider, dragAndDropController: new DragAndDropController() });
+        treeView = vscode.window.createTreeView("codeMarker", {
+            treeDataProvider,
+            dragAndDropController: new DragAndDropController(),
+        });
         context.subscriptions.push(treeView);
 
         vscode.window.onDidChangeTextEditorSelection((e) => this.checkSelectionEventAndRevealEntryUnderCursor(e));
