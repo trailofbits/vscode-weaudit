@@ -169,7 +169,7 @@ function validateAuditedFile(auditedFile: AuditedFile): boolean {
 }
 
 function validatepartiallyAuditedFile(partiallyAuditedFile: PartiallyAuditedFile): boolean {
-    return validateAuditedFile(partiallyAuditedFile) || partiallyAuditedFile.startLine !== undefined || partiallyAuditedFile.endLine !== undefined;
+    return validateAuditedFile(partiallyAuditedFile) && partiallyAuditedFile.startLine !== undefined && partiallyAuditedFile.endLine !== undefined;
 }
 
 function validateLocation(location: Location): boolean {
@@ -379,7 +379,7 @@ export function getEntryIndexFromArray(entry: Entry, array: Entry[]): number {
 export function mergeTwoEntryArrays(a: Entry[], b: Entry[]): Entry[] {
     // merge two arrays of entries
     // without duplicates
-    const result: Entry[] = a;
+    const result: Entry[] = [...a];
     for (let i = 0; i < b.length; i++) {
         let found = false;
         for (let j = 0; j < a.length; j++) {
@@ -424,7 +424,7 @@ function partiallyAuditedEquals(a: PartiallyAuditedFile, b: PartiallyAuditedFile
 export function mergeTwoAuditedFileArrays(a: AuditedFile[], b: AuditedFile[]): AuditedFile[] {
     // merge two arrays of entries
     // without duplicates
-    const result: AuditedFile[] = a;
+    const result: AuditedFile[] = [...a];
     for (let i = 0; i < b.length; i++) {
         let found = false;
         for (let j = 0; j < a.length; j++) {
@@ -449,7 +449,7 @@ export function mergeTwoAuditedFileArrays(a: AuditedFile[], b: AuditedFile[]): A
 export function mergeTwoPartiallyAuditedFileArrays(a: PartiallyAuditedFile[], b: PartiallyAuditedFile[]): PartiallyAuditedFile[] {
     // merge two arrays of entries
     // without duplicates
-    const result: PartiallyAuditedFile[] = a;
+    const result: PartiallyAuditedFile[] = [...a];
     for (let i = 0; i < b.length; i++) {
         let found = false;
         for (let j = 0; j < a.length; j++) {
