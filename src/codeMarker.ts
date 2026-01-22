@@ -3756,6 +3756,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
         };
 
+        treeItem.contextValue = entry.entryType === EntryType.Note ? "note" : "finding";
+
         return treeItem;
     }
 
