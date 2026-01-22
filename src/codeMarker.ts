@@ -3657,7 +3657,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 notes.push(entry);
             }
         }
-        return entries.concat(notes).filter((entry) => this.hasVisibleLocation(entry));
+        return entries
+            .concat(notes)
+            .filter((entry) => this.hasVisibleLocation(entry))
+            .sort((a, b) => a.label.localeCompare(b.label));
     }
 
     /**
