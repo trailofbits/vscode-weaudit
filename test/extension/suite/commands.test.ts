@@ -14,7 +14,11 @@ interface SerializedEntry {
 interface SerializedData {
     treeEntries: SerializedEntry[];
     auditedFiles: Array<{ path: string; author: string }>;
-    partiallyAuditedFiles: Array<{ path: string; startLine: number; endLine: number }>;
+    partiallyAuditedFiles: Array<{
+        path: string;
+        startLine: number;
+        endLine: number;
+    }>;
     resolvedEntries: SerializedEntry[];
 }
 

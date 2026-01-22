@@ -8,11 +8,11 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Run Prettier check
-echo "Checking Prettier formatting..."
-npm run prettier --check .
+# Run Biome format check
+echo "Checking Biome formatting..."
+npm run format:check
 if [ $? -ne 0 ]; then
-    echo "Prettier check failed. Run 'npm run prettier' to fix formatting."
+    echo "Biome check failed. Run 'npm run format' to fix formatting."
     exit 1
 fi
 

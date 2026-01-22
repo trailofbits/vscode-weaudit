@@ -23,7 +23,13 @@ import {
     mergeTwoPartiallyAuditedFileArrays,
 } from "../../src/types";
 
-const baseLocation = { path: "src/index.ts", startLine: 0, endLine: 3, label: "here", description: "" };
+const baseLocation = {
+    path: "src/index.ts",
+    startLine: 0,
+    endLine: 3,
+    label: "here",
+    description: "",
+};
 const baseEntry: Entry = {
     label: "test",
     entryType: EntryType.Finding,
@@ -49,7 +55,10 @@ describe("types utilities", () => {
 
         it("entryEquals rejects when location counts differ", () => {
             const a = baseEntry;
-            const b = { ...baseEntry, locations: [...baseEntry.locations, { ...baseLocation, path: "other" }] };
+            const b = {
+                ...baseEntry,
+                locations: [...baseEntry.locations, { ...baseLocation, path: "other" }],
+            };
             expect(entryEquals(a, b)).to.equal(false);
         });
 
@@ -78,9 +87,19 @@ describe("types utilities", () => {
             expect(merged).to.deep.equal([audited, auditedOther]);
         });
 
-        const partial: PartiallyAuditedFile = { path: "src/a.ts", author: "alice", startLine: 0, endLine: 1 };
+        const partial: PartiallyAuditedFile = {
+            path: "src/a.ts",
+            author: "alice",
+            startLine: 0,
+            endLine: 1,
+        };
         const partialOverlap: PartiallyAuditedFile = { ...partial };
-        const partialNew: PartiallyAuditedFile = { path: "src/a.ts", author: "alice", startLine: 2, endLine: 3 };
+        const partialNew: PartiallyAuditedFile = {
+            path: "src/a.ts",
+            author: "alice",
+            startLine: 2,
+            endLine: 3,
+        };
 
         it("mergeTwoPartiallyAuditedFileArrays removes exact duplicates", () => {
             const merged = mergeTwoPartiallyAuditedFileArrays([partial], [partialOverlap, partialNew]);
@@ -91,7 +110,10 @@ describe("types utilities", () => {
     describe("type guards and config equality", () => {
         it("isEntry and isOldEntry distinguish entry shapes", () => {
             const fullLoc: FullLocation = { ...baseLocation, rootPath: "/workspace" };
-            const fullEntry: FullEntry = { ...(baseEntry as FullEntry), locations: [fullLoc] };
+            const fullEntry: FullEntry = {
+                ...(baseEntry as FullEntry),
+                locations: [fullLoc],
+            };
             expect(isEntry(fullEntry)).to.equal(true);
             expect(isOldEntry(baseEntry)).to.equal(true);
             expect(isOldEntry(fullEntry)).to.equal(false);
@@ -109,7 +131,11 @@ describe("types utilities", () => {
         });
 
         it("isConfigurationEntry and isWorkspaceRootEntry type guards behave on mixed inputs", () => {
-            const config = { path: "/tmp/a", username: "alice", root: { label: "root" } };
+            const config = {
+                path: "/tmp/a",
+                username: "alice",
+                root: { label: "root" },
+            };
             const root = { label: "root" };
             const arbitrary = { pathLabel: "x" };
 

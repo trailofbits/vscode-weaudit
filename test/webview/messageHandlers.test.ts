@@ -382,7 +382,10 @@ describe("Webview Message Handlers", () => {
 
     describe("currentRootPathAndLabel Updates", () => {
         it("updates current root when setGitConfigRoots finds matching root", () => {
-            let currentRootPathAndLabel = { rootPath: "/workspace/project1", rootLabel: "project1" };
+            let currentRootPathAndLabel = {
+                rootPath: "/workspace/project1",
+                rootLabel: "project1",
+            };
             const newRoots = [
                 { rootPath: "/workspace/project1", rootLabel: "project1" },
                 { rootPath: "/workspace/project2", rootLabel: "project2" },
@@ -399,7 +402,10 @@ describe("Webview Message Handlers", () => {
         });
 
         it("switches to first root when current root not found", () => {
-            let currentRootPathAndLabel = { rootPath: "/workspace/removed", rootLabel: "removed" };
+            let currentRootPathAndLabel = {
+                rootPath: "/workspace/removed",
+                rootLabel: "removed",
+            };
             const newRoots = [
                 { rootPath: "/workspace/project1", rootLabel: "project1" },
                 { rootPath: "/workspace/project2", rootLabel: "project2" },

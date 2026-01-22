@@ -64,7 +64,9 @@ export class ResolvedEntries {
 
         vscode.window.onDidChangeActiveColorTheme(() => this.treeDataProvider.refresh());
 
-        const treeView = vscode.window.createTreeView("resolvedFindings", { treeDataProvider: this.treeDataProvider });
+        const treeView = vscode.window.createTreeView("resolvedFindings", {
+            treeDataProvider: this.treeDataProvider,
+        });
         context.subscriptions.push(treeView);
     }
 

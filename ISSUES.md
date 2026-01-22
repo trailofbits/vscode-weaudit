@@ -17,36 +17,42 @@ Set up the foundational test infrastructure before writing individual tests.
 ## Tasks
 - [ ] Add devDependencies: `jsdom`, `nyc`, `@vscode/test-electron`
 - [ ] Create directory structure:
-  ```
-  test/
-  ├── unit/
-  ├── extension/
-  ├── webview/
-  ├── mocks/
-  └── fixtures/
-  ```
+```
+
+test/
+├── unit/
+├── extension/
+├── webview/
+├── mocks/
+└── fixtures/
+
+````
 - [ ] Create `test/mocks/vscode.ts` with factories:
-  - `createMockWorkspaceFolder(path)`
-  - `createMockTextEditor(uri, selection?)`
-  - `createMockExtensionContext()`
+- `createMockWorkspaceFolder(path)`
+- `createMockTextEditor(uri, selection?)`
+- `createMockExtensionContext()`
 - [ ] Create `test/fixtures/` with sample `.weaudit` files (valid, corrupt, empty, legacy)
 - [ ] Add npm scripts to `package.json`:
-  ```json
-  "test": "npm run test:unit && npm run test:ext",
-  "test:unit": "mocha -r ts-node/register test/unit/**/*.test.ts",
-  "test:ext": "vscode-test",
-  "coverage": "nyc npm run test:unit"
-  ```
+```json
+"test": "npm run test:unit && npm run test:ext",
+"test:unit": "mocha -r ts-node/register test/unit/**/*.test.ts",
+"test:ext": "vscode-test",
+"coverage": "nyc npm run test:unit"
+````
+
 - [ ] Configure nyc coverage thresholds (80% types.ts, 60% overall)
 
 ## Acceptance Criteria
+
 - `npm run test:unit` executes successfully
 - Mock factories importable in tests
 - Fixtures available for subsequent test issues
 
 ## Reference
+
 See TESTING.md'
-```
+
+````
 
 ---
 
@@ -126,7 +132,7 @@ P0 priority tests for data validation, type guards, and file persistence. If the
 - `test/unit/persistence.test.ts`
 
 ## Total: 70 tests'
-```
+````
 
 ---
 
@@ -349,7 +355,7 @@ P2 priority tests for tree data providers, webview message handlers, and decorat
 
 ## Issue 6: CI Integration
 
-```bash
+````bash
 gh issue create \
   --repo trailofbits/vscode-weaudit \
   --title "Testing: CI workflow for automated test runs" \
@@ -387,14 +393,16 @@ jobs:
           DISPLAY: ":99"
       - run: npm run coverage
       - uses: codecov/codecov-action@v3
-```
+````
 
 ## Acceptance Criteria
+
 - [ ] Tests run on every PR
 - [ ] Coverage reports uploaded
 - [ ] Badge visible in README
 - [ ] Failed tests block merge'
-```
+
+````
 
 ---
 
@@ -416,4 +424,4 @@ jobs:
 ```bash
 # Run from repo root after copying each command above
 # Or use GitHub web UI to create issues with the body content
-```
+````

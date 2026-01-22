@@ -1,35 +1,35 @@
 permissions:
-    actions: read
+  actions: read
 
 name: ESLint and Biome
 on: push
 jobs:
-    build:
-        runs-on: ubuntu-latest
-        permissions:
-            # required for all workflows
-            security-events: write
-        steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-              with:
-                  persist-credentials: false
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      # required for all workflows
+      security-events: write
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          persist-credentials: false
 
-            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
-              with:
-                  node-version-file: ".nvmrc"
-                  cache: "npm"
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
 
-            - name: Install modules
-              run: npm install
+      - name: Install modules
+        run: npm install
 
-            - name: Run formatter check
-              run: npx biome check --formatter-enabled=true --linter-enabled=false .
+      - name: Run formatter check
+        run: npx biome check --formatter-enabled=true --linter-enabled=false .
 
-            - name: Run ESLint
-              run: npx eslint --ext ts --color -c .eslintrc.cjs src
+      - name: Run ESLint
+        run: npx eslint --ext ts --color -c .eslintrc.cjs src
 
-            - name: Run TypeScript type check
-              run: npx tsc --noEmit
+      - name: Run TypeScript type check
+        run: npx tsc --noEmit
 
-            - name: Run tests
-              run: npm test
+      - name: Run tests
+        run: npm test

@@ -269,7 +269,9 @@ export function createMockSecretStorage(): {
 export function createMockExtensionContext(extensionPath: string = "/mock/extension"): {
     subscriptions: { dispose: sinon.SinonStub }[];
     workspaceState: ReturnType<typeof createMockMemento>;
-    globalState: ReturnType<typeof createMockMemento> & { setKeysForSync: sinon.SinonStub };
+    globalState: ReturnType<typeof createMockMemento> & {
+        setKeysForSync: sinon.SinonStub;
+    };
     secrets: ReturnType<typeof createMockSecretStorage>;
     extensionUri: ReturnType<typeof createMockUri>;
     extensionPath: string;
@@ -383,7 +385,9 @@ export function createMockEventEmitter<T>(): {
     return {
         event: sinon.stub().callsFake((listener: (e: T) => void) => {
             listeners.push(listener);
-            return { dispose: () => listeners.splice(listeners.indexOf(listener), 1) };
+            return {
+                dispose: () => listeners.splice(listeners.indexOf(listener), 1),
+            };
         }),
         fire: sinon.stub().callsFake((data: T) => {
             listeners.forEach((listener) => listener(data));

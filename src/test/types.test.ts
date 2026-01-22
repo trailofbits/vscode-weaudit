@@ -101,7 +101,14 @@ describe("types.ts", () => {
                 gitSha: "abc123",
                 treeEntries: [createValidEntry()],
                 auditedFiles: [{ path: "src/test.ts", author: "testuser" }],
-                partiallyAuditedFiles: [{ path: "src/partial.ts", author: "testuser", startLine: 1, endLine: 50 }],
+                partiallyAuditedFiles: [
+                    {
+                        path: "src/partial.ts",
+                        author: "testuser",
+                        startLine: 1,
+                        endLine: 50,
+                    },
+                ],
                 resolvedEntries: [],
             };
         }
@@ -188,7 +195,13 @@ describe("types.ts", () => {
         it("should reject partially audited file missing startLine", () => {
             const data = createDefaultSerializedData();
             // Create a partially audited file missing startLine - should be invalid
-            data.partiallyAuditedFiles = [{ path: "test.ts", author: "user", endLine: 10 } as unknown as PartiallyAuditedFile];
+            data.partiallyAuditedFiles = [
+                {
+                    path: "test.ts",
+                    author: "user",
+                    endLine: 10,
+                } as unknown as PartiallyAuditedFile,
+            ];
 
             // This test FAILS - validateSerializedData returns true due to the || bug
             assert.strictEqual(validateSerializedData(data), false);
@@ -197,7 +210,13 @@ describe("types.ts", () => {
         // BUG TEST: Similar test for missing endLine
         it("should reject partially audited file missing endLine", () => {
             const data = createDefaultSerializedData();
-            data.partiallyAuditedFiles = [{ path: "test.ts", author: "user", startLine: 1 } as unknown as PartiallyAuditedFile];
+            data.partiallyAuditedFiles = [
+                {
+                    path: "test.ts",
+                    author: "user",
+                    startLine: 1,
+                } as unknown as PartiallyAuditedFile,
+            ];
 
             // This test FAILS - validateSerializedData returns true due to the || bug
             assert.strictEqual(validateSerializedData(data), false);
@@ -262,8 +281,20 @@ describe("types.ts", () => {
             const a = createEntry();
             const b = createEntry({
                 locations: [
-                    { path: "src/test.ts", startLine: 1, endLine: 10, label: "Location 1", description: "" },
-                    { path: "src/test2.ts", startLine: 1, endLine: 5, label: "Location 2", description: "" },
+                    {
+                        path: "src/test.ts",
+                        startLine: 1,
+                        endLine: 10,
+                        label: "Location 1",
+                        description: "",
+                    },
+                    {
+                        path: "src/test2.ts",
+                        startLine: 1,
+                        endLine: 5,
+                        label: "Location 2",
+                        description: "",
+                    },
                 ],
             });
             assert.strictEqual(entryEquals(a, b), false);
@@ -271,40 +302,104 @@ describe("types.ts", () => {
 
         it("should return false for different location paths", () => {
             const a = createEntry({
-                locations: [{ path: "src/a.ts", startLine: 1, endLine: 10, label: "L", description: "" }],
+                locations: [
+                    {
+                        path: "src/a.ts",
+                        startLine: 1,
+                        endLine: 10,
+                        label: "L",
+                        description: "",
+                    },
+                ],
             });
             const b = createEntry({
-                locations: [{ path: "src/b.ts", startLine: 1, endLine: 10, label: "L", description: "" }],
+                locations: [
+                    {
+                        path: "src/b.ts",
+                        startLine: 1,
+                        endLine: 10,
+                        label: "L",
+                        description: "",
+                    },
+                ],
             });
             assert.strictEqual(entryEquals(a, b), false);
         });
 
         it("should return false for different location startLines", () => {
             const a = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "L", description: "" }],
+                locations: [
+                    {
+                        path: "src/test.ts",
+                        startLine: 1,
+                        endLine: 10,
+                        label: "L",
+                        description: "",
+                    },
+                ],
             });
             const b = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 5, endLine: 10, label: "L", description: "" }],
+                locations: [
+                    {
+                        path: "src/test.ts",
+                        startLine: 5,
+                        endLine: 10,
+                        label: "L",
+                        description: "",
+                    },
+                ],
             });
             assert.strictEqual(entryEquals(a, b), false);
         });
 
         it("should return false for different location endLines", () => {
             const a = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "L", description: "" }],
+                locations: [
+                    {
+                        path: "src/test.ts",
+                        startLine: 1,
+                        endLine: 10,
+                        label: "L",
+                        description: "",
+                    },
+                ],
             });
             const b = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 1, endLine: 20, label: "L", description: "" }],
+                locations: [
+                    {
+                        path: "src/test.ts",
+                        startLine: 1,
+                        endLine: 20,
+                        label: "L",
+                        description: "",
+                    },
+                ],
             });
             assert.strictEqual(entryEquals(a, b), false);
         });
 
         it("should ignore differences in location labels", () => {
             const a = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "Label A", description: "" }],
+                locations: [
+                    {
+                        path: "src/test.ts",
+                        startLine: 1,
+                        endLine: 10,
+                        label: "Label A",
+                        description: "",
+                    },
+                ],
             });
             const b = createEntry({
-                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "Label B", description: "" }],
+                locations: [
+                    {
+                        path: "src/test.ts",
+                        startLine: 1,
+                        endLine: 10,
+                        label: "Label B",
+                        description: "",
+                    },
+                ],
             });
             assert.strictEqual(entryEquals(a, b), true);
         });
@@ -481,7 +576,16 @@ describe("types.ts", () => {
                     entryType: EntryType.Finding,
                     author: "user",
                     details: createDefaultEntryDetails(),
-                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" }],
+                    locations: [
+                        {
+                            path: "test.ts",
+                            startLine: 1,
+                            endLine: 5,
+                            label: "L",
+                            description: "",
+                            rootPath: "/root",
+                        },
+                    ],
                 };
                 assert.strictEqual(isEntry(entry), true);
             });
@@ -497,10 +601,26 @@ describe("types.ts", () => {
                     entryType: EntryType.Finding,
                     author: "user",
                     details: createDefaultEntryDetails(),
-                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" }],
+                    locations: [
+                        {
+                            path: "test.ts",
+                            startLine: 1,
+                            endLine: 5,
+                            label: "L",
+                            description: "",
+                            rootPath: "/root",
+                        },
+                    ],
                 };
                 const entry: FullLocationEntry = {
-                    location: { path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" },
+                    location: {
+                        path: "test.ts",
+                        startLine: 1,
+                        endLine: 5,
+                        label: "L",
+                        description: "",
+                        rootPath: "/root",
+                    },
                     parentEntry,
                 };
                 assert.strictEqual(isEntry(entry), false);
@@ -514,10 +634,26 @@ describe("types.ts", () => {
                     entryType: EntryType.Finding,
                     author: "user",
                     details: createDefaultEntryDetails(),
-                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" }],
+                    locations: [
+                        {
+                            path: "test.ts",
+                            startLine: 1,
+                            endLine: 5,
+                            label: "L",
+                            description: "",
+                            rootPath: "/root",
+                        },
+                    ],
                 };
                 const entry: FullLocationEntry = {
-                    location: { path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" },
+                    location: {
+                        path: "test.ts",
+                        startLine: 1,
+                        endLine: 5,
+                        label: "L",
+                        description: "",
+                        rootPath: "/root",
+                    },
                     parentEntry,
                 };
                 assert.strictEqual(isLocationEntry(entry), true);
@@ -529,7 +665,16 @@ describe("types.ts", () => {
                     entryType: EntryType.Finding,
                     author: "user",
                     details: createDefaultEntryDetails(),
-                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" }],
+                    locations: [
+                        {
+                            path: "test.ts",
+                            startLine: 1,
+                            endLine: 5,
+                            label: "L",
+                            description: "",
+                            rootPath: "/root",
+                        },
+                    ],
                 };
                 assert.strictEqual(isLocationEntry(entry), false);
             });
@@ -547,7 +692,16 @@ describe("types.ts", () => {
                     entryType: EntryType.Finding,
                     author: "user",
                     details: createDefaultEntryDetails(),
-                    locations: [{ path: "test.ts", startLine: 1, endLine: 5, label: "L", description: "", rootPath: "/root" }],
+                    locations: [
+                        {
+                            path: "test.ts",
+                            startLine: 1,
+                            endLine: 5,
+                            label: "L",
+                            description: "",
+                            rootPath: "/root",
+                        },
+                    ],
                 };
                 assert.strictEqual(isPathOrganizerEntry(entry), false);
             });

@@ -11,6 +11,7 @@ For detailed information about the available AI agents, their capabilities, and 
 ## What are AI Agents?
 
 AI agents are specialized Claude Code tools that can autonomously perform complex tasks such as:
+
 - Writing security vulnerability reports
 - Searching historical audit findings
 - Creating executive summaries for security audits
@@ -25,6 +26,7 @@ AI agents are specialized Claude Code tools that can autonomously perform comple
 ## Contributing
 
 When adding new agents, please update the [AGENTS.md](./AGENTS.md) file with:
+
 - Agent name and description
 - Usage examples
 - Required inputs/parameters

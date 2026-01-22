@@ -63,13 +63,19 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
                 continue;
             }
 
-            const rootEntry = { label: rootPathAndLabel.rootLabel } as WorkspaceRootEntry;
+            const rootEntry = {
+                label: rootPathAndLabel.rootLabel,
+            } as WorkspaceRootEntry;
             this.rootEntries.push(rootEntry);
 
             fs.readdirSync(vscodeFolder).forEach((file) => {
                 if (path.extname(file) === SERIALIZED_FILE_EXTENSION) {
                     const parsedPath = path.parse(file);
-                    const entry = { path: path.join(vscodeFolder, file), username: parsedPath.name, root: rootEntry };
+                    const entry = {
+                        path: path.join(vscodeFolder, file),
+                        username: parsedPath.name,
+                        root: rootEntry,
+                    };
                     this.configurationEntries.push(entry);
                 }
             });
@@ -137,7 +143,9 @@ export class MultipleSavedFindings {
         const treeDataProvider = new MultipleSavedFindingsTree();
 
         vscode.window.onDidChangeActiveColorTheme(() => treeDataProvider.refresh());
-        const treeView = vscode.window.createTreeView("savedFindings", { treeDataProvider });
+        const treeView = vscode.window.createTreeView("savedFindings", {
+            treeDataProvider,
+        });
         context.subscriptions.push(treeView);
     }
 }

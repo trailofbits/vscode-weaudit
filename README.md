@@ -23,26 +23,24 @@ Install weAudit directly from [weAudit @ VSCode Marketplace](https://marketplac
 
 See the [Build and install](#build-and-install) section below for how to build and install from source.
 
-
-
 ## Features
 
--   [**Findings and Notes**](#findings-and-notes) - Bookmark regions of code to identify findings or to add audit notes.
--   [**Audited Files**](#audited-files) - Mark an entire file as reviewed.
--   [**Partially Audited Files**](#partially-audited-files) - Mark a region of code as reviewed.
--   [**Detailed Findings**](#detailed-findings) - Fill detailed information about a finding.
--   [**GitHub/Gitlab Issues**](#githubgitlab-issues) - Create formatted GitHub or Gitlab issues with the Detailed Findings information.
--   [**Multi-region Findings**](#multi-region-findings) - Group multiple locations under a single finding.
--   [**Resolve and Restore**](#resolve-and-restore) - Resolved findings will not be highlighted in the editor but are still visible in the sidebar.
--   [**Copy Permalinks**](#copy-permalinks) - Copy GitHub permalinks to findings, or to a selected code region.
--   [**Daily Log**](#daily-log) - View a daily log of all the marked files and LOC per day.
--   [**View Mode**](#view-mode) - View findings in a list, or grouped by filename.
--   [**Multiple Users**](#multiple-users) - Findings can be viewed from multiple different users.
--   [**Hide Findings**](#hide-findings) - Hide all findings associated with a specific user.
--   [**Search & Filter Findings**](#search--filter-findings) - Search and filter the findings in the _List of Findings_ panel.
--   [**Export Findings**](#export-findings) - Export findings to a markdown file.
--   [**Drag & drop Findings and Locations**](#drag--drop-findings-and-locations) - Drag and drop findings and locations in the _List of Findings_ panel.
--   [**Settings**](#settings) - Customize colors and general preferences.
+- [**Findings and Notes**](#findings-and-notes) - Bookmark regions of code to identify findings or to add audit notes.
+- [**Audited Files**](#audited-files) - Mark an entire file as reviewed.
+- [**Partially Audited Files**](#partially-audited-files) - Mark a region of code as reviewed.
+- [**Detailed Findings**](#detailed-findings) - Fill detailed information about a finding.
+- [**GitHub/Gitlab Issues**](#githubgitlab-issues) - Create formatted GitHub or Gitlab issues with the Detailed Findings information.
+- [**Multi-region Findings**](#multi-region-findings) - Group multiple locations under a single finding.
+- [**Resolve and Restore**](#resolve-and-restore) - Resolved findings will not be highlighted in the editor but are still visible in the sidebar.
+- [**Copy Permalinks**](#copy-permalinks) - Copy GitHub permalinks to findings, or to a selected code region.
+- [**Daily Log**](#daily-log) - View a daily log of all the marked files and LOC per day.
+- [**View Mode**](#view-mode) - View findings in a list, or grouped by filename.
+- [**Multiple Users**](#multiple-users) - Findings can be viewed from multiple different users.
+- [**Hide Findings**](#hide-findings) - Hide all findings associated with a specific user.
+- [**Search & Filter Findings**](#search--filter-findings) - Search and filter the findings in the _List of Findings_ panel.
+- [**Export Findings**](#export-findings) - Export findings to a markdown file.
+- [**Drag & drop Findings and Locations**](#drag--drop-findings-and-locations) - Drag and drop findings and locations in the _List of Findings_ panel.
+- [**Settings**](#settings) - Customize colors and general preferences.
 
 ---
 
@@ -72,9 +70,10 @@ The highlighted color can be customized in the [settings](#settings).
 
 You can also partially mark a file as reviewed by selecting a region of code and calling the `weAudit: Mark Region as Reviewed` command. Partially reviewed regions can be merged together by calling the same command on a region containing.
 If called on a region:
- - that matches an already audited region, the region will be unmarked.
- - containing an already audited region, the region will be extended.
- - contained in an already audited region, the region will be split into two regions.
+
+- that matches an already audited region, the region will be unmarked.
+- containing an already audited region, the region will be extended.
+- contained in an already audited region, the region will be split into two regions.
 
 Once a file is marked as audited with the `weAudit: Mark File as Reviewed` command, all partial regions will be discarded.
 
@@ -147,23 +146,29 @@ There are color settings for other user's findings and notes, and for your own f
 ![Multiple Users](media/readme/multi_user.png)
 
 ### Hide Findings
-You can hide all findings associated with a specific user by clicking on that user's name on the  `weAudit Files` panel.
+
+You can hide all findings associated with a specific user by clicking on that user's name on the `weAudit Files` panel.
 
 ![Hide Findings associated to a user](media/readme/gifs/hide_findings.gif)
 
 ### Toggle Highlights
+
 Hide every findings/notes highlight in the editor by running the `weAudit: Toggle Findings Highlighting` command from the Command Palette. Run the command again to bring the highlights back whenever you need to review them.
 
 ### Search & Filter Findings
+
 You can search for and filter the findings in the `List of Findings` panel by calling the `weAudit: Search and Filter Findings` command.
 
 ![Filter Findings](media/readme/gifs/filter_findings.gif)
 
 ### Export Findings
+
 You can export the findings to a markdown file by calling the `weAudit: Export Findings as Markdown` command.
 
 ### Drag & Drop Findings and Locations
+
 You can drag and drop findings and locations in the _List of Findings_ panel to:
+
 - drag a location (from a multi location finding) into another finding;
 - drag a location (from a multi location finding) to create a separate finding;
 - drag a multi-location finding into another finding, moving all locations into it;
@@ -175,41 +180,40 @@ You can drag and drop findings and locations in the _List of Findings_ panel to:
 
 #### General settings
 
--   `weAudit.general.treeViewMode`: The List of Findings display mode ("list" or "byFile")
--   `weAudit.general.githubOrganizationName`: Organization name for audit repository (enhances permalink heuristic)
--   `weAudit.general.username`: Username to use as finding's author (defaults to system username if empty)
--   `weAudit.general.permalinkSeparator`: Separator to use in permalinks (\\n is interpreted as newline)
+- `weAudit.general.treeViewMode`: The List of Findings display mode ("list" or "byFile")
+- `weAudit.general.githubOrganizationName`: Organization name for audit repository (enhances permalink heuristic)
+- `weAudit.general.username`: Username to use as finding's author (defaults to system username if empty)
+- `weAudit.general.permalinkSeparator`: Separator to use in permalinks (\\n is interpreted as newline)
 
 #### Background colors
 
 Each background color is customizable via the VSCode settings page. Write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA:
 
--   `weAudit.auditedColor`: Background color for files marked as audited
--   `weAudit.{other,own}findingColor`: Background color for findings
--   `weAudit.{other,own}noteColor`: Background color for notes
+- `weAudit.auditedColor`: Background color for files marked as audited
+- `weAudit.{other,own}findingColor`: Background color for findings
+- `weAudit.{other,own}noteColor`: Background color for notes
 
 #### Keybindings
 
 You can configure the keybindings to any of the extension's commands in the VSCode settings. The default shortcuts are:
 
--   `weAudit.addFinding`: Add Selected Code To Findings: `cmd + 3`
--   `weAudit.addNote`: Add Selected Code To Notes: `cmd + 4`
--   `weAudit.deleteLocationUnderCursor`: Delete Finding Under Cursor: `cmd + 5`
--   `weAudit.editEntryUnderCursor`: Edit Finding Under Cursor: `cmd + 6`
--   `weAudit.toggleAudited`: Mark Current File As Reviewed: `cmd + 7`
--   `weAudit.addPartiallyAudited`: Mark Region As Reviewed: `cmd + shift + 7`
--   `weAudit.copySelectedCodePermalink`: Copy Permalink (for the Selected Code Region): `cmd + 8`
--   `weAudit.copySelectedCodeClientPermalink`: Copy Client Permalink (for the Selected Code Region): `cmd + 9`
--   `weAudit.navigateToNextPartiallyAuditedRegion`: Navigate to Next Partially Audited Region: `cmd + 0`
+- `weAudit.addFinding`: Add Selected Code To Findings: `cmd + 3`
+- `weAudit.addNote`: Add Selected Code To Notes: `cmd + 4`
+- `weAudit.deleteLocationUnderCursor`: Delete Finding Under Cursor: `cmd + 5`
+- `weAudit.editEntryUnderCursor`: Edit Finding Under Cursor: `cmd + 6`
+- `weAudit.toggleAudited`: Mark Current File As Reviewed: `cmd + 7`
+- `weAudit.addPartiallyAudited`: Mark Region As Reviewed: `cmd + shift + 7`
+- `weAudit.copySelectedCodePermalink`: Copy Permalink (for the Selected Code Region): `cmd + 8`
+- `weAudit.copySelectedCodeClientPermalink`: Copy Client Permalink (for the Selected Code Region): `cmd + 9`
+- `weAudit.navigateToNextPartiallyAuditedRegion`: Navigate to Next Partially Audited Region: `cmd + 0`
 
 ## WeAudit Concepts
 
--   **Findings and Notes**: A region of code that is of interest. Findings can be marked as "Resolved" or "Restored". There is no actual difference between findings and notes, except that they can be assigned different colors and that findings are displayed before notes in the _List of Findings_ panel.
--   **Audited Files**: A file that has been reviewed. This is a binary state, either a file is audited or it is not.
--   **Audit and Client Repositories**:
-    -   **Audit Repository**: The repository where issues should be created. This is usually the Trail of Bits repository with the code being audited.
-    -   **Client Repository**: The repository that the Audit Repository mirrors. This is used to create permalinks to include in the report.
-
+- **Findings and Notes**: A region of code that is of interest. Findings can be marked as "Resolved" or "Restored". There is no actual difference between findings and notes, except that they can be assigned different colors and that findings are displayed before notes in the _List of Findings_ panel.
+- **Audited Files**: A file that has been reviewed. This is a binary state, either a file is audited or it is not.
+- **Audit and Client Repositories**:
+  - **Audit Repository**: The repository where issues should be created. This is usually the Trail of Bits repository with the code being audited.
+  - **Client Repository**: The repository that the Audit Repository mirrors. This is used to create permalinks to include in the report.
 
 ## Development
 
