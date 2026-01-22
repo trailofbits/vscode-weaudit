@@ -1,7 +1,7 @@
 permissions:
     actions: read
 
-name: ESLint and Prettier
+name: ESLint and Biome
 on: push
 jobs:
     build:
@@ -10,25 +10,23 @@ jobs:
             # required for all workflows
             security-events: write
         steps:
-            - uses: actions/checkout@v6
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
               with:
                   persist-credentials: false
 
-            - uses: actions/setup-node@v6
+            - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+              with:
+                  node-version-file: ".nvmrc"
+                  cache: "npm"
 
             - name: Install modules
               run: npm install
 
-            - name: Run prettier
-              run: npx prettier --check .
+            - name: Run formatter check
+              run: npx biome check --formatter-enabled=true --linter-enabled=false .
 
             - name: Run ESLint
               run: npx eslint --ext ts --color -c .eslintrc.cjs src
 
-            # GH's SARIF viewer does not support suppression directives so we get too many false positives
-            # - name: SARIF
-            #   run: npx eslint -c .eslintrc.json -f @microsoft/eslint-formatter-sarif -o eslint.sarif . || true
-            # - name: Upload SARIF file
-            #   uses: github/codeql-action/upload-sarif@v3
-            #   with:
-            #       sarif_file: eslint.sarif
+            - name: Run TypeScript type check
+              run: npx tsc --noEmit
