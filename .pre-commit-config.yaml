@@ -1,0 +1,31 @@
+repos:
+    - repo: https://github.com/pre-commit/pre-commit-hooks
+      rev: v6.0.0
+      hooks:
+          - id: trailing-whitespace
+          - id: end-of-file-fixer
+          - id: check-yaml
+          - id: check-added-large-files
+            args: ["--maxkb=500"]
+
+    - repo: local
+      hooks:
+          - id: biome-format
+            name: biome format
+            entry: npx biome check --formatter-enabled=true --linter-enabled=false --write
+            language: system
+            types_or: [javascript, ts, json]
+            exclude: "node_modules|out"
+
+          - id: eslint
+            name: eslint
+            entry: npx eslint --ext ts -c .eslintrc.cjs
+            language: system
+            types: [ts]
+
+          - id: typecheck
+            name: typecheck
+            entry: npx tsc --noEmit
+            language: system
+            types: [ts]
+            pass_filenames: false

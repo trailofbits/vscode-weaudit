@@ -10,6 +10,8 @@ updates:
           - "dependencies"
           - "npm"
       versioning-strategy: increase
+      cooldown:
+          default-days: 7
       groups:
           npm-dependencies:
               patterns:
@@ -24,6 +26,8 @@ updates:
       labels:
           - "dependencies"
           - "github-actions"
+      cooldown:
+          default-days: 7
       groups:
           github-actions:
               patterns:

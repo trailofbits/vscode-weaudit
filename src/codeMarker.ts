@@ -1625,6 +1625,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     private decorationManager: DecorationManager;
     private decorationsEnabled = true;
 
+    // Cached configuration for sorting entries alphabetically
+    private sortEntriesAlphabetically: boolean;
+
     // State for navigating through partially audited regions
     private currentPartiallyAuditedIndex = -1;
 
@@ -1640,6 +1643,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         this.treeViewMode = TreeViewMode.List;
         this.loadTreeViewModeConfiguration();
+
+        this.sortEntriesAlphabetically = vscode.workspace.getConfiguration("weAudit").get<boolean>("general.sortEntriesAlphabetically", false);
 
         this.username = this.setUsernameConfigOrDefault();
         this.findAndLoadConfigurationUsernames();
@@ -2296,6 +2301,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refreshTree();
     }
 
+    /**
+     * Loads the sort entries alphabetically setting from the configuration,
+     * refreshing the tree.
+     */
+    loadSortEntriesConfiguration(): void {
+        this.sortEntriesAlphabetically = vscode.workspace.getConfiguration("weAudit").get<boolean>("general.sortEntriesAlphabetically", false);
+        this.refreshTree();
+    }
+
     getTreeViewMode(): TreeViewMode {
         return this.treeViewMode;
     }
@@ -2799,10 +2813,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             clientPermalinks.push(clientPermalink);
             auditPermalinks.push(auditRemoteAndPermalink.permalink);
 
-            if (location.description !== "") {
+            // Include location section if there's a label or description
+            if (location.label !== "" || location.description !== "") {
                 locationDescriptions += `\n\n---\n`;
-                locationDescriptions += `#### Location ${i + 1} ${location.label}\n`;
-                locationDescriptions += `${location.description}\n\n`;
+                locationDescriptions += `#### Location ${i + 1}${location.label ? ` ${location.label}` : ""}\n`;
+                if (location.description !== "") {
+                    locationDescriptions += `${location.description}\n\n`;
+                }
                 locationDescriptions += `${auditRemoteAndPermalink.permalink}`;
             }
         }
@@ -3625,7 +3642,23 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         } else {
             // get entries with same path as element
             if (isPathOrganizerEntry(element)) {
-                return this.pathToEntryMap.get(element.pathLabel) ?? [];
+                const entries = this.pathToEntryMap.get(element.pathLabel) ?? [];
+                if (this.sortEntriesAlphabetically) {
+                    return [...entries].sort((a, b) => {
+                        // Sort by entry type first (findings before notes), then by label
+                        if (a.parentEntry.entryType !== b.parentEntry.entryType) {
+                            if (a.parentEntry.entryType === EntryType.Finding) {
+                                return -1;
+                            }
+                            if (b.parentEntry.entryType === EntryType.Finding) {
+                                return 1;
+                            }
+                            return 0; // Stable sort for any future entry types
+                        }
+                        return a.parentEntry.label.localeCompare(b.parentEntry.label);
+                    });
+                }
+                return entries;
             } else {
                 return [];
             }
@@ -3664,6 +3697,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 notes.push(entry);
             }
         }
+
+        if (this.sortEntriesAlphabetically) {
+            entries.sort((a, b) => a.label.localeCompare(b.label));
+            notes.sort((a, b) => a.label.localeCompare(b.label));
+        }
+
         return entries.concat(notes).filter((entry) => this.hasVisibleLocation(entry));
     }
 
@@ -3759,6 +3798,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             title: "Open File",
             arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
         };
+
+        treeItem.contextValue = entry.entryType === EntryType.Note ? "note" : "finding";
 
         return treeItem;
     }
@@ -4384,6 +4425,8 @@ export class AuditMarker {
     private selectivelyReloadConfigurations(e: vscode.ConfigurationChangeEvent): void {
         if (e.affectsConfiguration("weAudit.general.treeViewMode")) {
             treeDataProvider.loadTreeViewModeConfiguration();
+        } else if (e.affectsConfiguration("weAudit.general.sortEntriesAlphabetically")) {
+            treeDataProvider.loadSortEntriesConfiguration();
         } else if (e.affectsConfiguration("weAudit.general.username")) {
             treeDataProvider.setUsernameConfigOrDefault();
         } else {
