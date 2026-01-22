@@ -1644,9 +1644,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.treeViewMode = TreeViewMode.List;
         this.loadTreeViewModeConfiguration();
 
-        this.sortEntriesAlphabetically = vscode.workspace
-            .getConfiguration("weAudit")
-            .get<boolean>("general.sortEntriesAlphabetically", false);
+        this.sortEntriesAlphabetically = vscode.workspace.getConfiguration("weAudit").get<boolean>("general.sortEntriesAlphabetically", false);
 
         this.username = this.setUsernameConfigOrDefault();
         this.findAndLoadConfigurationUsernames();
@@ -2300,6 +2298,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         } else {
             this.treeViewMode = TreeViewMode.GroupByFile;
         }
+        this.refreshTree();
+    }
+
+    /**
+     * Loads the sort entries alphabetically setting from the configuration,
+     * refreshing the tree.
+     */
+    loadSortEntriesConfiguration(): void {
+        this.sortEntriesAlphabetically = vscode.workspace.getConfiguration("weAudit").get<boolean>("general.sortEntriesAlphabetically", false);
         this.refreshTree();
     }
 
@@ -4412,10 +4419,7 @@ export class AuditMarker {
         if (e.affectsConfiguration("weAudit.general.treeViewMode")) {
             treeDataProvider.loadTreeViewModeConfiguration();
         } else if (e.affectsConfiguration("weAudit.general.sortEntriesAlphabetically")) {
-            treeDataProvider.sortEntriesAlphabetically = vscode.workspace
-                .getConfiguration("weAudit")
-                .get<boolean>("general.sortEntriesAlphabetically", false);
-            treeDataProvider._onDidChangeTreeDataEmitter.fire();
+            treeDataProvider.loadSortEntriesConfiguration();
         } else if (e.affectsConfiguration("weAudit.general.username")) {
             treeDataProvider.setUsernameConfigOrDefault();
         } else {
