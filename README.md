@@ -28,7 +28,7 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Audited Files**](#audited-files) - Mark an entire file as reviewed.
 -   [**Partially Audited Files**](#partially-audited-files) - Mark a region of code as reviewed.
 -   [**Detailed Findings**](#detailed-findings) - Fill detailed information about a finding.
--   [**GitHub/Gitlab Issues**](#github-issues) - Create formatted GitHub or Gitlab issues with the Detailed Findings information.
+-   [**GitHub/Gitlab Issues**](#githubgitlab-issues) - Create formatted GitHub or Gitlab issues with the Detailed Findings information.
 -   [**Multi-region Findings**](#multi-region-findings) - Group multiple locations under a single finding.
 -   [**Resolve and Restore**](#resolve-and-restore) - Resolved findings will not be highlighted in the editor but are still visible in the sidebar.
 -   [**Copy Permalinks**](#copy-permalinks) - Copy GitHub permalinks to findings, or to a selected code region.
@@ -39,7 +39,7 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Search & Filter Findings**](#search--filter-findings) - Search and filter the findings in the _List of Findings_ panel.
 -   [**Export Findings**](#export-findings) - Export findings to a markdown file.
 -   [**Drag & drop Findings and Locations**](#drag--drop-findings-and-locations) - Drag and drop findings and locations in the _List of Findings_ panel.
--   [**Settings**](#settings) - Customize colors.
+-   [**Settings**](#settings) - Customize colors and general preferences.
 
 ---
 
@@ -84,7 +84,11 @@ The highlighted color can be customized in the [settings](#settings).
 
 In addition to files you've audited, you can mark a file as irrelevant for the audit by calling the `weAudit: Mark Files as Ignored` command.
 The file will be greyed out in the file tree in the same way a file in `.gitignore` would.
-Folders containing only ignored files will be marked as audited.
+Folders containing only ignored and audited files will be marked as audited.
+
+#### Navigation Between Partially Audited Regions
+
+You can quickly navigate through all partially audited regions in your workspace using the `weAudit: Navigate to Next Partially Audited Region` command. This command will cycle through each partially audited region across all files, helping you efficiently review your progress.
 
 ### Detailed Findings
 
@@ -94,7 +98,7 @@ You can fill detailed information about a finding by clicking on it in the _List
 
 ### GitHub/Gitlab Issues
 
-You can create a GitHub/Gitlab issue with the detailed findings information by clicking on the corresponding `Open Remote Issue` button in the _List of Findings_ panel. A browser window in will open prompting you to open the issue with the prefilled information from the _Finding Details_ panel.
+You can create a GitHub/Gitlab issue with the detailed findings information by clicking on the corresponding `Open Remote Issue` button in the _List of Findings_ panel or the same button in the _Finding Details_ view. A browser window will open prompting you to open the issue with the prefilled information from the _Finding Details_ panel.
 
 ![Open Remote Issue](media/readme/gifs/create_gh_issue.gif)
 
@@ -150,6 +154,9 @@ You can hide all findings associated with a specific user by clicking on that us
 
 ![Hide Findings associated to a user](media/readme/gifs/hide_findings.gif)
 
+### Toggle Highlights
+Hide every findings/notes highlight in the editor by running the `weAudit: Toggle Findings Highlighting` command from the Command Palette. Run the command again to bring the highlights back whenever you need to review them.
+
 ### Search & Filter Findings
 You can search for and filter the findings in the `List of Findings` panel by calling the `weAudit: Search and Filter Findings` command.
 
@@ -169,12 +176,19 @@ You can drag and drop findings and locations in the _List of Findings_ panel to:
 
 ### Settings
 
+#### General settings
+
+-   `weAudit.general.treeViewMode`: The List of Findings display mode ("list" or "byFile")
+-   `weAudit.general.githubOrganizationName`: Organization name for audit repository (enhances permalink heuristic)
+-   `weAudit.general.username`: Username to use as finding's author (defaults to system username if empty)
+-   `weAudit.general.permalinkSeparator`: Separator to use in permalinks (\\n is interpreted as newline)
+
 #### Background colors
 
 Each background color is customizable via the VSCode settings page. Write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA:
 
 -   `weAudit.auditedColor`: Background color for files marked as audited
--   `wAudit.{other,own}findingColor`: Background color for findings
+-   `weAudit.{other,own}findingColor`: Background color for findings
 -   `weAudit.{other,own}noteColor`: Background color for notes
 
 #### Keybindings
@@ -188,6 +202,8 @@ You can configure the keybindings to any of the extension's commands in the VSCo
 -   `weAudit.toggleAudited`: Mark Current File As Reviewed: `cmd + 7`
 -   `weAudit.addPartiallyAudited`: Mark Region As Reviewed: `cmd + shift + 7`
 -   `weAudit.copySelectedCodePermalink`: Copy Permalink (for the Selected Code Region): `cmd + 8`
+-   `weAudit.copySelectedCodeClientPermalink`: Copy Client Permalink (for the Selected Code Region): `cmd + 9`
+-   `weAudit.navigateToNextPartiallyAuditedRegion`: Navigate to Next Partially Audited Region: `cmd + 0`
 
 ## WeAudit Concepts
 
@@ -211,12 +227,12 @@ npm install
 
 ### Linting and Formatting
 
-We use ESLint and Prettier to enforce a consistent code style.
+We use ESLint and Biome to enforce a consistent code style.
 
 ```bash
 # run ESLint
-npx eslint -c .eslintrc.json .
+npx eslint -c .eslintrc.cjs .
 
-# run Prettier
-npx prettier --write .
+# run Biome formatter
+npx biome format --write .
 ```

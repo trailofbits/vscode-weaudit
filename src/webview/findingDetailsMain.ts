@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { provideVSCodeDesignSystem, vsCodeDropdown, vsCodeTextArea, vsCodeOption, vsCodeTextField } from "@vscode/webview-ui-toolkit";
 import { TextArea, Dropdown, TextField } from "@vscode/webview-ui-toolkit";
 import { UpdateEntryMessage } from "./webviewMessageTypes";
@@ -13,9 +14,13 @@ const vscode = acquireVsCodeApi();
 // Just like a regular webpage we need to wait for the webview
 // DOM to load before we can reference any of the HTML elements
 // or toolkit components
-window.addEventListener("load", main);
+window.addEventListener("load", () => {
+    main();
+    // Notify the extension that the webview is ready
+    vscode.postMessage({ command: "webview-ready" });
+});
 
-function main() {
+function main(): void {
     const titleField = document.getElementById("label-area") as TextField;
     titleField?.addEventListener("change", handlePersistentFieldChange);
 
@@ -84,7 +89,7 @@ function handlePersistentFieldChange(e: Event): void {
 }
 
 function handleFieldChange(e: Event, isPersistent: boolean): void {
-    const element = e!.target! as HTMLInputElement;
+    const element = e.target! as HTMLInputElement;
     const value = element.value;
     const field = element.id.split("-")[0];
 

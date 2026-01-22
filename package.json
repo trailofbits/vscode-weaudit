@@ -2,7 +2,7 @@
     "name": "weaudit",
     "displayName": "weAudit",
     "description": "Bookmark findings and quickly navigate to areas of interest in the codebase",
-    "version": "1.2.1",
+    "version": "1.3.1",
     "publisher": "trailofbits",
     "author": "Trail of Bits",
     "categories": [],
@@ -22,7 +22,7 @@
     },
     "icon": "media/icon.png",
     "engines": {
-        "vscode": "^1.75.0"
+        "vscode": "^1.107.0"
     },
     "activationEvents": [
         "onStartupFinished",
@@ -78,8 +78,18 @@
                 "icon": "$(github)"
             },
             {
+                "command": "weAudit.openGithubIssueFromDetails",
+                "title": "Open Remote Issue",
+                "icon": "$(github)"
+            },
+            {
                 "command": "weAudit.copyEntryPermalink",
                 "title": "Copy Audit Permalink",
+                "icon": "$(link)"
+            },
+            {
+                "command": "weAudit.copyEntryPermalinks",
+                "title": "Copy All Audit Permalinks",
                 "icon": "$(link)"
             },
             {
@@ -103,9 +113,24 @@
                 "title": "weAudit: Edit Git Commit Hash"
             },
             {
-                "command": "weAudit.setupRepositories",
-                "title": "weAudit: Setup Audit and Client Repositories, and the Git Commit Hash",
-                "icon": "$(settings-gear)"
+                "command": "weAudit.setupRepositoriesCurrent",
+                "title": "weAudit: Setup git configurations for this workspace root",
+                "icon": "$(github)"
+            },
+            {
+                "command": "weAudit.setupRepositoriesAll",
+                "title": "weAudit: Setup git configurations for all workspace roots",
+                "icon": "$(github-inverted)"
+            },
+            {
+                "command": "weAudit.nextGitConfig",
+                "title": "weAudit: Show next workspace root",
+                "icon": "$(arrow-right)"
+            },
+            {
+                "command": "weAudit.prevGitConfig",
+                "title": "weAudit: Show previous workspace root",
+                "icon": "$(arrow-left)"
             },
             {
                 "command": "weAudit.resolveFinding",
@@ -200,6 +225,10 @@
                 "title": "weAudit: Add Region to a Finding"
             },
             {
+                "command": "weAudit.addRegionToAnEntryWithLabel",
+                "title": "weAudit: Add Region to a Finding with Label"
+            },
+            {
                 "command": "weAudit.showFindingsSearchBar",
                 "title": "weAudit: Search and Filter Findings"
             },
@@ -207,6 +236,14 @@
                 "command": "weAudit.exportFindingsInMarkdown",
                 "title": "weAudit: Export Findings as Markdown",
                 "icon": "$(markdown)"
+            },
+            {
+                "command": "weAudit.navigateToNextPartiallyAuditedRegion",
+                "title": "weAudit: Navigate to Next Partially Audited Region"
+            },
+            {
+                "command": "weAudit.toggleFindingsHighlighting",
+                "title": "weAudit: Toggle Findings Highlighting"
             }
         ],
         "keybindings": [
@@ -249,6 +286,11 @@
                 "command": "weAudit.copySelectedCodeClientPermalink",
                 "key": "ctrl+alt+9",
                 "mac": "cmd+9"
+            },
+            {
+                "command": "weAudit.navigateToNextPartiallyAuditedRegion",
+                "key": "ctrl+alt+0",
+                "mac": "cmd+0"
             }
         ],
         "menus": {
@@ -330,9 +372,29 @@
                     "group": "navigation@2"
                 },
                 {
-                    "command": "weAudit.setupRepositories",
+                    "command": "weAudit.setupRepositoriesCurrent",
+                    "when": "view == gitConfig",
+                    "group": "navigation@2"
+                },
+                {
+                    "command": "weAudit.setupRepositoriesAll",
+                    "when": "view == gitConfig && workspaceFolderCount > 1",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "weAudit.nextGitConfig",
+                    "when": "view == gitConfig",
+                    "group": "navigation@1"
+                },
+                {
+                    "command": "weAudit.prevGitConfig",
                     "when": "view == gitConfig",
                     "group": "navigation@0"
+                },
+                {
+                    "command": "weAudit.openGithubIssueFromDetails",
+                    "when": "view == findingDetails && weAudit.findingDetailsHasEntry",
+                    "group": "navigation"
                 }
             ],
             "view/item/context": [
@@ -343,7 +405,12 @@
                 },
                 {
                     "command": "weAudit.copyEntryPermalink",
-                    "when": "view == codeMarker && viewItem != pathOrganizer",
+                    "when": "view == codeMarker && viewItem == additionalLocation",
+                    "group": "inline@2"
+                },
+                {
+                    "command": "weAudit.copyEntryPermalinks",
+                    "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
                     "group": "inline@2"
                 },
                 {
@@ -428,6 +495,11 @@
                         "type": "string",
                         "default": "",
                         "description": "The username to use as the finding's author. (Defaults to the system's username if left empty.)"
+                    },
+                    "weAudit.general.permalinkSeparator": {
+                        "type": "string",
+                        "default": "\\n",
+                        "description": "The separator to use in permalinks. (Note that \\n is interpreted as a newline)"
                     }
                 }
             },
@@ -469,26 +541,32 @@
         "compile": "node ./esbuild.js",
         "package": "NODE_ENV=production node ./esbuild.js",
         "watch": "node ./esbuild.js --watch",
-        "lint": "eslint src --ext ts"
+        "lint": "eslint --ext ts --color -c .eslintrc.cjs src",
+        "lint:fix": "eslint --ext ts -c .eslintrc.cjs src --fix",
+        "format": "biome format --write .",
+        "format:check": "biome check --formatter-enabled=true --linter-enabled=false .",
+        "typecheck": "tsc --noEmit",
+        "test": "mocha --require ts-node/register 'src/test/**/*.test.ts'"
     },
     "devDependencies": {
-        "@microsoft/eslint-formatter-sarif": "^3.0.0",
+        "@biomejs/biome": "^2.3.11",
+        "@microsoft/eslint-formatter-sarif": "^3.1.0",
+        "@stylistic/eslint-plugin": "^5.7.0",
         "@types/asciichart": "^1.5.6",
-        "@types/glob": "^7.2.0",
-        "@types/mocha": "^9.1.1",
-        "@types/node": "16.x",
-        "@types/rimraf": "^2.0.5",
-        "@types/vscode": "^1.71.0",
+        "@types/glob": "^9.0.0",
+        "@types/mocha": "^10.0.10",
+        "@types/node": "25.x",
+        "@types/vscode": "^1.108.1",
         "@types/vscode-webview": "^1.57.1",
-        "@typescript-eslint/eslint-plugin": "^5.30.0",
-        "@typescript-eslint/parser": "^5.30.0",
-        "@vscode/test-electron": "^2.1.5",
-        "esbuild": "^0.16.17",
-        "eslint": "^8.18.0",
-        "glob": "^8.0.3",
-        "mocha": "^10.0.0",
-        "prettier": "^3.2.5",
-        "typescript": "^4.8.4"
+        "@typescript-eslint/eslint-plugin": "^8.53.0",
+        "@typescript-eslint/parser": "^8.50.0",
+        "@vscode/test-electron": "^2.5.2",
+        "esbuild": "^0.27.2",
+        "eslint": "^9.39.2",
+        "glob": "^13.0.0",
+        "mocha": "^11.7.5",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.9.3"
     },
     "dependencies": {
         "@vscode/webview-ui-toolkit": "^1.4.0",

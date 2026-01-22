@@ -7,15 +7,17 @@ import { MultipleSavedFindings } from "./multiConfigs";
 import { activateFindingDetailsWebview } from "./panels/findingDetailsPanel";
 import { activateGitConfigWebview } from "./panels/gitConfigPanel";
 
-export function activate(context: vscode.ExtensionContext) {
+export function activate(context: vscode.ExtensionContext): void {
     // if there are no open folders, return
     // the extension will be reactivated when a folder is opened
     if (vscode.workspace.workspaceFolders === undefined) {
         return;
     }
 
-    vscode.commands.registerCommand("weAudit.openFileLines", (resource, startLine, endLine) => openResource(resource, startLine, endLine));
-    vscode.commands.registerCommand("weAudit.openFile", (resource) => vscode.window.showTextDocument(resource));
+    vscode.commands.registerCommand("weAudit.openFileLines", (resource: vscode.Uri, startLine: number, endLine: number) =>
+        openResource(resource, startLine, endLine),
+    );
+    vscode.commands.registerCommand("weAudit.openFile", (resource: vscode.TextDocument) => vscode.window.showTextDocument(resource));
 
     new AuditMarker(context);
     new MultipleSavedFindings(context);

@@ -2,9 +2,11 @@ import * as vscode from "vscode";
 import * as crypto from "crypto";
 
 import { getUri } from "../utilities/getUri";
-import { WebviewMessage, UpdateRepositoryMessage } from "../webview/webviewMessageTypes";
+import { WebviewMessage, UpdateRepositoryMessage, SetWorkspaceRootsMessage } from "../webview/webviewMessageTypes";
+import { RootPathAndLabel } from "../types";
+import htmlBody from "./gitConfig.html";
 
-export function activateGitConfigWebview(context: vscode.ExtensionContext) {
+export function activateGitConfigWebview(context: vscode.ExtensionContext): void {
     const provider = new GitConfigProvider(context.extensionUri);
 
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(GitConfigProvider.viewType, provider));
@@ -13,12 +15,70 @@ export function activateGitConfigWebview(context: vscode.ExtensionContext) {
 class GitConfigProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = "gitConfig";
     private _disposables: vscode.Disposable[] = [];
+    private currentRootPathAndLabel: RootPathAndLabel;
+    private dirToPathMap: Map<string, string>;
 
     private _view?: vscode.WebviewView;
 
-    constructor(private readonly _extensionUri: vscode.Uri) {}
+    constructor(private readonly _extensionUri: vscode.Uri) {
+        this.currentRootPathAndLabel = { rootPath: "", rootLabel: "" } as RootPathAndLabel;
+        this.dirToPathMap = new Map<string, string>();
 
-    public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken) {
+        vscode.commands.registerCommand(
+            "weAudit.setGitConfigView",
+            (rootPathAndLabel: RootPathAndLabel, clientRepo: string, auditRepo: string, commitHash: string) => {
+                this.currentRootPathAndLabel = rootPathAndLabel;
+                const msg: UpdateRepositoryMessage = {
+                    command: "update-repository-config",
+                    rootLabel: rootPathAndLabel.rootLabel,
+                    clientURL: clientRepo,
+                    auditURL: auditRepo,
+                    commitHash,
+                };
+                this._view?.webview.postMessage(msg);
+            },
+        );
+
+        vscode.commands.registerCommand("weAudit.setGitConfigRoots", (rootPathsAndLabels: RootPathAndLabel[]) => {
+            const idx = rootPathsAndLabels.findIndex((rootPathAndLabel) => {
+                return (
+                    rootPathAndLabel.rootPath === this.currentRootPathAndLabel.rootPath && rootPathAndLabel.rootLabel === this.currentRootPathAndLabel.rootLabel
+                );
+            });
+
+            if (idx === -1) {
+                if (rootPathsAndLabels.length > 0) {
+                    this.currentRootPathAndLabel = rootPathsAndLabels[0];
+                }
+            }
+            this.dirToPathMap.clear();
+            for (const rootPathAndLabel of rootPathsAndLabels) {
+                this.dirToPathMap.set(rootPathAndLabel.rootLabel, rootPathAndLabel.rootPath);
+            }
+
+            const msg: SetWorkspaceRootsMessage = {
+                command: "set-workspace-roots",
+                rootLabels: rootPathsAndLabels.map((rootPathAndLabel) => rootPathAndLabel.rootLabel),
+            };
+            this._view?.webview.postMessage(msg);
+        });
+
+        vscode.commands.registerCommand("weAudit.nextGitConfig", async () => {
+            const nextRootPath = await vscode.commands.executeCommand("weAudit.nextRoot", this.currentRootPathAndLabel.rootPath, true);
+            vscode.commands.executeCommand("weAudit.pushGitConfigView", nextRootPath);
+        });
+
+        vscode.commands.registerCommand("weAudit.prevGitConfig", async () => {
+            const prevRootPath = await vscode.commands.executeCommand("weAudit.nextRoot", this.currentRootPathAndLabel.rootPath, false);
+            vscode.commands.executeCommand("weAudit.pushGitConfigView", prevRootPath);
+        });
+
+        vscode.commands.registerCommand("weAudit.setupRepositoriesCurrent", () => {
+            vscode.commands.executeCommand("weAudit.setupRepositoriesOne", this.currentRootPathAndLabel.rootPath);
+        });
+    }
+
+    public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken): void {
         this._view = webviewView;
 
         webviewView.webview.options = {
@@ -30,26 +90,17 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
         this._setWebviewMessageListener(this._view.webview);
 
-        vscode.commands.registerCommand("weAudit.setGitConfigView", (clientRepo: string, auditRepo: string, commitHash: string) => {
-            const msg: UpdateRepositoryMessage = {
-                command: "update-repository-config",
-                clientURL: clientRepo,
-                auditURL: auditRepo,
-                commitHash,
-            };
-            this._view?.webview.postMessage(msg);
-        });
-
         // the webview does not save the context so we
         // need to re-push the data when the webview is hidden and then shown again
         webviewView.onDidChangeVisibility(() => {
             if (webviewView.visible) {
-                vscode.commands.executeCommand("weAudit.pushGitConfigView");
+                vscode.commands.executeCommand("weAudit.getGitConfigRoots");
+                vscode.commands.executeCommand("weAudit.pushGitConfigView", this.currentRootPathAndLabel.rootPath);
             }
         });
     }
 
-    private _getHtmlForWebview(webview: vscode.Webview) {
+    private _getHtmlForWebview(webview: vscode.Webview): string {
         // Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
         const styleUri = getUri(webview, this._extensionUri, ["media", "style.css"]);
         const webviewUri = getUri(webview, this._extensionUri, ["out", "gitConfigWebview.js"]);
@@ -57,40 +108,56 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
         // Use a nonce to only allow a specific script to be run.
         const nonce = getNonce();
 
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
-        const htmlBody = require("./gitConfig.html");
-
         return /*html*/ `
           <!DOCTYPE html>
           <html lang="en">
             <head>
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-              <link rel="stylesheet" href="${styleUri}">
+              <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; font-src ${webview.cspSource}; script-src 'nonce-${nonce}'; connect-src ${webview.cspSource};">
+              <link rel="stylesheet" href="${styleUri.toString()}">
               <title>Component Gallery</title>
             </head>
             <body>
               <section class="component-row">
                 ${htmlBody}
               </section>
-              <script type="module" nonce="${nonce}" src="${webviewUri}"></script>
+              <script type="module" nonce="${nonce}" src="${webviewUri.toString()}"></script>
             </body>
           </html>
         `;
     }
 
-    private _setWebviewMessageListener(webview: vscode.Webview) {
+    private _setWebviewMessageListener(webview: vscode.Webview): void {
         webview.onDidReceiveMessage(
             (message: WebviewMessage) => {
                 const command = message.command;
-
+                let rootPath;
                 switch (command) {
                     case "update-repository-config":
-                        vscode.commands.executeCommand("weAudit.updateGitConfig", message.clientURL, message.auditURL, message.commitHash);
+                        rootPath = this.dirToPathMap.get(message.rootLabel);
+                        if (rootPath === undefined) {
+                            vscode.window.showErrorMessage(
+                                `weAudit: Error updating repository config. Directory: ${message.rootLabel} is not a workspace root.`,
+                            );
+                            return;
+                        }
+                        vscode.commands.executeCommand("weAudit.updateGitConfig", rootPath, message.clientURL, message.auditURL, message.commitHash);
+                        return;
+                    case "choose-workspace-root":
+                        rootPath = this.dirToPathMap.get(message.rootLabel);
+                        if (rootPath === undefined) {
+                            vscode.window.showErrorMessage(`weAudit: Error choosing workspace root. Directory: ${message.rootLabel} is not a workspace root.`);
+                            return;
+                        }
+                        vscode.commands.executeCommand("weAudit.pushGitConfigView", rootPath);
                         return;
                     case "webview-ready":
-                        vscode.commands.executeCommand("weAudit.pushGitConfigView");
+                        vscode.commands.executeCommand("weAudit.getGitConfigRoots");
+                        vscode.commands.executeCommand(
+                            "weAudit.pushGitConfigView",
+                            this.currentRootPathAndLabel.rootPath ? this.currentRootPathAndLabel.rootPath : null,
+                        );
                         return;
                 }
             },
@@ -100,6 +167,6 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
     }
 }
 
-function getNonce() {
+function getNonce(): string {
     return crypto.randomBytes(16).toString("base64");
 }

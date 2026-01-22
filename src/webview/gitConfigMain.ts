@@ -1,11 +1,12 @@
-import { provideVSCodeDesignSystem, vsCodeTextField } from "@vscode/webview-ui-toolkit";
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+import { provideVSCodeDesignSystem, vsCodeTextField, vsCodeDropdown, vsCodeOption, Dropdown } from "@vscode/webview-ui-toolkit";
 import { TextField } from "@vscode/webview-ui-toolkit";
-import { WebviewIsReadyMessage, UpdateRepositoryMessage } from "./webviewMessageTypes";
+import { WebviewIsReadyMessage, UpdateRepositoryMessage, ChooseWorkspaceRootMessage } from "./webviewMessageTypes";
 
 // In order to use all the Webview UI Toolkit web components they
 // must be registered with the browser (i.e. webview) using the
 // syntax below.
-provideVSCodeDesignSystem().register(vsCodeTextField());
+provideVSCodeDesignSystem().register(vsCodeTextField(), vsCodeDropdown(), vsCodeOption());
 
 const vscode = acquireVsCodeApi();
 
@@ -14,7 +15,10 @@ const vscode = acquireVsCodeApi();
 // or toolkit components
 window.addEventListener("load", main);
 
-function main() {
+function main(): void {
+    const rootDropdown = document.getElementById("workspace-root-list-dropdown") as Dropdown;
+    rootDropdown?.addEventListener("change", handleDropdownChange);
+
     const clientURL = document.getElementById("client-url") as TextField;
     clientURL?.addEventListener("change", handleFieldChange);
 
@@ -27,12 +31,28 @@ function main() {
     // handle the message inside the webview
     window.addEventListener("message", (event) => {
         const message = event.data;
+        let rootList;
 
         switch (message.command) {
             case "update-repository-config":
+                rootDropdown.value = message.rootLabel;
                 clientURL.value = message.clientURL;
                 auditURL.value = message.auditURL;
                 commitHash.value = message.commitHash;
+                break;
+
+            case "set-workspace-roots":
+                rootList = document.getElementById("workspace-root-list-dropdown");
+                if (rootList === null) {
+                    break;
+                }
+                // clear the list
+                rootList.textContent = "";
+                for (let i = 0; i < message.rootLabels.length; i++) {
+                    const option = document.createElement("vscode-option");
+                    option.innerText = message.rootLabels[i];
+                    rootList.appendChild(option);
+                }
                 break;
         }
     });
@@ -47,12 +67,24 @@ function handleFieldChange(_e: Event): void {
     const clientURL = document.getElementById("client-url") as TextField;
     const auditURL = document.getElementById("audit-url") as TextField;
     const commitHash = document.getElementById("commit-hash") as TextField;
+    const rootDropdown = document.getElementById("workspace-root-list-dropdown") as Dropdown;
 
     const message: UpdateRepositoryMessage = {
         command: "update-repository-config",
+        rootLabel: rootDropdown.currentValue,
         clientURL: clientURL.value,
         auditURL: auditURL.value,
         commitHash: commitHash.value,
+    };
+    vscode.postMessage(message);
+}
+
+function handleDropdownChange(_e: Event): void {
+    const rootDropdown = document.getElementById("workspace-root-list-dropdown") as Dropdown;
+
+    const message: ChooseWorkspaceRootMessage = {
+        command: "choose-workspace-root",
+        rootLabel: rootDropdown.value,
     };
     vscode.postMessage(message);
 }

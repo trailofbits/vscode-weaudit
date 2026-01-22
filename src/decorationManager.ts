@@ -26,45 +26,68 @@ export class DecorationManager {
         this.auditedFileDecorationType = this.loadAuditedDecorationConfiguration();
     }
 
-    private createDecorationTypeWithString(color: string) {
+    private createDecorationTypeWithString(color: string): vscode.TextEditorDecorationType {
+        const overviewColor = this.withLessTransparentAlpha(color);
         return vscode.window.createTextEditorDecorationType({
             isWholeLine: true,
             backgroundColor: color,
             gutterIconPath: this.gutterIconPath,
             gutterIconSize: "contain",
-            overviewRulerColor: color,
-            overviewRulerLane: vscode.OverviewRulerLane.Full,
+            overviewRulerColor: overviewColor,
+            overviewRulerLane: vscode.OverviewRulerLane.Center,
         });
     }
+    /**
+     * Returns the same color as the provided hex string but with a boosted alpha channel,
+     * making it less transparent while preserving the hue for overview rulers.
+     */
+    private withLessTransparentAlpha(color: string | undefined): string | undefined {
+        if (color === undefined || !color.startsWith("#")) {
+            return color;
+        }
+        const hex = color.slice(1);
+        if (hex.length === 4) {
+            const base = hex.slice(0, 3);
+            const alpha = parseInt(hex[3], 16);
+            const newAlpha = Math.min(0xf, alpha + 0x7);
+            return `#${base}${newAlpha.toString(16)}`;
+        }
+        if (hex.length === 8) {
+            const base = hex.slice(0, 6);
+            const alpha = parseInt(hex.slice(6), 16);
+            const newAlpha = Math.min(0xff, alpha + 0x77);
+            return `#${base}${newAlpha.toString(16).padStart(2, "0")}`;
+        }
+        return color;
+    }
 
-    private loadOwnDecorationConfiguration() {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    private loadOwnDecorationConfiguration(): vscode.TextEditorDecorationType {
         const color: string = vscode.workspace.getConfiguration("weAudit").get("ownFindingColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
-    private loadOtherDecorationConfiguration() {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    private loadOtherDecorationConfiguration(): vscode.TextEditorDecorationType {
         const color: string = vscode.workspace.getConfiguration("weAudit").get("otherFindingColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
-    private loadOwnNoteDecorationConfiguration() {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    private loadOwnNoteDecorationConfiguration(): vscode.TextEditorDecorationType {
         const color: string = vscode.workspace.getConfiguration("weAudit").get("ownNoteColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
-    private loadOtherNoteDecorationConfiguration() {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    private loadOtherNoteDecorationConfiguration(): vscode.TextEditorDecorationType {
         const color: string = vscode.workspace.getConfiguration("weAudit").get("otherNoteColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
-    private loadAuditedDecorationConfiguration() {
+    private loadAuditedDecorationConfiguration(): vscode.TextEditorDecorationType {
+        const color: string | undefined = vscode.workspace.getConfiguration("weAudit").get("auditedColor");
         return vscode.window.createTextEditorDecorationType({
             isWholeLine: true,
-            backgroundColor: vscode.workspace.getConfiguration("weAudit").get("auditedColor"),
+            backgroundColor: color,
+            overviewRulerColor: this.withLessTransparentAlpha(color),
+            overviewRulerLane: vscode.OverviewRulerLane.Full,
         });
     }
 
@@ -72,7 +95,7 @@ export class DecorationManager {
      * Reload all decoration configurations.
      * TODO: make it possible to reload only one decoration type
      */
-    public reloadAllDecorationConfigurations() {
+    public reloadAllDecorationConfigurations(): void {
         // dispose old decoration types. This is necessary to clean up old decoration types,
         // otherwise they would be left over and we wouldn't be able to remove them.
         this.ownFindingDecorationType.dispose();
@@ -86,6 +109,16 @@ export class DecorationManager {
         this.ownNoteDecorationType = this.loadOwnNoteDecorationConfiguration();
         this.otherNoteDecorationType = this.loadOtherNoteDecorationConfiguration();
         this.auditedFileDecorationType = this.loadAuditedDecorationConfiguration();
+    }
+
+    /**
+     * Removes the finding decorations from the given editor so the file can be shown without highlights.
+     */
+    public clearEditorDecorations(editor: vscode.TextEditor): void {
+        editor.setDecorations(this.ownFindingDecorationType, []);
+        editor.setDecorations(this.otherFindingDecorationType, []);
+        editor.setDecorations(this.ownNoteDecorationType, []);
+        editor.setDecorations(this.otherNoteDecorationType, []);
     }
 }
 
