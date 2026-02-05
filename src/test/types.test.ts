@@ -4,6 +4,7 @@ import {
     type ConfigurationEntry,
     type Entry,
     EntryType,
+    EntryResolution,
     FindingDifficulty,
     FindingSeverity,
     FindingType,
@@ -55,6 +56,7 @@ describe("types.ts", () => {
             assert.strictEqual(details.description, "");
             assert.strictEqual(details.exploit, "");
             assert.strictEqual(details.recommendation, "Short term, \nLong term, \n");
+            assert.strictEqual(details.resolution, EntryResolution.Open);
             assert.ok(details.provenance);
             if (typeof details.provenance !== "object" || details.provenance === null) {
                 assert.fail("Expected provenance to be an object.");
@@ -89,6 +91,7 @@ describe("types.ts", () => {
                     description: "Test description",
                     exploit: "Test exploit",
                     recommendation: "Test recommendation",
+                    resolution: EntryResolution.Open,
                 },
                 locations: [
                     {
@@ -188,6 +191,12 @@ describe("types.ts", () => {
             const data = createValidSerializedData();
             data.treeEntries[0].entryType = EntryType.Note;
             assert.strictEqual(validateSerializedData(data), true);
+        });
+
+        it("should return false for entry with invalid resolution", () => {
+            const data = createValidSerializedData();
+            (data.treeEntries[0].details as unknown as { resolution: string }).resolution = "Not a resolution";
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         // BUG TEST: This test exposes a logic error in validatepartiallyAuditedFile

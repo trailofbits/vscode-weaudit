@@ -15,6 +15,17 @@ export enum EntryType {
 }
 
 /**
+ * Represents the resolution status of an entry.
+ */
+export enum EntryResolution {
+    Open = "Open",
+    Resolved = "Resolved",
+    TruePositive = "True Positive",
+    FalseNegative = "False Negative",
+    Unclassified = "Unclassified",
+}
+
+/**
  * Represent the client or audit repository.
  */
 export enum Repository {
@@ -186,6 +197,7 @@ function validateEntryDetails(entryDetails: EntryDetails): boolean {
             typeof entryDetails.provenance.created === "string" &&
             (typeof entryDetails.provenance.campaign === "string" || entryDetails.provenance.campaign === null) &&
             typeof entryDetails.provenance.commitHash === "string");
+    const resolutionValid = entryDetails.resolution === undefined || isEntryResolution(entryDetails.resolution);
     return (
         entryDetails.severity !== undefined &&
         entryDetails.difficulty !== undefined &&
@@ -193,7 +205,8 @@ function validateEntryDetails(entryDetails: EntryDetails): boolean {
         entryDetails.description !== undefined &&
         entryDetails.exploit !== undefined &&
         entryDetails.recommendation !== undefined &&
-        provenanceValid
+        provenanceValid &&
+        resolutionValid
     );
 }
 
@@ -214,6 +227,7 @@ export interface EntryDetails {
     description: string;
     exploit: string;
     recommendation: string;
+    resolution?: EntryResolution;
     provenance?: EntryProvenance | string;
 }
 
@@ -230,6 +244,7 @@ export function createDefaultEntryDetails(commitHash?: string): EntryDetails {
         description: "",
         exploit: "",
         recommendation: "Short term, \nLong term, \n",
+        resolution: EntryResolution.Open,
         provenance: {
             source: "human",
             created: new Date().toISOString(),
@@ -237,6 +252,21 @@ export function createDefaultEntryDetails(commitHash?: string): EntryDetails {
             commitHash: commitHash ?? "",
         },
     };
+}
+
+/**
+ * Checks whether a value is a valid EntryResolution.
+ * @param value The value to validate.
+ * @returns True if the value is a valid EntryResolution.
+ */
+export function isEntryResolution(value: string | undefined): value is EntryResolution {
+    return (
+        value === EntryResolution.Open ||
+        value === EntryResolution.Resolved ||
+        value === EntryResolution.TruePositive ||
+        value === EntryResolution.FalseNegative ||
+        value === EntryResolution.Unclassified
+    );
 }
 
 /**

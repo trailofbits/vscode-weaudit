@@ -26,6 +26,13 @@ function main(): void {
 
     const provenanceValue = document.getElementById("provenance-value") as HTMLSpanElement;
 
+    const resolutionFindingRow = document.getElementById("resolution-row-finding") as HTMLDivElement;
+    const resolutionNoteRow = document.getElementById("resolution-row-note") as HTMLDivElement;
+    const resolutionFindingDropdown = document.getElementById("resolution-finding-dropdown") as Dropdown;
+    const resolutionNoteDropdown = document.getElementById("resolution-note-dropdown") as Dropdown;
+    resolutionFindingDropdown?.addEventListener("change", handlePersistentFieldChange);
+    resolutionNoteDropdown?.addEventListener("change", handlePersistentFieldChange);
+
     const severityDropdown = document.getElementById("severity-dropdown") as Dropdown;
     severityDropdown?.addEventListener("change", handlePersistentFieldChange);
 
@@ -57,6 +64,8 @@ function main(): void {
 
     // start with the container hidden
     containerDiv.style.display = "none";
+    resolutionFindingRow.style.display = "none";
+    resolutionNoteRow.style.display = "none";
 
     // handle the message inside the webview
     window.addEventListener("message", (event) => {
@@ -67,6 +76,14 @@ function main(): void {
                 containerDiv.style.display = "block";
                 titleField.value = message.title;
                 provenanceValue.textContent = message.provenance ?? "human";
+                setResolutionControls(
+                    message.entryType as string | undefined,
+                    message.resolution as string | undefined,
+                    resolutionFindingRow,
+                    resolutionNoteRow,
+                    resolutionFindingDropdown,
+                    resolutionNoteDropdown,
+                );
                 severityDropdown.value = message.severity;
                 difficultyDropdown.value = message.difficulty;
                 typeDropdown.value = message.type;
@@ -79,9 +96,42 @@ function main(): void {
             case "hide-finding-details":
                 containerDiv.style.display = "none";
                 provenanceValue.textContent = "";
+                resolutionFindingRow.style.display = "none";
+                resolutionNoteRow.style.display = "none";
                 break;
         }
     });
+}
+
+/**
+ * Selects the appropriate resolution control and value for the current entry type.
+ */
+function setResolutionControls(
+    entryType: string | undefined,
+    resolution: string | undefined,
+    resolutionFindingRow: HTMLDivElement,
+    resolutionNoteRow: HTMLDivElement,
+    resolutionFindingDropdown: Dropdown,
+    resolutionNoteDropdown: Dropdown,
+): void {
+    const isFinding = entryType === "finding";
+    const findingResolution = coerceResolutionValue(resolution, ["Open", "True Positive", "False Negative"], "Open");
+    const noteResolution = coerceResolutionValue(resolution, ["Open", "Resolved"], "Open");
+
+    resolutionFindingRow.style.display = isFinding ? "flex" : "none";
+    resolutionNoteRow.style.display = isFinding ? "none" : "flex";
+    resolutionFindingDropdown.value = findingResolution;
+    resolutionNoteDropdown.value = noteResolution;
+}
+
+/**
+ * Returns a valid resolution value or a fallback when an invalid value is provided.
+ */
+function coerceResolutionValue(value: string | undefined, allowed: string[], fallback: string): string {
+    if (value && allowed.includes(value)) {
+        return value;
+    }
+    return fallback;
 }
 
 function handleNonPersistentFieldChange(e: Event): void {

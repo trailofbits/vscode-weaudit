@@ -141,8 +141,18 @@
             },
             {
                 "command": "weAudit.resolveFinding",
-                "title": "Resolve Finding",
+                "title": "Resolve Note",
                 "icon": "$(pass)"
+            },
+            {
+                "command": "weAudit.markTruePositive",
+                "title": "Mark True Positive",
+                "icon": "$(check)"
+            },
+            {
+                "command": "weAudit.markFalseNegative",
+                "title": "Mark False Negative",
+                "icon": "$(close)"
             },
             {
                 "command": "weAudit.editEntryTitle",
@@ -315,6 +325,14 @@
                     "when": "false"
                 },
                 {
+                    "command": "weAudit.markTruePositive",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.markFalseNegative",
+                    "when": "false"
+                },
+                {
                     "command": "weAudit.openGithubIssue",
                     "when": "false"
                 },
@@ -432,13 +450,23 @@
                 },
                 {
                     "command": "weAudit.resolveFinding",
-                    "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
+                    "when": "view == codeMarker && viewItem == note",
                     "group": "inline@5"
+                },
+                {
+                    "command": "weAudit.markTruePositive",
+                    "when": "view == codeMarker && viewItem == finding",
+                    "group": "inline@5"
+                },
+                {
+                    "command": "weAudit.markFalseNegative",
+                    "when": "view == codeMarker && viewItem == finding",
+                    "group": "inline@6"
                 },
                 {
                     "command": "weAudit.deleteFinding",
                     "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
-                    "group": "inline@6"
+                    "group": "inline@7"
                 },
                 {
                     "command": "weAudit.deleteLocation",

@@ -1,7 +1,30 @@
 import * as vscode from "vscode";
 import * as path from "path";
 
-import { FullEntry, EntryType } from "./types";
+import { FullEntry, EntryType, EntryResolution } from "./types";
+
+/**
+ * Returns a short status badge for a resolved entry.
+ * @param entry The resolved entry to label.
+ * @returns A short status badge string.
+ */
+function getResolutionBadge(entry: FullEntry): string {
+    if (entry.entryType === EntryType.Note) {
+        return "RESOLVED";
+    }
+
+    if (entry.details?.resolution === EntryResolution.TruePositive) {
+        return "TP";
+    }
+    if (entry.details?.resolution === EntryResolution.FalseNegative) {
+        return "FN";
+    }
+    if (entry.details?.resolution === EntryResolution.Unclassified) {
+        return "UNCLASSIFIED";
+    }
+
+    return "UNCLASSIFIED";
+}
 
 export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
     private resolvedEntries: FullEntry[];
@@ -49,8 +72,10 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
             arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
         };
 
-        treeItem.description = path.basename(mainLocation.path);
-        treeItem.tooltip = entry.author + "'s findings";
+        const badge = getResolutionBadge(entry);
+        treeItem.description = `${path.basename(mainLocation.path)} [${badge}]`;
+        treeItem.tooltip = `${entry.author}'s ${entry.entryType === EntryType.Note ? "note" : "finding"} (${badge})`;
+        treeItem.contextValue = entry.entryType === EntryType.Note ? "resolvedNote" : "resolvedFinding";
 
         return treeItem;
     }

@@ -31,6 +31,7 @@ import {
     FindingSeverity,
     FindingType,
     EntryType,
+    EntryResolution,
     RemoteAndPermalink,
     validateSerializedData,
     createPathOrganizer,
@@ -45,6 +46,7 @@ import {
     WorkspaceRootEntry,
     configEntryEquals,
     RootPathAndLabel,
+    isEntryResolution,
 } from "./types";
 import { normalizePathForOS } from "./utilities/normalizePath";
 
@@ -1748,8 +1750,17 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.navigateToNextPartiallyAuditedRegion();
         });
 
+        // Add explicit TP/FN commands so findings aren't resolved like notes.
         vscode.commands.registerCommand("weAudit.resolveFinding", (node: FullEntry) => {
             this.resolveFinding(node);
+        });
+
+        vscode.commands.registerCommand("weAudit.markTruePositive", (node: FullEntry) => {
+            this.markTruePositive(node);
+        });
+
+        vscode.commands.registerCommand("weAudit.markFalseNegative", (node: FullEntry) => {
+            this.markFalseNegative(node);
         });
 
         vscode.commands.registerCommand("weAudit.deleteFinding", (node: FullEntry) => {
@@ -2262,6 +2273,18 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // TODO: determine how to update the entry from the field string
         switch (field) {
+            case "resolution": {
+                // Route resolution changes through the unified helper so list placement stays consistent.
+                if (!isEntryResolution(value)) {
+                    return;
+                }
+                const normalizedResolution = this.normalizeResolutionForEntry(entry, value);
+                if (normalizedResolution === undefined) {
+                    return;
+                }
+                this.applyEntryResolution(entry, normalizedResolution, isPersistent);
+                return;
+            }
             case "severity":
                 entry.details.severity = value as FindingSeverity;
                 break;
@@ -2923,12 +2946,108 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     /**
-     * Deletes the entry from the tree entries list and adds it to the
-     * resolved entries list.
+     * Resolves a note and moves it to the resolved entries list.
+     * Findings must be marked as true positive or false negative instead.
      * @param entry the entry to resolve.
      */
     resolveFinding(entry: FullEntry): void {
-        this.deleteAndResolveFinding(entry, true);
+        // Notes can be resolved; findings must be triaged as TP/FN.
+        if (entry.entryType !== EntryType.Note) {
+            vscode.window.showInformationMessage("Findings cannot be resolved. Mark them as True Positive or False Negative instead.");
+            return;
+        }
+        this.applyEntryResolution(entry, EntryResolution.Resolved, true);
+    }
+
+    /**
+     * Marks a finding as a true positive and moves it to the resolved entries list.
+     * @param entry the finding to mark.
+     */
+    private markTruePositive(entry: FullEntry): void {
+        // Findings only: use TP to close the entry.
+        if (entry.entryType !== EntryType.Finding) {
+            vscode.window.showInformationMessage("Only findings can be marked as True Positive.");
+            return;
+        }
+        this.applyEntryResolution(entry, EntryResolution.TruePositive, true);
+    }
+
+    /**
+     * Marks a finding as a false negative and moves it to the resolved entries list.
+     * @param entry the finding to mark.
+     */
+    private markFalseNegative(entry: FullEntry): void {
+        // Findings only: use FN to close the entry.
+        if (entry.entryType !== EntryType.Finding) {
+            vscode.window.showInformationMessage("Only findings can be marked as False Negative.");
+            return;
+        }
+        this.applyEntryResolution(entry, EntryResolution.FalseNegative, true);
+    }
+
+    /**
+     * Normalizes a resolution choice to ensure it is valid for the entry type.
+     * @param entry The entry being updated.
+     * @param resolution The requested resolution.
+     * @returns The normalized resolution or undefined if it is not allowed.
+     */
+    private normalizeResolutionForEntry(entry: FullEntry, resolution: EntryResolution): EntryResolution | undefined {
+        if (entry.entryType === EntryType.Note) {
+            if (resolution === EntryResolution.Open || resolution === EntryResolution.Resolved) {
+                return resolution;
+            }
+            return;
+        }
+
+        if (resolution === EntryResolution.Open || resolution === EntryResolution.TruePositive || resolution === EntryResolution.FalseNegative) {
+            return resolution;
+        }
+        return;
+    }
+
+    /**
+     * Applies a resolution to an entry and moves it between active and resolved lists as needed.
+     * @param entry The entry to update.
+     * @param resolution The resolution to apply.
+     * @param persist Whether to persist the change immediately.
+     */
+    private applyEntryResolution(entry: FullEntry, resolution: EntryResolution, persist: boolean): void {
+        // Keep resolution state and list placement in sync.
+        if (entry.details === undefined) {
+            entry.details = createDefaultEntryDetails();
+        }
+        entry.details.resolution = resolution;
+
+        const shouldBeResolved = resolution !== EntryResolution.Open;
+        const treeIndex = getEntryIndexFromArray(entry, this.treeEntries);
+        const resolvedIndex = getEntryIndexFromArray(entry, this.resolvedEntries);
+
+        if (shouldBeResolved) {
+            if (treeIndex !== -1) {
+                const removed = this.treeEntries.splice(treeIndex, 1)[0];
+                if (resolvedIndex === -1) {
+                    this.resolvedEntries.push(removed);
+                }
+            } else if (resolvedIndex === -1) {
+                this.resolvedEntries.push(entry);
+            }
+        } else {
+            if (resolvedIndex !== -1) {
+                const removed = this.resolvedEntries.splice(resolvedIndex, 1)[0];
+                if (treeIndex === -1) {
+                    this.treeEntries.push(removed);
+                }
+            } else if (treeIndex === -1) {
+                this.treeEntries.push(entry);
+            }
+        }
+
+        this.resolvedEntriesTree.refresh();
+        this.refreshAndDecorateEntry(entry);
+
+        if (persist) {
+            void this.updateSavedData(entry.author);
+        }
     }
 
     /**
@@ -2959,17 +3078,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             entry.details = createDefaultEntryDetails();
         }
 
-        this.treeEntries.push(entry);
-        const idx = getEntryIndexFromArray(entry, this.resolvedEntries);
-        if (idx === -1) {
-            console.log("error in restoreFinding");
-            return;
-        }
-        this.resolvedEntries.splice(idx, 1);
-        this.resolvedEntriesTree.refresh();
-
-        this.refreshAndDecorateEntry(entry);
-        void this.updateSavedData(entry.author);
+        // Restoring always reopens the entry so it returns to the active list.
+        this.applyEntryResolution(entry, EntryResolution.Open, true);
     }
 
     /**
@@ -3013,8 +3123,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        this.treeEntries = this.treeEntries.concat(this.resolvedEntries);
-
         // get authors and paths tuples of the resolved findings
         const authorSet: Set<string> = new Set();
         for (const entry of this.resolvedEntries) {
@@ -3028,6 +3136,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         for (const entry of spliced) {
+            // Restoring reopens entries so they reappear in the active list.
+            entry.details.resolution = EntryResolution.Open;
+            this.treeEntries.push(entry);
             this.refreshEntry(entry);
         }
         this.resolvedEntriesTree.refresh();
@@ -3435,6 +3546,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         this.ensureEntryDetailsProvenance(fullParsedEntries.treeEntries);
         this.ensureEntryDetailsProvenance(fullParsedEntries.resolvedEntries);
+        // Ensure resolution defaults for legacy data and keep list placement consistent.
+        this.ensureEntryDetailsResolution(fullParsedEntries.treeEntries, fullParsedEntries.resolvedEntries);
 
         if (update) {
             if (add) {
@@ -3542,6 +3655,37 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
             if (legacyCommitHash !== undefined) {
                 delete (entry.details as { commitHash?: string }).commitHash;
+            }
+        }
+    }
+
+    /**
+     * Ensure all entries have a resolution value consistent with their current list placement.
+     * @param openEntries Entries in the active list.
+     * @param resolvedEntries Entries in the resolved list.
+     */
+    private ensureEntryDetailsResolution(openEntries: FullEntry[], resolvedEntries: FullEntry[]): void {
+        for (const entry of openEntries) {
+            // Active entries must be open to keep the tree and decorations consistent.
+            if (!isEntryResolution(entry.details.resolution) || entry.details.resolution !== EntryResolution.Open) {
+                entry.details.resolution = EntryResolution.Open;
+            }
+        }
+
+        for (const entry of resolvedEntries) {
+            if (entry.entryType === EntryType.Note) {
+                // Notes resolve to a single terminal state.
+                entry.details.resolution = EntryResolution.Resolved;
+                continue;
+            }
+
+            // Legacy resolved findings default to Unclassified unless already triaged.
+            if (
+                entry.details.resolution !== EntryResolution.TruePositive &&
+                entry.details.resolution !== EntryResolution.FalseNegative &&
+                entry.details.resolution !== EntryResolution.Unclassified
+            ) {
+                entry.details.resolution = EntryResolution.Unclassified;
             }
         }
     }
@@ -4527,8 +4671,11 @@ export class AuditMarker {
             entry.details = createDefaultEntryDetails();
         }
 
+        // Active entries should always present an open resolution in the details view.
+        entry.details.resolution = EntryResolution.Open;
+
         // Fills the Finding details webview with the currently selected entry details
-        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details, entry.label);
+        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details, entry.label, entry.entryType);
     }
 
     /**

@@ -30,7 +30,7 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Detailed Findings**](#detailed-findings) - Fill detailed information about a finding.
 -   [**GitHub/Gitlab Issues**](#githubgitlab-issues) - Create formatted GitHub or Gitlab issues with the Detailed Findings information.
 -   [**Multi-region Findings**](#multi-region-findings) - Group multiple locations under a single finding.
--   [**Resolve and Restore**](#resolve-and-restore) - Resolved findings will not be highlighted in the editor but are still visible in the sidebar.
+-   [**Resolve and Restore**](#resolve-and-restore) - Resolved notes and triaged findings will not be highlighted in the editor but remain visible in the sidebar.
 -   [**Copy Permalinks**](#copy-permalinks) - Copy GitHub permalinks to findings, or to a selected code region.
 -   [**Daily Log**](#daily-log) - View a daily log of all the marked files and LOC per day.
 -   [**View Mode**](#view-mode) - View findings in a list, or grouped by filename.
@@ -106,7 +106,7 @@ You can add multiple regions to a single finding or note. Once you select the co
 
 ### Resolve and Restore
 
-You can resolve a finding by clicking on the corresponding `Resolve` button in the _List of Findings_ panel. The finding will no longer be highlighted in the editor, but will still be visible in the _Resolved Findings_ panel. You can restore a resolved finding by clicking on the corresponding `Restore` button in the _Resolved Findings_ panel.
+Notes can be resolved from the _List of Findings_ panel. Findings are triaged instead: mark them as `True Positive` or `False Negative` from the same panel. Resolved notes and triaged findings are no longer highlighted in the editor but remain visible in the _Resolved Findings_ panel with a status badge. You can restore any resolved entry by clicking the corresponding `Restore` button in the _Resolved Findings_ panel.
 
 ![Resolve and Restore](media/readme/gifs/resolve_finding.gif)
 
