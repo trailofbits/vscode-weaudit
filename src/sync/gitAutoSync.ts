@@ -12,7 +12,6 @@ const DEFAULT_REMOTE_NAME = "origin";
 const DEFAULT_SYNC_MODE = "repo-branch";
 const DEFAULT_POLL_MINUTES = 1;
 const DEFAULT_DEBOUNCE_MS = 1000;
-const SUPPRESS_EVENTS_MS = 2000;
 const SYNC_COMMIT_MESSAGE = "chore(weaudit): sync findings";
 const LAST_SUCCESS_KEY = "weAudit.sync.lastSuccessAt";
 const CENTRAL_REMOTE_NAME = "origin";
@@ -551,10 +550,10 @@ class GitSyncSession implements SyncSession {
     private readonly onSyncSuccess: () => void;
     private readonly watchers: vscode.FileSystemWatcher[] = [];
     private readonly dirtyFiles = new Set<string>();
+    private readonly suppressedFileHashes = new Map<string, string | null>();
     private syncQueue: Promise<void> = Promise.resolve();
     private debounceTimer: NodeJS.Timeout | undefined;
     private pollTimer: NodeJS.Timeout | undefined;
-    private suppressEventsUntil = 0;
 
     constructor(options: GitSyncSessionOptions) {
         this.repoRoot = options.repoRoot;
@@ -643,9 +642,15 @@ class GitSyncSession implements SyncSession {
         for (const mapping of this.workspaceMappings) {
             const pattern = new vscode.RelativePattern(mapping.workspaceRoot, `.vscode/*${SERIALIZED_FILE_EXTENSION}`);
             const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-            watcher.onDidCreate((uri) => this.onWorkspaceFileChange(uri.fsPath));
-            watcher.onDidChange((uri) => this.onWorkspaceFileChange(uri.fsPath));
-            watcher.onDidDelete((uri) => this.onWorkspaceFileChange(uri.fsPath));
+            watcher.onDidCreate((uri) => {
+                void this.onWorkspaceFileChange(uri.fsPath);
+            });
+            watcher.onDidChange((uri) => {
+                void this.onWorkspaceFileChange(uri.fsPath);
+            });
+            watcher.onDidDelete((uri) => {
+                void this.onWorkspaceFileChange(uri.fsPath);
+            });
             this.watchers.push(watcher);
         }
     }
@@ -675,8 +680,8 @@ class GitSyncSession implements SyncSession {
     /**
      * Handle a local .weaudit file change event.
      */
-    private onWorkspaceFileChange(filePath: string): void {
-        if (Date.now() < this.suppressEventsUntil) {
+    private async onWorkspaceFileChange(filePath: string): Promise<void> {
+        if (await this.shouldIgnoreChange(filePath)) {
             return;
         }
         this.dirtyFiles.add(filePath);
@@ -825,10 +830,8 @@ class GitSyncSession implements SyncSession {
      */
     private async applyRemoteToWorkspace(dirtySnapshot: Set<string>): Promise<boolean> {
         let didApply = false;
-        this.suppressEventsUntil = Number.MAX_SAFE_INTEGER;
 
-        try {
-            for (const mapping of this.workspaceMappings) {
+        for (const mapping of this.workspaceMappings) {
                 const workspaceVscodeDir = path.join(mapping.workspaceRoot, ".vscode");
                 const worktreeVscodeDir = path.join(this.worktreePath, mapping.repoRelativeRoot, ".vscode");
 
@@ -847,6 +850,7 @@ class GitSyncSession implements SyncSession {
                     }
                     if (!(await filesAreIdentical(worktreeFile, workspaceFile))) {
                         await ensureDirectory(workspaceVscodeDir);
+                        await this.recordSuppressedHash(worktreeFile, workspaceFile);
                         await fs.promises.copyFile(worktreeFile, workspaceFile);
                         didApply = true;
                     }
@@ -860,14 +864,11 @@ class GitSyncSession implements SyncSession {
                     if (dirtySnapshot.has(workspaceFile)) {
                         continue;
                     }
+                    this.recordSuppressedDeletion(workspaceFile);
                     await fs.promises.unlink(workspaceFile);
                     didApply = true;
                 }
-            }
-        } finally {
-            this.suppressEventsUntil = Date.now() + SUPPRESS_EVENTS_MS;
         }
-
         return didApply;
     }
 
@@ -934,6 +935,68 @@ class GitSyncSession implements SyncSession {
             this.dirtyFiles.add(file);
         }
     }
+
+    /**
+     * Record a workspace path hash to suppress echo change events.
+     */
+    private async recordSuppressedHash(sourcePath: string, targetPath: string): Promise<void> {
+        const hash = await this.computeFileHash(sourcePath);
+        if (hash) {
+            this.suppressedFileHashes.set(targetPath, hash);
+        }
+    }
+
+    /**
+     * Record a workspace path deletion to suppress echo delete events.
+     */
+    private recordSuppressedDeletion(filePath: string): void {
+        this.suppressedFileHashes.set(filePath, null);
+    }
+
+    /**
+     * Determine whether a change event should be ignored.
+     */
+    private async shouldIgnoreChange(filePath: string): Promise<boolean> {
+        const expectedHash = this.suppressedFileHashes.get(filePath);
+        if (expectedHash === undefined) {
+            return false;
+        }
+
+        const exists = fs.existsSync(filePath);
+        if (!exists) {
+            if (expectedHash === null) {
+                this.suppressedFileHashes.delete(filePath);
+                return true;
+            }
+            this.suppressedFileHashes.delete(filePath);
+            return false;
+        }
+
+        if (expectedHash === null) {
+            this.suppressedFileHashes.delete(filePath);
+            return false;
+        }
+
+        const currentHash = await this.computeFileHash(filePath);
+        if (currentHash === expectedHash) {
+            return true;
+        }
+
+        this.suppressedFileHashes.delete(filePath);
+        return false;
+    }
+
+    /**
+     * Compute a sha256 hash for a file path.
+     */
+    private async computeFileHash(filePath: string): Promise<string | undefined> {
+        try {
+            const contents = await fs.promises.readFile(filePath);
+            return createHash("sha256").update(contents).digest("hex");
+        } catch (_error) {
+            return;
+        }
+    }
 }
 
 /**
@@ -947,10 +1010,10 @@ class CentralGitSyncSession implements SyncSession {
     private readonly onSyncSuccess: () => void;
     private readonly watchers: vscode.FileSystemWatcher[] = [];
     private readonly dirtyFiles = new Set<string>();
+    private readonly suppressedFileHashes = new Map<string, string | null>();
     private syncQueue: Promise<void> = Promise.resolve();
     private debounceTimer: NodeJS.Timeout | undefined;
     private pollTimer: NodeJS.Timeout | undefined;
-    private suppressEventsUntil = 0;
 
     constructor(options: CentralGitSyncSessionOptions) {
         this.workspaceMappings = options.workspaceMappings;
@@ -965,6 +1028,13 @@ class CentralGitSyncSession implements SyncSession {
      * Initialize the central repo, watchers, and polling timer.
      */
     async initialize(): Promise<void> {
+        this.log(`weAudit: central sync initializing (repoPath=${this.repoPath}, branch=${this.settings.centralBranch}).`);
+        this.log(`weAudit: central sync mappings: ${this.workspaceMappings.length} workspace root(s).`);
+        for (const mapping of this.workspaceMappings) {
+            this.log(
+                `weAudit: central sync mapping ${mapping.workspaceRoot} -> repos/${mapping.repoKey}/${mapping.repoRelativeRoot || "."}`,
+            );
+        }
         await this.ensureCentralRepo();
         const seededDirty = this.seedLocalUserFile();
         this.setupWatchers();
@@ -1024,9 +1094,15 @@ class CentralGitSyncSession implements SyncSession {
         for (const mapping of this.workspaceMappings) {
             const pattern = new vscode.RelativePattern(mapping.workspaceRoot, `.vscode/*${SERIALIZED_FILE_EXTENSION}`);
             const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-            watcher.onDidCreate((uri) => this.onWorkspaceFileChange(uri.fsPath));
-            watcher.onDidChange((uri) => this.onWorkspaceFileChange(uri.fsPath));
-            watcher.onDidDelete((uri) => this.onWorkspaceFileChange(uri.fsPath));
+            watcher.onDidCreate((uri) => {
+                void this.onWorkspaceFileChange(uri.fsPath);
+            });
+            watcher.onDidChange((uri) => {
+                void this.onWorkspaceFileChange(uri.fsPath);
+            });
+            watcher.onDidDelete((uri) => {
+                void this.onWorkspaceFileChange(uri.fsPath);
+            });
             this.watchers.push(watcher);
         }
     }
@@ -1056,10 +1132,12 @@ class CentralGitSyncSession implements SyncSession {
     /**
      * Handle a local .weaudit file change event.
      */
-    private onWorkspaceFileChange(filePath: string): void {
-        if (Date.now() < this.suppressEventsUntil) {
+    private async onWorkspaceFileChange(filePath: string): Promise<void> {
+        if (await this.shouldIgnoreChange(filePath)) {
+            this.log(`weAudit: central sync ignoring echoed change for ${filePath}.`);
             return;
         }
+        this.log(`weAudit: central sync detected local change ${filePath}.`);
         this.dirtyFiles.add(filePath);
         if (this.debounceTimer) {
             clearTimeout(this.debounceTimer);
@@ -1074,7 +1152,9 @@ class CentralGitSyncSession implements SyncSession {
      */
     private async ensureCentralRepo(): Promise<void> {
         await ensureDirectory(this.repoPath);
-        if (!fs.existsSync(path.join(this.repoPath, ".git"))) {
+        const gitDir = path.join(this.repoPath, ".git");
+        if (!fs.existsSync(gitDir)) {
+            this.log("weAudit: central sync initializing local repository.");
             await runGit(["init"], this.repoPath);
         }
         await this.ensureCentralRemote();
@@ -1090,9 +1170,11 @@ class CentralGitSyncSession implements SyncSession {
             const current = await runGit(["remote", "get-url", CENTRAL_REMOTE_NAME], this.repoPath);
             if (current.trim() !== remoteUrl) {
                 await runGit(["remote", "set-url", CENTRAL_REMOTE_NAME, remoteUrl], this.repoPath);
+                this.log(`weAudit: central sync updated remote ${CENTRAL_REMOTE_NAME}.`);
             }
         } catch (_error) {
             await runGit(["remote", "add", CENTRAL_REMOTE_NAME, remoteUrl], this.repoPath);
+            this.log(`weAudit: central sync added remote ${CENTRAL_REMOTE_NAME}.`);
         }
     }
 
@@ -1118,8 +1200,10 @@ class CentralGitSyncSession implements SyncSession {
                 ["checkout", "-B", this.settings.centralBranch, `${CENTRAL_REMOTE_NAME}/${this.settings.centralBranch}`],
                 this.repoPath,
             );
+            this.log(`weAudit: central sync checked out ${this.settings.centralBranch} from remote.`);
         } else {
             await runGit(["checkout", "-B", this.settings.centralBranch], this.repoPath);
+            this.log(`weAudit: central sync created local branch ${this.settings.centralBranch}.`);
         }
     }
 
@@ -1147,6 +1231,7 @@ class CentralGitSyncSession implements SyncSession {
         let shouldRecordSuccess = false;
 
         try {
+            this.log(`weAudit: central sync starting local sync (dirty=${dirtySnapshot.size}).`);
             await this.ensureCentralRepo();
             const hasRemote = await this.pullRemote();
             if (hasRemote) {
@@ -1159,6 +1244,7 @@ class CentralGitSyncSession implements SyncSession {
             }
 
             if (dirtySnapshot.size === 0) {
+                this.log("weAudit: central sync no local changes to push.");
                 if (shouldRecordSuccess) {
                     this.onSyncSuccess();
                 }
@@ -1169,7 +1255,10 @@ class CentralGitSyncSession implements SyncSession {
             const committed = await this.commitChanges(dirtySnapshot);
             if (committed) {
                 await this.pushRemote();
+                this.log("weAudit: central sync pushed local changes.");
                 shouldRecordSuccess = true;
+            } else {
+                this.log("weAudit: central sync no changes to commit after staging.");
             }
             if (shouldRecordSuccess) {
                 this.onSyncSuccess();
@@ -1184,9 +1273,11 @@ class CentralGitSyncSession implements SyncSession {
      * Perform a polling sync: pull remote and apply changes locally.
      */
     private async performPollSync(): Promise<void> {
+        this.log("weAudit: central sync starting poll.");
         await this.ensureCentralRepo();
         const hasRemote = await this.pullRemote();
         if (!hasRemote) {
+            this.log("weAudit: central sync poll skipped (remote branch not found).");
             return;
         }
         const dirtySnapshot = new Set(this.dirtyFiles);
@@ -1207,6 +1298,7 @@ class CentralGitSyncSession implements SyncSession {
             return false;
         }
         await runGit(["pull", "--rebase", CENTRAL_REMOTE_NAME, this.settings.centralBranch], this.repoPath);
+        this.log(`weAudit: central sync pulled ${this.settings.centralBranch}.`);
         return true;
     }
 
@@ -1222,10 +1314,8 @@ class CentralGitSyncSession implements SyncSession {
      */
     private async applyRemoteToWorkspace(dirtySnapshot: Set<string>): Promise<boolean> {
         let didApply = false;
-        this.suppressEventsUntil = Number.MAX_SAFE_INTEGER;
 
-        try {
-            for (const mapping of this.workspaceMappings) {
+        for (const mapping of this.workspaceMappings) {
                 const workspaceVscodeDir = path.join(mapping.workspaceRoot, ".vscode");
                 const centralVscodeDir = path.join(
                     this.repoPath,
@@ -1250,6 +1340,7 @@ class CentralGitSyncSession implements SyncSession {
                     }
                     if (!(await filesAreIdentical(centralFile, workspaceFile))) {
                         await ensureDirectory(workspaceVscodeDir);
+                        await this.recordSuppressedHash(centralFile, workspaceFile);
                         await fs.promises.copyFile(centralFile, workspaceFile);
                         didApply = true;
                     }
@@ -1263,14 +1354,11 @@ class CentralGitSyncSession implements SyncSession {
                     if (dirtySnapshot.has(workspaceFile)) {
                         continue;
                     }
+                    this.recordSuppressedDeletion(workspaceFile);
                     await fs.promises.unlink(workspaceFile);
                     didApply = true;
                 }
-            }
-        } finally {
-            this.suppressEventsUntil = Date.now() + SUPPRESS_EVENTS_MS;
         }
-
         return didApply;
     }
 
@@ -1278,6 +1366,7 @@ class CentralGitSyncSession implements SyncSession {
      * Apply local workspace changes into the central repository, including deletions.
      */
     private async applyWorkspaceToCentral(dirtySnapshot: Set<string>): Promise<void> {
+        this.log(`weAudit: central sync staging ${dirtySnapshot.size} local change(s).`);
         for (const workspaceFile of dirtySnapshot) {
             const centralRelativePath = this.getCentralRelativePath(workspaceFile);
             if (!centralRelativePath) {
@@ -1304,15 +1393,18 @@ class CentralGitSyncSession implements SyncSession {
 
         const uniquePaths = Array.from(new Set(relativePaths));
         if (uniquePaths.length === 0) {
+            this.log("weAudit: central sync no eligible paths to commit.");
             return false;
         }
 
         await runGit(["add", "-f", "--", ...uniquePaths], this.repoPath);
         const status = await runGit(["status", "--porcelain"], this.repoPath);
         if (status.trim().length === 0) {
+            this.log("weAudit: central sync working tree clean after add.");
             return false;
         }
         await runGit(["commit", "-m", SYNC_COMMIT_MESSAGE], this.repoPath);
+        this.log(`weAudit: central sync committed ${uniquePaths.length} path(s).`);
         return true;
     }
 
@@ -1365,5 +1457,74 @@ class CentralGitSyncSession implements SyncSession {
         for (const file of dirtySnapshot) {
             this.dirtyFiles.add(file);
         }
+    }
+
+    /**
+     * Record a workspace path hash to suppress echo change events.
+     */
+    private async recordSuppressedHash(sourcePath: string, targetPath: string): Promise<void> {
+        const hash = await this.computeFileHash(sourcePath);
+        if (hash) {
+            this.suppressedFileHashes.set(targetPath, hash);
+        }
+    }
+
+    /**
+     * Record a workspace path deletion to suppress echo delete events.
+     */
+    private recordSuppressedDeletion(filePath: string): void {
+        this.suppressedFileHashes.set(filePath, null);
+    }
+
+    /**
+     * Determine whether a change event should be ignored.
+     */
+    private async shouldIgnoreChange(filePath: string): Promise<boolean> {
+        const expectedHash = this.suppressedFileHashes.get(filePath);
+        if (expectedHash === undefined) {
+            return false;
+        }
+
+        const exists = fs.existsSync(filePath);
+        if (!exists) {
+            if (expectedHash === null) {
+                this.suppressedFileHashes.delete(filePath);
+                return true;
+            }
+            this.suppressedFileHashes.delete(filePath);
+            return false;
+        }
+
+        if (expectedHash === null) {
+            this.suppressedFileHashes.delete(filePath);
+            return false;
+        }
+
+        const currentHash = await this.computeFileHash(filePath);
+        if (currentHash === expectedHash) {
+            return true;
+        }
+
+        this.suppressedFileHashes.delete(filePath);
+        return false;
+    }
+
+    /**
+     * Compute a sha256 hash for a file path.
+     */
+    private async computeFileHash(filePath: string): Promise<string | undefined> {
+        try {
+            const contents = await fs.promises.readFile(filePath);
+            return createHash("sha256").update(contents).digest("hex");
+        } catch (_error) {
+            return;
+        }
+    }
+
+    /**
+     * Write a line to the sync output channel.
+     */
+    private log(message: string): void {
+        this.outputChannel.appendLine(message);
     }
 }

@@ -25,7 +25,6 @@ function main(): void {
     titleField?.addEventListener("change", handlePersistentFieldChange);
 
     const provenanceValue = document.getElementById("provenance-value") as HTMLSpanElement;
-    const commitHashValue = document.getElementById("commit-hash-value") as HTMLSpanElement;
 
     const severityDropdown = document.getElementById("severity-dropdown") as Dropdown;
     severityDropdown?.addEventListener("change", handlePersistentFieldChange);
@@ -68,7 +67,6 @@ function main(): void {
                 containerDiv.style.display = "block";
                 titleField.value = message.title;
                 provenanceValue.textContent = message.provenance ?? "human";
-                commitHashValue.textContent = message.commitHash || "Unknown";
                 severityDropdown.value = message.severity;
                 difficultyDropdown.value = message.difficulty;
                 typeDropdown.value = message.type;
@@ -81,7 +79,6 @@ function main(): void {
             case "hide-finding-details":
                 containerDiv.style.display = "none";
                 provenanceValue.textContent = "";
-                commitHashValue.textContent = "";
                 break;
         }
     });
