@@ -37,15 +37,11 @@ function main(): void {
     const noteActionsRow = document.getElementById("note-actions") as HTMLDivElement;
     const markTruePositiveButton = document.getElementById("action-mark-true-positive") as Button | null;
     const markFalsePositiveButton = document.getElementById("action-mark-false-positive") as Button | null;
-    const openGithubIssueButton = document.getElementById("action-open-github-issue") as Button | null;
     const resolveNoteButton = document.getElementById("action-resolve-note") as Button | null;
-    const openGithubIssueNoteButton = document.getElementById("action-open-github-issue-note") as Button | null;
 
     registerActionButton(markTruePositiveButton, "mark-true-positive");
     registerActionButton(markFalsePositiveButton, "mark-false-positive");
-    registerActionButton(openGithubIssueButton, "open-github-issue");
     registerActionButton(resolveNoteButton, "resolve-note");
-    registerActionButton(openGithubIssueNoteButton, "open-github-issue");
 
     const resolutionFindingRow = document.getElementById("resolution-row-finding") as HTMLDivElement;
     const resolutionNoteRow = document.getElementById("resolution-row-note") as HTMLDivElement;

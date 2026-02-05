@@ -172,7 +172,7 @@
             {
                 "command": "weAudit.restoreFinding",
                 "title": "Restore Finding",
-                "icon": "$(check)"
+                "icon": "$(reply)"
             },
             {
                 "command": "weAudit.deleteFinding",
