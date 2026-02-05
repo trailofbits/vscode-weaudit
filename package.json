@@ -150,8 +150,8 @@
                 "icon": "$(check)"
             },
             {
-                "command": "weAudit.markFalseNegative",
-                "title": "Mark False Negative",
+                "command": "weAudit.markFalsePositive",
+                "title": "Mark False Positive",
                 "icon": "$(close)"
             },
             {
@@ -329,7 +329,7 @@
                     "when": "false"
                 },
                 {
-                    "command": "weAudit.markFalseNegative",
+                    "command": "weAudit.markFalsePositive",
                     "when": "false"
                 },
                 {
@@ -459,7 +459,7 @@
                     "group": "inline@5"
                 },
                 {
-                    "command": "weAudit.markFalseNegative",
+                    "command": "weAudit.markFalsePositive",
                     "when": "view == codeMarker && viewItem == finding",
                     "group": "inline@6"
                 },

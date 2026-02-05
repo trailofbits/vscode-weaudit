@@ -16,8 +16,9 @@ function getResolutionBadge(entry: FullEntry): string {
     if (entry.details?.resolution === EntryResolution.TruePositive) {
         return "TP";
     }
-    if (entry.details?.resolution === EntryResolution.FalseNegative) {
-        return "FN";
+    const resolutionValue = String(entry.details?.resolution);
+    if (resolutionValue === "False Positive" || resolutionValue === "False Negative") {
+        return "FP";
     }
     if (entry.details?.resolution === EntryResolution.Unclassified) {
         return "UNCLASSIFIED";

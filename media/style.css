@@ -12,6 +12,13 @@
     flex: 1;
 }
 
+.detailsActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    padding-bottom: 1em;
+}
+
 vscode-dropdown,
 vscode-text-area,
 vscode-text-field {

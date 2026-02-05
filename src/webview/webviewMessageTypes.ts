@@ -1,5 +1,6 @@
 export type WebviewMessage =
     | UpdateEntryMessage
+    | DetailsActionMessage
     | UpdateRepositoryMessage
     | UpdateSyncConfigMessage
     | SyncNowMessage
@@ -13,6 +14,11 @@ export interface UpdateEntryMessage {
     field: string;
     value: string;
     isPersistent: boolean;
+}
+
+export interface DetailsActionMessage {
+    command: "details-action";
+    action: "mark-true-positive" | "mark-false-positive" | "resolve-note" | "open-github-issue";
 }
 
 export interface UpdateRepositoryMessage {

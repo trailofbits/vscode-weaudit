@@ -133,6 +133,23 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                     case "update-entry":
                         vscode.commands.executeCommand("weAudit.updateCurrentSelectedEntry", message.field, message.value, message.isPersistent);
                         return;
+                    case "details-action": {
+                        switch (message.action) {
+                            case "mark-true-positive":
+                                vscode.commands.executeCommand("weAudit.updateCurrentSelectedEntry", "resolution", "True Positive", true);
+                                return;
+                            case "mark-false-positive":
+                                vscode.commands.executeCommand("weAudit.updateCurrentSelectedEntry", "resolution", "False Positive", true);
+                                return;
+                            case "resolve-note":
+                                vscode.commands.executeCommand("weAudit.updateCurrentSelectedEntry", "resolution", "Resolved", true);
+                                return;
+                            case "open-github-issue":
+                                vscode.commands.executeCommand("weAudit.openGithubIssueFromDetails");
+                                return;
+                        }
+                        return;
+                    }
                     case "webview-ready":
                         // When the webview reports it's ready, update with current data
                         vscode.commands.executeCommand("weAudit.showSelectedEntryInFindingDetails");

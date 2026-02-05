@@ -1759,8 +1759,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.markTruePositive(node);
         });
 
+        vscode.commands.registerCommand("weAudit.markFalsePositive", (node: FullEntry) => {
+            this.markFalsePositive(node);
+        });
+
+        // Legacy alias for backward compatibility.
         vscode.commands.registerCommand("weAudit.markFalseNegative", (node: FullEntry) => {
-            this.markFalseNegative(node);
+            this.markFalsePositive(node);
         });
 
         vscode.commands.registerCommand("weAudit.deleteFinding", (node: FullEntry) => {
@@ -2953,7 +2958,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     resolveFinding(entry: FullEntry): void {
         // Notes can be resolved; findings must be triaged as TP/FN.
         if (entry.entryType !== EntryType.Note) {
-            vscode.window.showInformationMessage("Findings cannot be resolved. Mark them as True Positive or False Negative instead.");
+            vscode.window.showInformationMessage("Findings cannot be resolved. Mark them as True Positive or False Positive instead.");
             return;
         }
         this.applyEntryResolution(entry, EntryResolution.Resolved, true);
@@ -2976,13 +2981,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Marks a finding as a false negative and moves it to the resolved entries list.
      * @param entry the finding to mark.
      */
-    private markFalseNegative(entry: FullEntry): void {
-        // Findings only: use FN to close the entry.
+    private markFalsePositive(entry: FullEntry): void {
+        // Findings only: use FP to close the entry.
         if (entry.entryType !== EntryType.Finding) {
-            vscode.window.showInformationMessage("Only findings can be marked as False Negative.");
+            vscode.window.showInformationMessage("Only findings can be marked as False Positive.");
             return;
         }
-        this.applyEntryResolution(entry, EntryResolution.FalseNegative, true);
+        this.applyEntryResolution(entry, EntryResolution.FalsePositive, true);
     }
 
     /**
@@ -2999,7 +3004,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        if (resolution === EntryResolution.Open || resolution === EntryResolution.TruePositive || resolution === EntryResolution.FalseNegative) {
+        if (resolution === EntryResolution.Open || resolution === EntryResolution.TruePositive || resolution === EntryResolution.FalsePositive) {
             return resolution;
         }
         return;
@@ -3680,9 +3685,14 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
 
             // Legacy resolved findings default to Unclassified unless already triaged.
+            const resolutionValue = String(entry.details.resolution);
+            if (resolutionValue === "False Negative") {
+                entry.details.resolution = EntryResolution.FalsePositive;
+            }
+
             if (
                 entry.details.resolution !== EntryResolution.TruePositive &&
-                entry.details.resolution !== EntryResolution.FalseNegative &&
+                entry.details.resolution !== EntryResolution.FalsePositive &&
                 entry.details.resolution !== EntryResolution.Unclassified
             ) {
                 entry.details.resolution = EntryResolution.Unclassified;

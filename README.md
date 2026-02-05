@@ -89,6 +89,7 @@ You can quickly navigate through all partially audited regions in your workspace
 
 You can fill detailed information about a finding by clicking on it in the _List of Findings_ view in the sidebar. The respective _Finding Details_ panel will open, where you can fill the information.
 The panel also shows a read-only provenance field (defaulting to "human").
+The action buttons at the top let you triage findings (True/False Positive), resolve notes, or open a GitHub issue.
 
 ![Finding Details](media/readme/finding_details.png)
 
@@ -106,7 +107,7 @@ You can add multiple regions to a single finding or note. Once you select the co
 
 ### Resolve and Restore
 
-Notes can be resolved from the _List of Findings_ panel. Findings are triaged instead: mark them as `True Positive` or `False Negative` from the same panel. Resolved notes and triaged findings are no longer highlighted in the editor but remain visible in the _Resolved Findings_ panel with a status badge. You can restore any resolved entry by clicking the corresponding `Restore` button in the _Resolved Findings_ panel.
+Notes can be resolved from the _List of Findings_ panel. Findings are triaged instead: mark them as `True Positive` or `False Positive` from the same panel. Resolved notes and triaged findings are no longer highlighted in the editor but remain visible in the _Resolved Findings_ panel with a status badge. You can restore any resolved entry by clicking the corresponding `Restore` button in the _Resolved Findings_ panel.
 
 ![Resolve and Restore](media/readme/gifs/resolve_finding.gif)
 

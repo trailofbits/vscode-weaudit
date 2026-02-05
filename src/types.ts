@@ -21,7 +21,7 @@ export enum EntryResolution {
     Open = "Open",
     Resolved = "Resolved",
     TruePositive = "True Positive",
-    FalseNegative = "False Negative",
+    FalsePositive = "False Positive",
     Unclassified = "Unclassified",
 }
 
@@ -197,7 +197,10 @@ function validateEntryDetails(entryDetails: EntryDetails): boolean {
             typeof entryDetails.provenance.created === "string" &&
             (typeof entryDetails.provenance.campaign === "string" || entryDetails.provenance.campaign === null) &&
             typeof entryDetails.provenance.commitHash === "string");
-    const resolutionValid = entryDetails.resolution === undefined || isEntryResolution(entryDetails.resolution);
+    const resolutionValid =
+        entryDetails.resolution === undefined ||
+        isEntryResolution(entryDetails.resolution) ||
+        entryDetails.resolution === "False Negative";
     return (
         entryDetails.severity !== undefined &&
         entryDetails.difficulty !== undefined &&
@@ -264,7 +267,7 @@ export function isEntryResolution(value: string | undefined): value is EntryReso
         value === EntryResolution.Open ||
         value === EntryResolution.Resolved ||
         value === EntryResolution.TruePositive ||
-        value === EntryResolution.FalseNegative ||
+        value === EntryResolution.FalsePositive ||
         value === EntryResolution.Unclassified
     );
 }

@@ -1,13 +1,20 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-import { provideVSCodeDesignSystem, vsCodeDropdown, vsCodeTextArea, vsCodeOption, vsCodeTextField } from "@vscode/webview-ui-toolkit";
-import { TextArea, Dropdown, TextField } from "@vscode/webview-ui-toolkit";
-import { UpdateEntryMessage } from "./webviewMessageTypes";
+import {
+    provideVSCodeDesignSystem,
+    vsCodeDropdown,
+    vsCodeTextArea,
+    vsCodeOption,
+    vsCodeTextField,
+    vsCodeButton,
+} from "@vscode/webview-ui-toolkit";
+import { TextArea, Dropdown, TextField, Button } from "@vscode/webview-ui-toolkit";
+import { DetailsActionMessage, UpdateEntryMessage } from "./webviewMessageTypes";
 
 // In order to use all the Webview UI Toolkit web components they
 // must be registered with the browser (i.e. webview) using the
 // syntax below.
 // provideVSCodeDesignSystem().register(allComponents);
-provideVSCodeDesignSystem().register(vsCodeDropdown(), vsCodeTextArea(), vsCodeOption(), vsCodeTextField());
+provideVSCodeDesignSystem().register(vsCodeDropdown(), vsCodeTextArea(), vsCodeOption(), vsCodeTextField(), vsCodeButton());
 
 const vscode = acquireVsCodeApi();
 
@@ -25,6 +32,20 @@ function main(): void {
     titleField?.addEventListener("change", handlePersistentFieldChange);
 
     const provenanceValue = document.getElementById("provenance-value") as HTMLSpanElement;
+
+    const findingActionsRow = document.getElementById("finding-actions") as HTMLDivElement;
+    const noteActionsRow = document.getElementById("note-actions") as HTMLDivElement;
+    const markTruePositiveButton = document.getElementById("action-mark-true-positive") as Button | null;
+    const markFalsePositiveButton = document.getElementById("action-mark-false-positive") as Button | null;
+    const openGithubIssueButton = document.getElementById("action-open-github-issue") as Button | null;
+    const resolveNoteButton = document.getElementById("action-resolve-note") as Button | null;
+    const openGithubIssueNoteButton = document.getElementById("action-open-github-issue-note") as Button | null;
+
+    registerActionButton(markTruePositiveButton, "mark-true-positive");
+    registerActionButton(markFalsePositiveButton, "mark-false-positive");
+    registerActionButton(openGithubIssueButton, "open-github-issue");
+    registerActionButton(resolveNoteButton, "resolve-note");
+    registerActionButton(openGithubIssueNoteButton, "open-github-issue");
 
     const resolutionFindingRow = document.getElementById("resolution-row-finding") as HTMLDivElement;
     const resolutionNoteRow = document.getElementById("resolution-row-note") as HTMLDivElement;
@@ -66,6 +87,8 @@ function main(): void {
     containerDiv.style.display = "none";
     resolutionFindingRow.style.display = "none";
     resolutionNoteRow.style.display = "none";
+    findingActionsRow.style.display = "none";
+    noteActionsRow.style.display = "none";
 
     // handle the message inside the webview
     window.addEventListener("message", (event) => {
@@ -79,6 +102,8 @@ function main(): void {
                 setResolutionControls(
                     message.entryType as string | undefined,
                     message.resolution as string | undefined,
+                    findingActionsRow,
+                    noteActionsRow,
                     resolutionFindingRow,
                     resolutionNoteRow,
                     resolutionFindingDropdown,
@@ -98,6 +123,8 @@ function main(): void {
                 provenanceValue.textContent = "";
                 resolutionFindingRow.style.display = "none";
                 resolutionNoteRow.style.display = "none";
+                findingActionsRow.style.display = "none";
+                noteActionsRow.style.display = "none";
                 break;
         }
     });
@@ -109,15 +136,19 @@ function main(): void {
 function setResolutionControls(
     entryType: string | undefined,
     resolution: string | undefined,
+    findingActionsRow: HTMLDivElement,
+    noteActionsRow: HTMLDivElement,
     resolutionFindingRow: HTMLDivElement,
     resolutionNoteRow: HTMLDivElement,
     resolutionFindingDropdown: Dropdown,
     resolutionNoteDropdown: Dropdown,
 ): void {
     const isFinding = entryType === "finding";
-    const findingResolution = coerceResolutionValue(resolution, ["Open", "True Positive", "False Negative"], "Open");
+    const findingResolution = coerceResolutionValue(resolution, ["Open", "True Positive", "False Positive"], "Open");
     const noteResolution = coerceResolutionValue(resolution, ["Open", "Resolved"], "Open");
 
+    findingActionsRow.style.display = isFinding ? "flex" : "none";
+    noteActionsRow.style.display = isFinding ? "none" : "flex";
     resolutionFindingRow.style.display = isFinding ? "flex" : "none";
     resolutionNoteRow.style.display = isFinding ? "none" : "flex";
     resolutionFindingDropdown.value = findingResolution;
@@ -152,6 +183,29 @@ function handleFieldChange(e: Event, isPersistent: boolean): void {
         field: field,
         value: value,
         isPersistent: isPersistent,
+    };
+    vscode.postMessage(message);
+}
+
+/**
+ * Registers a button click listener that posts a details action message.
+ */
+function registerActionButton(button: Button | null, action: DetailsActionMessage["action"]): void {
+    if (!button) {
+        return;
+    }
+    button.addEventListener("click", () => {
+        postDetailsAction(action);
+    });
+}
+
+/**
+ * Posts a details action message to the extension host.
+ */
+function postDetailsAction(action: DetailsActionMessage["action"]): void {
+    const message: DetailsActionMessage = {
+        command: "details-action",
+        action: action,
     };
     vscode.postMessage(message);
 }
