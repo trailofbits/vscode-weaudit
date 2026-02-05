@@ -14,6 +14,7 @@ import { WebviewIsReadyMessage, UpdateSyncConfigMessage, SyncNowMessage, SetSync
 provideVSCodeDesignSystem().register(vsCodeTextField(), vsCodeCheckbox(), vsCodeButton(), vsCodeDropdown(), vsCodeOption());
 
 const vscode = acquireVsCodeApi();
+let hasLoadedConfig = false;
 
 // Wait for DOM content before wiring up the form.
 window.addEventListener("load", main);
@@ -62,6 +63,7 @@ function main(): void {
         repoKeyOverrideField.value = message.repoKeyOverride;
         lastSuccessValue.textContent = formatLastSuccess(message.lastSuccessAt);
         updateModeVisibility(message.mode);
+        hasLoadedConfig = true;
     });
 
     const webviewIsReadyMessage: WebviewIsReadyMessage = {
@@ -83,6 +85,10 @@ function handleConfigChange(): void {
     const centralRepoUrlField = document.getElementById("sync-central-url") as TextField;
     const centralBranchField = document.getElementById("sync-central-branch") as TextField;
     const repoKeyOverrideField = document.getElementById("sync-repo-key-override") as TextField;
+    updateModeVisibility(modeDropdown.value as "repo-branch" | "central-repo");
+    if (!hasLoadedConfig) {
+        return;
+    }
 
     const message: UpdateSyncConfigMessage = {
         command: "update-sync-config",
@@ -97,7 +103,6 @@ function handleConfigChange(): void {
         repoKeyOverride: repoKeyOverrideField.value,
     };
     vscode.postMessage(message);
-    updateModeVisibility(message.mode);
 }
 
 /**
