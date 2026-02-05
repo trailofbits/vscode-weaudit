@@ -178,6 +178,7 @@ function validateLocation(location: Location): boolean {
 
 function validateEntryDetails(entryDetails: EntryDetails): boolean {
     const provenanceValid = entryDetails.provenance === undefined || typeof entryDetails.provenance === "string";
+    const commitHashValid = entryDetails.commitHash === undefined || typeof entryDetails.commitHash === "string";
     return (
         entryDetails.severity !== undefined &&
         entryDetails.difficulty !== undefined &&
@@ -185,7 +186,8 @@ function validateEntryDetails(entryDetails: EntryDetails): boolean {
         entryDetails.description !== undefined &&
         entryDetails.exploit !== undefined &&
         entryDetails.recommendation !== undefined &&
-        provenanceValid
+        provenanceValid &&
+        commitHashValid
     );
 }
 
@@ -200,13 +202,15 @@ export interface EntryDetails {
     exploit: string;
     recommendation: string;
     provenance?: string;
+    commitHash?: string;
 }
 
 /**
  * Creates a default entry details object.
+ * @param commitHash Optional commit hash to attach to the entry details.
  * @returns the default entry details object
  */
-export function createDefaultEntryDetails(): EntryDetails {
+export function createDefaultEntryDetails(commitHash?: string): EntryDetails {
     return {
         severity: FindingSeverity.Undefined,
         difficulty: FindingDifficulty.Undefined,
@@ -215,6 +219,7 @@ export function createDefaultEntryDetails(): EntryDetails {
         exploit: "",
         recommendation: "Short term, \nLong term, \n",
         provenance: "human",
+        commitHash: commitHash ?? "",
     };
 }
 

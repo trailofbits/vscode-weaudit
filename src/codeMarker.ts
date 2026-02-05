@@ -3075,12 +3075,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 return;
             }
 
+            const commitHash = this.getCommitHashForLocations(locations);
             const entry: FullEntry = {
                 label: title,
                 entryType: entryType,
                 author: this.username,
                 locations: locations,
-                details: createDefaultEntryDetails(),
+                details: createDefaultEntryDetails(commitHash),
             };
             this.treeEntries.push(entry);
             void this.updateSavedData(this.username);
@@ -3096,7 +3097,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             entryType: locationEntry.parentEntry.entryType,
             author: this.username,
             locations: [locationEntry.location],
-            details: createDefaultEntryDetails(),
+            details: createDefaultEntryDetails(this.getCommitHashForLocations([locationEntry.location])),
         };
         this.treeEntries.push(entry);
         void this.updateSavedData(this.username);
@@ -3118,6 +3119,21 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         return locations;
+    }
+
+    /**
+     * Resolve the git commit hash for the workspace root of the provided locations.
+     * Uses the first location as the root reference.
+     */
+    private getCommitHashForLocations(locations: FullLocation[]): string {
+        if (locations.length === 0) {
+            return "";
+        }
+        const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(locations[0].rootPath);
+        if (wsRoot === undefined) {
+            return "";
+        }
+        return wsRoot.findGitSha() ?? "";
     }
 
     /**

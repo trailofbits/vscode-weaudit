@@ -88,7 +88,7 @@ You can quickly navigate through all partially audited regions in your workspace
 ### Detailed Findings
 
 You can fill detailed information about a finding by clicking on it in the _List of Findings_ view in the sidebar. The respective _Finding Details_ panel will open, where you can fill the information.
-The panel also shows a read-only provenance field (defaulting to "human") to indicate who created the finding.
+The panel also shows a read-only provenance field (defaulting to "human") and the commit hash captured when the entry was created.
 
 ![Finding Details](media/readme/finding_details.png)
 
