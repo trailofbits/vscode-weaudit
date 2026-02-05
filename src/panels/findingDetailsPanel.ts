@@ -68,7 +68,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                 description: entry.description,
                 exploit: entry.exploit,
                 recommendation: entry.recommendation,
-                provenance: entry.provenance ?? "human",
+                provenance: typeof entry.provenance === "object" ? entry.provenance.source : entry.provenance ?? "human",
                 title: title,
             });
 

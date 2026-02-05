@@ -177,8 +177,15 @@ function validateLocation(location: Location): boolean {
 }
 
 function validateEntryDetails(entryDetails: EntryDetails): boolean {
-    const provenanceValid = entryDetails.provenance === undefined || typeof entryDetails.provenance === "string";
-    const commitHashValid = entryDetails.commitHash === undefined || typeof entryDetails.commitHash === "string";
+    const provenanceValid =
+        entryDetails.provenance === undefined ||
+        typeof entryDetails.provenance === "string" ||
+        (typeof entryDetails.provenance === "object" &&
+            entryDetails.provenance !== null &&
+            typeof entryDetails.provenance.source === "string" &&
+            typeof entryDetails.provenance.created === "string" &&
+            (typeof entryDetails.provenance.campaign === "string" || entryDetails.provenance.campaign === null) &&
+            typeof entryDetails.provenance.commitHash === "string");
     return (
         entryDetails.severity !== undefined &&
         entryDetails.difficulty !== undefined &&
@@ -186,14 +193,20 @@ function validateEntryDetails(entryDetails: EntryDetails): boolean {
         entryDetails.description !== undefined &&
         entryDetails.exploit !== undefined &&
         entryDetails.recommendation !== undefined &&
-        provenanceValid &&
-        commitHashValid
+        provenanceValid
     );
 }
 
 // ====================================================================
 
 // The data used to fill the Finding Details panel
+export interface EntryProvenance {
+    source: string;
+    created: string;
+    campaign: string | null;
+    commitHash: string;
+}
+
 export interface EntryDetails {
     severity: FindingSeverity;
     difficulty: FindingDifficulty;
@@ -201,8 +214,7 @@ export interface EntryDetails {
     description: string;
     exploit: string;
     recommendation: string;
-    provenance?: string;
-    commitHash?: string;
+    provenance?: EntryProvenance | string;
 }
 
 /**
@@ -218,8 +230,12 @@ export function createDefaultEntryDetails(commitHash?: string): EntryDetails {
         description: "",
         exploit: "",
         recommendation: "Short term, \nLong term, \n",
-        provenance: "human",
-        commitHash: commitHash ?? "",
+        provenance: {
+            source: "human",
+            created: new Date().toISOString(),
+            campaign: null,
+            commitHash: commitHash ?? "",
+        },
     };
 }
 

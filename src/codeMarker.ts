@@ -3526,10 +3526,39 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      */
     private ensureEntryDetailsProvenance(entries: FullEntry[]): void {
         for (const entry of entries) {
-            if (entry.details.provenance === undefined) {
-                entry.details.provenance = "human";
+            const provenance = entry.details.provenance;
+            const legacyCommitHash = (entry.details as { commitHash?: string }).commitHash;
+            if (provenance === undefined) {
+                entry.details.provenance = this.createDefaultProvenance("human", legacyCommitHash);
+            } else if (typeof provenance === "string") {
+                entry.details.provenance = this.createDefaultProvenance(provenance, legacyCommitHash);
+            } else {
+                entry.details.provenance = {
+                    source: provenance.source ?? "human",
+                    created: provenance.created ?? new Date().toISOString(),
+                    campaign: provenance.campaign ?? null,
+                    commitHash: provenance.commitHash ?? legacyCommitHash ?? "",
+                };
+            }
+            if (legacyCommitHash !== undefined) {
+                delete (entry.details as { commitHash?: string }).commitHash;
             }
         }
+    }
+
+    /**
+     * Build a provenance object for extension-created findings/notes.
+     */
+    private createDefaultProvenance(
+        source: string,
+        commitHash?: string,
+    ): { source: string; created: string; campaign: string | null; commitHash: string } {
+        return {
+            source,
+            created: new Date().toISOString(),
+            campaign: null,
+            commitHash: commitHash ?? "",
+        };
     }
 
     /**

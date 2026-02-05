@@ -55,8 +55,14 @@ describe("types.ts", () => {
             assert.strictEqual(details.description, "");
             assert.strictEqual(details.exploit, "");
             assert.strictEqual(details.recommendation, "Short term, \nLong term, \n");
-            assert.strictEqual(details.provenance, "human");
-            assert.strictEqual(details.commitHash, "");
+            assert.ok(details.provenance);
+            if (typeof details.provenance !== "object" || details.provenance === null) {
+                assert.fail("Expected provenance to be an object.");
+            }
+            assert.strictEqual(details.provenance.source, "human");
+            assert.strictEqual(details.provenance.campaign, null);
+            assert.ok(details.provenance.created.length > 0);
+            assert.strictEqual(details.provenance.commitHash, "");
         });
     });
 
