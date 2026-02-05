@@ -792,7 +792,8 @@ class GitSyncSession implements SyncSession {
         if (!hasRemote) {
             return;
         }
-        const appliedChanges = await this.applyRemoteToWorkspace(new Set<string>());
+        const dirtySnapshot = new Set(this.dirtyFiles);
+        const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
         if (appliedChanges) {
             await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
             await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
@@ -1188,7 +1189,8 @@ class CentralGitSyncSession implements SyncSession {
         if (!hasRemote) {
             return;
         }
-        const appliedChanges = await this.applyRemoteToWorkspace(new Set<string>());
+        const dirtySnapshot = new Set(this.dirtyFiles);
+        const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
         if (appliedChanges) {
             await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
             await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");

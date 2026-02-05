@@ -1545,11 +1545,9 @@ class MultiRootManager {
      * Updates the saved data for the given user.
      * @param username the username to update the saved data for
      */
-    updateSavedData(username: string): void {
+    async updateSavedData(username: string): Promise<void> {
         //Iterate over all workspace roots
-        for (const root of this.roots) {
-            void root.updateSavedData(username);
-        }
+        await Promise.all(this.roots.map((root) => root.updateSavedData(username)));
     }
 
     /**
@@ -1624,6 +1622,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     private decorationManager: DecorationManager;
     private decorationsEnabled = true;
+
+    // Track in-flight save operations per username to avoid reloading stale data.
+    private savingCounts = new Map<string, number>();
 
     // Cached configuration for sorting entries alphabetically
     private sortEntriesAlphabetically: boolean;
@@ -3159,7 +3160,40 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param username the username to update the saved data for
      */
     updateSavedData(username: string): void {
-        this.workspaces.updateSavedData(username);
+        this.incrementSaving(username);
+        void this.workspaces.updateSavedData(username).finally(() => {
+            this.decrementSaving(username);
+        });
+    }
+
+    /**
+     * Mark that a save operation is starting for a given username.
+     */
+    private incrementSaving(username: string): void {
+        const current = this.savingCounts.get(username) ?? 0;
+        this.savingCounts.set(username, current + 1);
+    }
+
+    /**
+     * Mark that a save operation has finished for a given username.
+     */
+    private decrementSaving(username: string): void {
+        const current = this.savingCounts.get(username);
+        if (current === undefined) {
+            return;
+        }
+        if (current <= 1) {
+            this.savingCounts.delete(username);
+        } else {
+            this.savingCounts.set(username, current - 1);
+        }
+    }
+
+    /**
+     * Check whether a save operation is in progress for a given username.
+     */
+    private isSaving(username: string): boolean {
+        return (this.savingCounts.get(username) ?? 0) > 0;
     }
 
     /**
@@ -3453,6 +3487,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     reloadSavedFindingsFromDisk(): void {
         const selectedConfigs = this.workspaces.getSelectedConfigurations();
         for (const config of selectedConfigs) {
+            if (this.isSaving(config.username)) {
+                continue;
+            }
             if (!fs.existsSync(config.path)) {
                 // If a synced file disappeared, clear the in-memory entries for that user/root.
                 this.removeEntriesForConfig(config);
