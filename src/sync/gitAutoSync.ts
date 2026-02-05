@@ -270,14 +270,14 @@ async function deriveRepoKey(
 }
 
 /**
- * Read weAudit sync settings from workspace configuration only.
+ * Read weAudit sync settings from configuration.
  */
 function readSyncSettings(): SyncSettings {
     const config = vscode.workspace.getConfiguration("weAudit");
-    const modeValue = readGlobalSetting(config, "sync.mode", DEFAULT_SYNC_MODE);
-    const mode: SyncMode = modeValue === "central-repo" ? "central-repo" : "repo-branch";
+    const modeValue = config.get<SyncMode>("sync.mode", DEFAULT_SYNC_MODE);
+    const mode: SyncMode = modeValue === "repo-branch" ? "repo-branch" : "central-repo";
     const isCentral = mode === "central-repo";
-    const centralRepoUrl = isCentral ? readGlobalSetting(config, "sync.centralRepoUrl", "") : "";
+    const centralRepoUrl = readGlobalSetting(config, "sync.centralRepoUrl", "");
     const repoKeyOverride = isCentral ? readGlobalSetting(config, "sync.repoKeyOverride", "") : "";
 
     return {

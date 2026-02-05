@@ -155,7 +155,7 @@ You can hide all findings associated with a specific user by clicking on that us
 weAudit can automatically sync `.weaudit` files across auditors using git.
 
 **Modes**
-- **Central repo (default):** syncs all `.weaudit` files to a separate centralized git repository (ideal for read-only clones).
+- **Central repo (default):** syncs all `.weaudit` files to a separate centralized git repository (ideal for read-only clones). The central repo URL is stored globally, but each workspace's mode controls whether it is used.
 - **Repo branch:** uses a dedicated sync branch (default: `weaudit-sync`) on a remote in each repo.
 
 In central repo mode, each repository is assigned a repo key derived from its git remote. If any remote lives under the `trailofbits` GitHub organization, that remote is preferred when building the key.
