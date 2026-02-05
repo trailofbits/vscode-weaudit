@@ -177,13 +177,15 @@ function validateLocation(location: Location): boolean {
 }
 
 function validateEntryDetails(entryDetails: EntryDetails): boolean {
+    const provenanceValid = entryDetails.provenance === undefined || typeof entryDetails.provenance === "string";
     return (
         entryDetails.severity !== undefined &&
         entryDetails.difficulty !== undefined &&
         entryDetails.type !== undefined &&
         entryDetails.description !== undefined &&
         entryDetails.exploit !== undefined &&
-        entryDetails.recommendation !== undefined
+        entryDetails.recommendation !== undefined &&
+        provenanceValid
     );
 }
 
@@ -197,6 +199,7 @@ export interface EntryDetails {
     description: string;
     exploit: string;
     recommendation: string;
+    provenance?: string;
 }
 
 /**
@@ -211,6 +214,7 @@ export function createDefaultEntryDetails(): EntryDetails {
         description: "",
         exploit: "",
         recommendation: "Short term, \nLong term, \n",
+        provenance: "human",
     };
 }
 

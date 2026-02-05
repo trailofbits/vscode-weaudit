@@ -22,7 +22,7 @@
     },
     "icon": "media/icon.png",
     "engines": {
-        "vscode": "^1.107.0"
+        "vscode": "^1.108.0"
     },
     "activationEvents": [
         "onStartupFinished",
@@ -61,6 +61,13 @@
                     "type": "webview",
                     "id": "gitConfig",
                     "name": "Repository Configuration",
+                    "visibility": "collapsed",
+                    "contextualTitle": "weAudit"
+                },
+                {
+                    "type": "webview",
+                    "id": "syncConfig",
+                    "name": "Sync Configuration",
                     "visibility": "collapsed",
                     "contextualTitle": "weAudit"
                 },
@@ -240,6 +247,10 @@
             {
                 "command": "weAudit.toggleFindingsHighlighting",
                 "title": "weAudit: Toggle Findings Highlighting"
+            },
+            {
+                "command": "weAudit.syncNow",
+                "title": "weAudit: Sync Findings Now"
             }
         ],
         "keybindings": [
@@ -388,6 +399,11 @@
                     "group": "navigation@0"
                 },
                 {
+                    "command": "weAudit.syncNow",
+                    "when": "view == syncConfig",
+                    "group": "navigation@0"
+                },
+                {
                     "command": "weAudit.openGithubIssueFromDetails",
                     "when": "view == findingDetails && weAudit.findingDetailsHasEntry",
                     "group": "navigation"
@@ -528,6 +544,39 @@
                         "type": "string",
                         "default": "#145ceb55",
                         "description": "Background color for other user's notes (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
+                    }
+                }
+            },
+            {
+                "title": "Sync",
+                "order": 3,
+                "properties": {
+                    "weAudit.sync.enabled": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Enable git-based auto sync for .weaudit files."
+                    },
+                    "weAudit.sync.remoteName": {
+                        "type": "string",
+                        "default": "origin",
+                        "description": "The git remote to use for auto sync."
+                    },
+                    "weAudit.sync.branchName": {
+                        "type": "string",
+                        "default": "weaudit-sync",
+                        "description": "The branch name used for auto sync."
+                    },
+                    "weAudit.sync.pollMinutes": {
+                        "type": "number",
+                        "default": 1,
+                        "minimum": 1,
+                        "description": "Polling interval (in minutes) for pulling remote .weaudit changes."
+                    },
+                    "weAudit.sync.debounceMs": {
+                        "type": "number",
+                        "default": 1000,
+                        "minimum": 0,
+                        "description": "Debounce delay (in milliseconds) before syncing local .weaudit changes."
                     }
                 }
             }

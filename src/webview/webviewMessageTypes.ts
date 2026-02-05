@@ -1,4 +1,12 @@
-export type WebviewMessage = UpdateEntryMessage | UpdateRepositoryMessage | WebviewIsReadyMessage | ChooseWorkspaceRootMessage | SetWorkspaceRootsMessage;
+export type WebviewMessage =
+    | UpdateEntryMessage
+    | UpdateRepositoryMessage
+    | UpdateSyncConfigMessage
+    | SyncNowMessage
+    | SetSyncConfigMessage
+    | WebviewIsReadyMessage
+    | ChooseWorkspaceRootMessage
+    | SetWorkspaceRootsMessage;
 
 export interface UpdateEntryMessage {
     command: "update-entry";
@@ -27,4 +35,27 @@ export interface SetWorkspaceRootsMessage {
 
 export interface WebviewIsReadyMessage {
     command: "webview-ready";
+}
+
+export interface UpdateSyncConfigMessage {
+    command: "update-sync-config";
+    enabled: boolean;
+    remoteName: string;
+    branchName: string;
+    pollMinutes: number;
+    debounceMs: number;
+}
+
+export interface SetSyncConfigMessage {
+    command: "set-sync-config";
+    enabled: boolean;
+    remoteName: string;
+    branchName: string;
+    pollMinutes: number;
+    debounceMs: number;
+    lastSuccessAt?: string;
+}
+
+export interface SyncNowMessage {
+    command: "sync-now";
 }

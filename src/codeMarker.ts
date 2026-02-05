@@ -2035,6 +2035,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             void this.exportFindingsInMarkdown();
         });
 
+        // Reload selected configs from disk to pick up external sync updates.
+        vscode.commands.registerCommand("weAudit.reloadSavedFindingsFromDisk", () => {
+            this.reloadSavedFindingsFromDisk();
+        });
+
         // Gets the filtered entries from the current tree that correspond to a specific username and workspace root
         vscode.commands.registerCommand("weAudit.getFilteredEntriesForSaving", (username: string, root: WARoot) => {
             return this.getFilteredEntriesForSaving(username, root);
@@ -3378,6 +3383,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             partiallyAuditedFile.path = normalizePathForOS(rootPath, partiallyAuditedFile.path);
         });
 
+        this.ensureEntryDetailsProvenance(fullParsedEntries.treeEntries);
+        this.ensureEntryDetailsProvenance(fullParsedEntries.resolvedEntries);
+
         if (update) {
             if (add) {
                 // Remove potential entries of username which appear on the tree.
@@ -3437,6 +3445,61 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.markPathMapDirty();
 
         return fullParsedEntries;
+    }
+
+    /**
+     * Reload all selected configurations from disk to keep the tree in sync with external changes.
+     */
+    reloadSavedFindingsFromDisk(): void {
+        const selectedConfigs = this.workspaces.getSelectedConfigurations();
+        for (const config of selectedConfigs) {
+            if (!fs.existsSync(config.path)) {
+                // If a synced file disappeared, clear the in-memory entries for that user/root.
+                this.removeEntriesForConfig(config);
+                continue;
+            }
+            this.loadSavedDataFromConfig(config, true, false);
+            this.loadSavedDataFromConfig(config, true, true);
+        }
+
+        vscode.commands.executeCommand("weAudit.refreshSavedFindings", selectedConfigs);
+        this.resolvedEntriesTree.setResolvedEntries(this.resolvedEntries);
+        this.refreshTree();
+        this.decorate();
+    }
+
+    /**
+     * Ensure all entry details include a provenance value.
+     */
+    private ensureEntryDetailsProvenance(entries: FullEntry[]): void {
+        for (const entry of entries) {
+            if (entry.details.provenance === undefined) {
+                entry.details.provenance = "human";
+            }
+        }
+    }
+
+    /**
+     * Remove entries for a config's username within its workspace root from in-memory state.
+     */
+    private removeEntriesForConfig(config: ConfigurationEntry): void {
+        const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(config.path);
+        if (wsRoot === undefined) {
+            return;
+        }
+        this.treeEntries = this.treeEntries.filter(
+            (entry) =>
+                entry.author !== config.username ||
+                entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
+        );
+        wsRoot.filterAudited(config.username);
+        wsRoot.filterPartiallyAudited(config.username);
+        this.resolvedEntries = this.resolvedEntries.filter(
+            (entry) =>
+                entry.author !== config.username ||
+                entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
+        );
+        this.markPathMapDirty();
     }
 
     /**
@@ -3738,6 +3801,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             if (entry.location.endLine !== entry.location.startLine) {
                 description += "-" + (entry.location.endLine + 1).toString();
             }
+            description += " (" + entry.parentEntry.author + ")";
             let mainLabel: string;
             if (this.treeViewMode === TreeViewMode.List) {
                 mainLabel = entry.location.label;
@@ -3782,9 +3846,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const basePath = path.basename(mainLocation.path);
         treeItem.description = basePath + ":" + (mainLocation.startLine + 1).toString();
 
-        if (entry.author !== this.username) {
-            treeItem.description += " (" + entry.author + ")";
-        }
+        treeItem.description += " (" + entry.author + ")";
 
         treeItem.command = {
             command: "weAudit.openFileLines",

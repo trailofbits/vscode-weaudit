@@ -24,6 +24,8 @@ function main(): void {
     const titleField = document.getElementById("label-area") as TextField;
     titleField?.addEventListener("change", handlePersistentFieldChange);
 
+    const provenanceValue = document.getElementById("provenance-value") as HTMLSpanElement;
+
     const severityDropdown = document.getElementById("severity-dropdown") as Dropdown;
     severityDropdown?.addEventListener("change", handlePersistentFieldChange);
 
@@ -64,6 +66,7 @@ function main(): void {
             case "set-finding-details":
                 containerDiv.style.display = "block";
                 titleField.value = message.title;
+                provenanceValue.textContent = message.provenance ?? "human";
                 severityDropdown.value = message.severity;
                 difficultyDropdown.value = message.difficulty;
                 typeDropdown.value = message.type;
@@ -75,6 +78,7 @@ function main(): void {
 
             case "hide-finding-details":
                 containerDiv.style.display = "none";
+                provenanceValue.textContent = "";
                 break;
         }
     });

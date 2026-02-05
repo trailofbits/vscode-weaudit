@@ -55,6 +55,7 @@ describe("types.ts", () => {
             assert.strictEqual(details.description, "");
             assert.strictEqual(details.exploit, "");
             assert.strictEqual(details.recommendation, "Short term, \nLong term, \n");
+            assert.strictEqual(details.provenance, "human");
         });
     });
 

@@ -36,6 +36,7 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**View Mode**](#view-mode) - View findings in a list, or grouped by filename.
 -   [**Multiple Users**](#multiple-users) - Findings can be viewed from multiple different users.
 -   [**Hide Findings**](#hide-findings) - Hide all findings associated with a specific user.
+-   [**Auto Sync (Git)**](#auto-sync-git) - Automatically sync .weaudit files across auditors via a dedicated branch.
 -   [**Search & Filter Findings**](#search--filter-findings) - Search and filter the findings in the _List of Findings_ panel.
 -   [**Export Findings**](#export-findings) - Export findings to a markdown file.
 -   [**Drag & drop Findings and Locations**](#drag--drop-findings-and-locations) - Drag and drop findings and locations in the _List of Findings_ panel.
@@ -87,6 +88,7 @@ You can quickly navigate through all partially audited regions in your workspace
 ### Detailed Findings
 
 You can fill detailed information about a finding by clicking on it in the _List of Findings_ view in the sidebar. The respective _Finding Details_ panel will open, where you can fill the information.
+The panel also shows a read-only provenance field (defaulting to "human") to indicate who created the finding.
 
 ![Finding Details](media/readme/finding_details.png)
 
@@ -140,6 +142,7 @@ You can share the weAudit file with you co-auditors to share findings. This file
 
 In the `weAudit Files` panel, you can toggle to show or hide the findings from each user by clicking on the entries.
 There are color settings for other user's findings and notes, and for your own findings and notes.
+Findings and notes show the author's username after the filename/line number in the _List of Findings_ panel.
 
 ![Multiple Users](media/readme/multi_user.png)
 
@@ -147,6 +150,22 @@ There are color settings for other user's findings and notes, and for your own f
 You can hide all findings associated with a specific user by clicking on that user's name on the  `weAudit Files` panel.
 
 ![Hide Findings associated to a user](media/readme/gifs/hide_findings.gif)
+
+### Auto Sync (Git)
+weAudit can automatically sync `.weaudit` files across auditors using a dedicated git branch.
+
+To enable, set `weAudit.sync.enabled` to `true` in your settings. By default, weAudit:
+- uses the `weaudit-sync` branch on the `origin` remote;
+- pulls the latest sync branch before committing local `.weaudit` changes;
+- polls every minute for remote updates (configurable);
+- syncs only `.vscode/*.weaudit` files.
+
+Sync runs from a dedicated git worktree stored in VS Code's global storage, so your current branch and working tree stay untouched.
+
+You can also configure these settings in the **Sync Configuration** panel in the weAudit sidebar.
+The panel shows the timestamp of the last successful sync.
+
+You can trigger a manual sync at any time with the `weAudit: Sync Findings Now` command.
 
 ### Toggle Highlights
 Hide every findings/notes highlight in the editor by running the `weAudit: Toggle Findings Highlighting` command from the Command Palette. Run the command again to bring the highlights back whenever you need to review them.
@@ -176,6 +195,16 @@ You can drag and drop findings and locations in the _List of Findings_ panel to:
 -   `weAudit.general.githubOrganizationName`: Organization name for audit repository (enhances permalink heuristic)
 -   `weAudit.general.username`: Username to use as finding's author (defaults to system username if empty)
 -   `weAudit.general.permalinkSeparator`: Separator to use in permalinks (\\n is interpreted as newline)
+
+#### Sync settings
+
+-   `weAudit.sync.enabled`: Enable git-based auto sync (opt-in)
+-   `weAudit.sync.remoteName`: Git remote to use (default: "origin")
+-   `weAudit.sync.branchName`: Sync branch name (default: "weaudit-sync")
+-   `weAudit.sync.pollMinutes`: Remote polling interval in minutes (default: 1)
+-   `weAudit.sync.debounceMs`: Debounce delay for local changes in milliseconds
+
+Sync settings are stored per-workspace (user-level settings are ignored).
 
 #### Background colors
 

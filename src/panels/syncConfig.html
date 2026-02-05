@@ -1,0 +1,28 @@
+<div id="container-div">
+    <div class="detailsDiv">
+        <vscode-checkbox id="sync-enabled">Enable auto sync</vscode-checkbox>
+    </div>
+    <div class="detailsDiv">
+        <span class="detailSpan">Last successful sync:</span>
+        <span id="sync-last-success" class="detailValue">Never</span>
+    </div>
+    <div class="detailsDiv">
+        <span class="detailSpan">Remote:</span>
+        <vscode-text-field id="sync-remote"></vscode-text-field>
+    </div>
+    <div class="detailsDiv">
+        <span class="detailSpan">Branch:</span>
+        <vscode-text-field id="sync-branch"></vscode-text-field>
+    </div>
+    <div class="detailsDiv">
+        <span class="detailSpan">Poll (minutes):</span>
+        <vscode-text-field id="sync-poll" type="number"></vscode-text-field>
+    </div>
+    <div class="detailsDiv">
+        <span class="detailSpan">Debounce (ms):</span>
+        <vscode-text-field id="sync-debounce" type="number"></vscode-text-field>
+    </div>
+    <div class="detailsDiv">
+        <vscode-button id="sync-now">Sync now</vscode-button>
+    </div>
+</div>
