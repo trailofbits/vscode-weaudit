@@ -9,7 +9,7 @@ import { SERIALIZED_FILE_EXTENSION } from "../codeMarker";
 const DEFAULT_BRANCH_NAME = "weaudit-sync";
 const DEFAULT_CENTRAL_BRANCH = "weaudit-sync";
 const DEFAULT_REMOTE_NAME = "origin";
-const DEFAULT_SYNC_MODE = "repo-branch";
+const DEFAULT_SYNC_MODE = "central-repo";
 const DEFAULT_POLL_MINUTES = 1;
 const DEFAULT_DEBOUNCE_MS = 1000;
 const SYNC_COMMIT_MESSAGE = "chore(weaudit): sync findings";
@@ -115,6 +115,20 @@ function readWorkspaceSetting<T>(config: vscode.WorkspaceConfiguration, key: str
     }
     if (inspected.workspaceFolderValue !== undefined) {
         return inspected.workspaceFolderValue as T;
+    }
+    return fallback;
+}
+
+/**
+ * Read a global setting and ignore workspace overrides.
+ */
+function readGlobalSetting<T>(config: vscode.WorkspaceConfiguration, key: string, fallback: T): T {
+    const inspected = config.inspect<T>(key);
+    if (!inspected) {
+        return fallback;
+    }
+    if (inspected.globalValue !== undefined) {
+        return inspected.globalValue as T;
     }
     return fallback;
 }
@@ -260,11 +274,11 @@ async function deriveRepoKey(
  */
 function readSyncSettings(): SyncSettings {
     const config = vscode.workspace.getConfiguration("weAudit");
-    const modeValue = readWorkspaceOrGlobalSetting(config, "sync.mode", DEFAULT_SYNC_MODE);
+    const modeValue = readGlobalSetting(config, "sync.mode", DEFAULT_SYNC_MODE);
     const mode: SyncMode = modeValue === "central-repo" ? "central-repo" : "repo-branch";
     const isCentral = mode === "central-repo";
-    const centralRepoUrl = isCentral ? readWorkspaceOrGlobalSetting(config, "sync.centralRepoUrl", "") : "";
-    const repoKeyOverride = isCentral ? readWorkspaceOrGlobalSetting(config, "sync.repoKeyOverride", "") : "";
+    const centralRepoUrl = isCentral ? readGlobalSetting(config, "sync.centralRepoUrl", "") : "";
+    const repoKeyOverride = isCentral ? readGlobalSetting(config, "sync.repoKeyOverride", "") : "";
 
     return {
         enabled: isCentral ? readWorkspaceOrGlobalSetting(config, "sync.enabled", false) : readWorkspaceSetting(config, "sync.enabled", false),
@@ -278,7 +292,7 @@ function readSyncSettings(): SyncSettings {
             ? readWorkspaceOrGlobalSetting(config, "sync.debounceMs", DEFAULT_DEBOUNCE_MS)
             : readWorkspaceSetting(config, "sync.debounceMs", DEFAULT_DEBOUNCE_MS),
         centralRepoUrl: centralRepoUrl.trim(),
-        centralBranch: isCentral ? readWorkspaceOrGlobalSetting(config, "sync.centralBranch", DEFAULT_CENTRAL_BRANCH) : DEFAULT_CENTRAL_BRANCH,
+        centralBranch: isCentral ? readGlobalSetting(config, "sync.centralBranch", DEFAULT_CENTRAL_BRANCH) : DEFAULT_CENTRAL_BRANCH,
         repoKeyOverride: repoKeyOverride.trim(),
     };
 }

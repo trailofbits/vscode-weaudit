@@ -559,7 +559,7 @@
                     "weAudit.sync.mode": {
                         "type": "string",
                         "enum": ["repo-branch", "central-repo"],
-                        "default": "repo-branch",
+                        "default": "central-repo",
                         "description": "Select whether to sync using a repo branch or a centralized sync repository."
                     },
                     "weAudit.sync.remoteName": {

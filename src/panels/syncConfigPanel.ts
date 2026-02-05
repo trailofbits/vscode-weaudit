@@ -9,7 +9,7 @@ const DEFAULT_BRANCH_NAME = "weaudit-sync";
 const DEFAULT_REMOTE_NAME = "origin";
 const DEFAULT_POLL_MINUTES = 1;
 const DEFAULT_DEBOUNCE_MS = 1000;
-const DEFAULT_SYNC_MODE = "repo-branch";
+const DEFAULT_SYNC_MODE = "central-repo";
 const DEFAULT_CENTRAL_BRANCH = "weaudit-sync";
 
 /**
@@ -77,14 +77,14 @@ class SyncConfigProvider implements vscode.WebviewViewProvider {
         const message: SetSyncConfigMessage = {
             command: "set-sync-config",
             enabled: config.get<boolean>("sync.enabled", false),
-            mode: config.get<"repo-branch" | "central-repo">("sync.mode", DEFAULT_SYNC_MODE),
+            mode: readGlobalSetting(config, "sync.mode", DEFAULT_SYNC_MODE),
             remoteName: config.get<string>("sync.remoteName", DEFAULT_REMOTE_NAME),
             branchName: config.get<string>("sync.branchName", DEFAULT_BRANCH_NAME),
             pollMinutes: config.get<number>("sync.pollMinutes", DEFAULT_POLL_MINUTES),
             debounceMs: config.get<number>("sync.debounceMs", DEFAULT_DEBOUNCE_MS),
-            centralRepoUrl: config.get<string>("sync.centralRepoUrl", ""),
-            centralBranch: config.get<string>("sync.centralBranch", DEFAULT_CENTRAL_BRANCH),
-            repoKeyOverride: config.get<string>("sync.repoKeyOverride", ""),
+            centralRepoUrl: readGlobalSetting(config, "sync.centralRepoUrl", ""),
+            centralBranch: readGlobalSetting(config, "sync.centralBranch", DEFAULT_CENTRAL_BRANCH),
+            repoKeyOverride: readGlobalSetting(config, "sync.repoKeyOverride", ""),
             lastSuccessAt,
         };
         this._view.webview.postMessage(message);
@@ -177,6 +177,20 @@ function normalizeNumber(value: number, fallback: number, minValue: number): num
         return fallback;
     }
     return Math.max(minValue, Math.floor(value));
+}
+
+/**
+ * Read a global setting and ignore workspace overrides.
+ */
+function readGlobalSetting<T>(config: vscode.WorkspaceConfiguration, key: string, fallback: T): T {
+    const inspected = config.inspect<T>(key);
+    if (!inspected) {
+        return fallback;
+    }
+    if (inspected.globalValue !== undefined) {
+        return inspected.globalValue as T;
+    }
+    return fallback;
 }
 
 /**
