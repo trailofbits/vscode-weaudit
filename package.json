@@ -556,6 +556,12 @@
                         "default": false,
                         "description": "Enable git-based auto sync for .weaudit files."
                     },
+                    "weAudit.sync.mode": {
+                        "type": "string",
+                        "enum": ["repo-branch", "central-repo"],
+                        "default": "repo-branch",
+                        "description": "Select whether to sync using a repo branch or a centralized sync repository."
+                    },
                     "weAudit.sync.remoteName": {
                         "type": "string",
                         "default": "origin",
@@ -565,6 +571,21 @@
                         "type": "string",
                         "default": "weaudit-sync",
                         "description": "The branch name used for auto sync."
+                    },
+                    "weAudit.sync.centralRepoUrl": {
+                        "type": "string",
+                        "default": "",
+                        "description": "The centralized git repository URL used for multi-repo sync."
+                    },
+                    "weAudit.sync.centralBranch": {
+                        "type": "string",
+                        "default": "weaudit-sync",
+                        "description": "The branch name used in the centralized sync repository."
+                    },
+                    "weAudit.sync.repoKeyOverride": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Optional override for the repo key used in centralized sync (applies to all repos)."
                     },
                     "weAudit.sync.pollMinutes": {
                         "type": "number",

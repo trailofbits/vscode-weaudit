@@ -152,17 +152,22 @@ You can hide all findings associated with a specific user by clicking on that us
 ![Hide Findings associated to a user](media/readme/gifs/hide_findings.gif)
 
 ### Auto Sync (Git)
-weAudit can automatically sync `.weaudit` files across auditors using a dedicated git branch.
+weAudit can automatically sync `.weaudit` files across auditors using git.
+
+**Modes**
+- **Repo branch (default):** uses a dedicated sync branch (default: `weaudit-sync`) on a remote in each repo.
+- **Central repo:** syncs all `.weaudit` files to a separate centralized git repository (ideal for read-only clones).
+
+In central repo mode, each repository is assigned a repo key derived from its git remote. If any remote lives under the `trailofbits` GitHub organization, that remote is preferred when building the key.
 
 To enable, set `weAudit.sync.enabled` to `true` in your settings. By default, weAudit:
-- uses the `weaudit-sync` branch on the `origin` remote;
 - pulls the latest sync branch before committing local `.weaudit` changes;
 - polls every minute for remote updates (configurable);
-- syncs only `.vscode/*.weaudit` files.
+- syncs only `.vscode/*.weaudit` files (daily log data stays local).
 
-Sync runs from a dedicated git worktree stored in VS Code's global storage, so your current branch and working tree stay untouched.
+Repo-branch sync runs from a dedicated git worktree stored in VS Code's global storage, so your current branch and working tree stay untouched. Central repo sync uses a dedicated clone in the same global storage location.
 
-You can also configure these settings in the **Sync Configuration** panel in the weAudit sidebar.
+You can configure these settings in the **Sync Configuration** panel in the weAudit sidebar.
 The panel shows the timestamp of the last successful sync.
 
 You can trigger a manual sync at any time with the `weAudit: Sync Findings Now` command.
@@ -199,12 +204,16 @@ You can drag and drop findings and locations in the _List of Findings_ panel to:
 #### Sync settings
 
 -   `weAudit.sync.enabled`: Enable git-based auto sync (opt-in)
+-   `weAudit.sync.mode`: Sync mode ("repo-branch" or "central-repo")
 -   `weAudit.sync.remoteName`: Git remote to use (default: "origin")
 -   `weAudit.sync.branchName`: Sync branch name (default: "weaudit-sync")
+-   `weAudit.sync.centralRepoUrl`: Centralized git repository URL for multi-repo sync
+-   `weAudit.sync.centralBranch`: Branch name in the centralized sync repository (default: "weaudit-sync")
+-   `weAudit.sync.repoKeyOverride`: Optional override for the repo key used in centralized sync
 -   `weAudit.sync.pollMinutes`: Remote polling interval in minutes (default: 1)
 -   `weAudit.sync.debounceMs`: Debounce delay for local changes in milliseconds
 
-Sync settings are stored per-workspace (user-level settings are ignored).
+Repo-branch settings are stored per-workspace. Central repo settings (mode, central repo URL/branch, and optional override) are stored globally.
 
 #### Background colors
 

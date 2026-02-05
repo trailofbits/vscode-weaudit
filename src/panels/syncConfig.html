@@ -3,24 +3,47 @@
         <vscode-checkbox id="sync-enabled">Enable auto sync</vscode-checkbox>
     </div>
     <div class="detailsDiv">
+        <span class="detailSpan">Mode:</span>
+        <vscode-dropdown id="sync-mode" position="below">
+            <vscode-option value="repo-branch">Repo branch</vscode-option>
+            <vscode-option value="central-repo">Central repo</vscode-option>
+        </vscode-dropdown>
+    </div>
+    <div class="detailsDiv">
         <span class="detailSpan">Last successful sync:</span>
         <span id="sync-last-success" class="detailValue">Never</span>
     </div>
-    <div class="detailsDiv">
-        <span class="detailSpan">Remote:</span>
-        <vscode-text-field id="sync-remote"></vscode-text-field>
+    <div id="sync-repo-fields">
+        <div class="detailsDiv">
+            <span class="detailSpan">Remote:</span>
+            <vscode-text-field id="sync-remote"></vscode-text-field>
+        </div>
+        <div class="detailsDiv">
+            <span class="detailSpan">Branch:</span>
+            <vscode-text-field id="sync-branch"></vscode-text-field>
+        </div>
+        <div class="detailsDiv">
+            <span class="detailSpan">Poll (minutes):</span>
+            <vscode-text-field id="sync-poll" type="number"></vscode-text-field>
+        </div>
+        <div class="detailsDiv">
+            <span class="detailSpan">Debounce (ms):</span>
+            <vscode-text-field id="sync-debounce" type="number"></vscode-text-field>
+        </div>
     </div>
-    <div class="detailsDiv">
-        <span class="detailSpan">Branch:</span>
-        <vscode-text-field id="sync-branch"></vscode-text-field>
-    </div>
-    <div class="detailsDiv">
-        <span class="detailSpan">Poll (minutes):</span>
-        <vscode-text-field id="sync-poll" type="number"></vscode-text-field>
-    </div>
-    <div class="detailsDiv">
-        <span class="detailSpan">Debounce (ms):</span>
-        <vscode-text-field id="sync-debounce" type="number"></vscode-text-field>
+    <div id="sync-central-fields">
+        <div class="detailsDiv">
+            <span class="detailSpan">Central repo URL:</span>
+            <vscode-text-field id="sync-central-url"></vscode-text-field>
+        </div>
+        <div class="detailsDiv">
+            <span class="detailSpan">Central branch:</span>
+            <vscode-text-field id="sync-central-branch"></vscode-text-field>
+        </div>
+        <div class="detailsDiv">
+            <span class="detailSpan">Repo key override:</span>
+            <vscode-text-field id="sync-repo-key-override"></vscode-text-field>
+        </div>
     </div>
     <div class="detailsDiv">
         <vscode-button id="sync-now">Sync now</vscode-button>

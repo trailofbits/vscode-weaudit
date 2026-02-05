@@ -9,6 +9,8 @@ const DEFAULT_BRANCH_NAME = "weaudit-sync";
 const DEFAULT_REMOTE_NAME = "origin";
 const DEFAULT_POLL_MINUTES = 1;
 const DEFAULT_DEBOUNCE_MS = 1000;
+const DEFAULT_SYNC_MODE = "repo-branch";
+const DEFAULT_CENTRAL_BRANCH = "weaudit-sync";
 
 /**
  * Register the sync configuration webview view.
@@ -75,10 +77,14 @@ class SyncConfigProvider implements vscode.WebviewViewProvider {
         const message: SetSyncConfigMessage = {
             command: "set-sync-config",
             enabled: config.get<boolean>("sync.enabled", false),
+            mode: config.get<"repo-branch" | "central-repo">("sync.mode", DEFAULT_SYNC_MODE),
             remoteName: config.get<string>("sync.remoteName", DEFAULT_REMOTE_NAME),
             branchName: config.get<string>("sync.branchName", DEFAULT_BRANCH_NAME),
             pollMinutes: config.get<number>("sync.pollMinutes", DEFAULT_POLL_MINUTES),
             debounceMs: config.get<number>("sync.debounceMs", DEFAULT_DEBOUNCE_MS),
+            centralRepoUrl: config.get<string>("sync.centralRepoUrl", ""),
+            centralBranch: config.get<string>("sync.centralBranch", DEFAULT_CENTRAL_BRANCH),
+            repoKeyOverride: config.get<string>("sync.repoKeyOverride", ""),
             lastSuccessAt,
         };
         this._view.webview.postMessage(message);
@@ -140,14 +146,26 @@ class SyncConfigProvider implements vscode.WebviewViewProvider {
      */
     private async updateSyncConfig(message: UpdateSyncConfigMessage): Promise<void> {
         const config = vscode.workspace.getConfiguration("weAudit");
+        const mode = message.mode || DEFAULT_SYNC_MODE;
+        const isCentral = mode === "central-repo";
         const pollMinutes = normalizeNumber(message.pollMinutes, DEFAULT_POLL_MINUTES, 1);
         const debounceMs = normalizeNumber(message.debounceMs, DEFAULT_DEBOUNCE_MS, 0);
 
-        await config.update("sync.enabled", message.enabled, vscode.ConfigurationTarget.Workspace);
-        await config.update("sync.remoteName", message.remoteName || DEFAULT_REMOTE_NAME, vscode.ConfigurationTarget.Workspace);
-        await config.update("sync.branchName", message.branchName || DEFAULT_BRANCH_NAME, vscode.ConfigurationTarget.Workspace);
-        await config.update("sync.pollMinutes", pollMinutes, vscode.ConfigurationTarget.Workspace);
-        await config.update("sync.debounceMs", debounceMs, vscode.ConfigurationTarget.Workspace);
+        await config.update("sync.mode", mode, vscode.ConfigurationTarget.Global);
+
+        const target = isCentral ? vscode.ConfigurationTarget.Global : vscode.ConfigurationTarget.Workspace;
+        await config.update("sync.enabled", message.enabled, target);
+        await config.update("sync.pollMinutes", pollMinutes, target);
+        await config.update("sync.debounceMs", debounceMs, target);
+
+        if (isCentral) {
+            await config.update("sync.centralRepoUrl", message.centralRepoUrl, vscode.ConfigurationTarget.Global);
+            await config.update("sync.centralBranch", message.centralBranch || DEFAULT_CENTRAL_BRANCH, vscode.ConfigurationTarget.Global);
+            await config.update("sync.repoKeyOverride", message.repoKeyOverride || "", vscode.ConfigurationTarget.Global);
+        } else {
+            await config.update("sync.remoteName", message.remoteName || DEFAULT_REMOTE_NAME, vscode.ConfigurationTarget.Workspace);
+            await config.update("sync.branchName", message.branchName || DEFAULT_BRANCH_NAME, vscode.ConfigurationTarget.Workspace);
+        }
     }
 }
 

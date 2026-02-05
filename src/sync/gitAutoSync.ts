@@ -7,25 +7,39 @@ import { userInfo } from "os";
 import { SERIALIZED_FILE_EXTENSION } from "../codeMarker";
 
 const DEFAULT_BRANCH_NAME = "weaudit-sync";
+const DEFAULT_CENTRAL_BRANCH = "weaudit-sync";
 const DEFAULT_REMOTE_NAME = "origin";
+const DEFAULT_SYNC_MODE = "repo-branch";
 const DEFAULT_POLL_MINUTES = 1;
 const DEFAULT_DEBOUNCE_MS = 1000;
 const SUPPRESS_EVENTS_MS = 2000;
 const SYNC_COMMIT_MESSAGE = "chore(weaudit): sync findings";
 const LAST_SUCCESS_KEY = "weAudit.sync.lastSuccessAt";
+const CENTRAL_REMOTE_NAME = "origin";
+const PREFERRED_ORG = "trailofbits";
+
+type SyncMode = "repo-branch" | "central-repo";
 
 type SyncSettings = {
     enabled: boolean;
+    mode: SyncMode;
     branchName: string;
     remoteName: string;
     pollMinutes: number;
     debounceMs: number;
+    centralRepoUrl: string;
+    centralBranch: string;
+    repoKeyOverride: string;
 };
 
 type WorkspaceRootMapping = {
     workspaceRoot: string;
     repoRelativeRoot: string;
 };
+
+interface SyncSession extends vscode.Disposable {
+    syncNow(): Promise<void>;
+}
 
 /**
  * Run a git command and return stdout as a trimmed string.
@@ -57,10 +71,17 @@ async function runGit(args: string[], cwd: string): Promise<string> {
 }
 
 /**
+ * Create a stable short hash for a string value.
+ */
+function hashValue(value: string): string {
+    return createHash("sha256").update(value).digest("hex").slice(0, 12);
+}
+
+/**
  * Create a stable hash string for a repository root path.
  */
 function hashRepoRoot(repoRoot: string): string {
-    return createHash("sha256").update(repoRoot).digest("hex").slice(0, 12);
+    return hashValue(repoRoot);
 }
 
 /**
@@ -83,9 +104,6 @@ async function ensureDirectory(dirPath: string): Promise<void> {
 }
 
 /**
- * Read weAudit sync settings from the VS Code configuration.
- */
-/**
  * Read a workspace-scoped setting and ignore user-level values.
  */
 function readWorkspaceSetting<T>(config: vscode.WorkspaceConfiguration, key: string, fallback: T): T {
@@ -103,16 +121,166 @@ function readWorkspaceSetting<T>(config: vscode.WorkspaceConfiguration, key: str
 }
 
 /**
+ * Read a setting preferring workspace values and falling back to globals.
+ */
+function readWorkspaceOrGlobalSetting<T>(config: vscode.WorkspaceConfiguration, key: string, fallback: T): T {
+    const inspected = config.inspect<T>(key);
+    if (!inspected) {
+        return fallback;
+    }
+    if (inspected.workspaceValue !== undefined) {
+        return inspected.workspaceValue as T;
+    }
+    if (inspected.workspaceFolderValue !== undefined) {
+        return inspected.workspaceFolderValue as T;
+    }
+    if (inspected.globalValue !== undefined) {
+        return inspected.globalValue as T;
+    }
+    return fallback;
+}
+
+/**
+ * Normalize a git remote URL to a stable https form without credentials.
+ */
+function normalizeRemoteUrl(remoteUrl: string): string {
+    let value = remoteUrl.trim();
+    if (value.length === 0) {
+        return "";
+    }
+
+    const scpLikeMatch = value.match(/^[^@]+@([^:]+):(.+)$/);
+    if (scpLikeMatch) {
+        value = `https://${scpLikeMatch[1]}/${scpLikeMatch[2]}`;
+    }
+
+    if (value.startsWith("ssh://")) {
+        try {
+            const parsed = new URL(value);
+            value = `https://${parsed.host}${parsed.pathname}`;
+        } catch (_error) {
+            return value;
+        }
+    }
+
+    if (value.startsWith("git://")) {
+        value = `https://${value.slice("git://".length)}`;
+    }
+
+    if (value.startsWith("http://") || value.startsWith("https://")) {
+        try {
+            const parsed = new URL(value);
+            value = `https://${parsed.host}${parsed.pathname}`;
+        } catch (_error) {
+            return value;
+        }
+    }
+
+    if (value.endsWith(".git")) {
+        value = value.slice(0, -".git".length);
+    }
+
+    return value.replace(/\/+$/, "");
+}
+
+/**
+ * Convert a normalized remote URL into a filesystem-safe repo key.
+ */
+function formatRepoKey(normalizedUrl: string): string {
+    const withoutScheme = normalizedUrl.replace(/^[a-z]+:\/\//i, "");
+    const sanitized = withoutScheme.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^_+|_+$/g, "");
+    return sanitized.length > 0 ? sanitized : hashValue(normalizedUrl);
+}
+
+/**
+ * Check if a normalized remote URL belongs to the preferred GitHub organization.
+ */
+function isPreferredOrgRemote(normalizedUrl: string, orgName: string): boolean {
+    try {
+        const parsed = new URL(normalizedUrl);
+        return parsed.hostname.toLowerCase() === "github.com" && parsed.pathname.toLowerCase().startsWith(`/${orgName}/`);
+    } catch (_error) {
+        return normalizedUrl.toLowerCase().includes(`github.com/${orgName.toLowerCase()}/`);
+    }
+}
+
+/**
+ * Select the preferred remote URL, prioritizing a specific GitHub organization.
+ */
+function selectPreferredRemoteUrl(normalizedRemotes: string[], orgName: string): string | undefined {
+    for (const remote of normalizedRemotes) {
+        if (isPreferredOrgRemote(remote, orgName)) {
+            return remote;
+        }
+    }
+    return normalizedRemotes[0];
+}
+
+/**
+ * List remote URLs configured for a repository.
+ */
+async function listRemoteUrls(repoRoot: string): Promise<string[]> {
+    try {
+        const output = await runGit(["config", "--get-regexp", "^remote\\..*\\.url$"], repoRoot);
+        return output
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
+            .map((line) => line.split(/\s+/).slice(1).join(" "));
+    } catch (_error) {
+        return [];
+    }
+}
+
+/**
+ * Derive a repo key from git remotes, falling back to a hash of the repo root.
+ */
+async function deriveRepoKey(
+    repoRoot: string,
+    repoKeyOverride: string,
+    outputChannel: vscode.OutputChannel,
+): Promise<string> {
+    if (repoKeyOverride.trim().length > 0) {
+        return formatRepoKey(repoKeyOverride.trim());
+    }
+
+    const remotes = await listRemoteUrls(repoRoot);
+    const normalizedRemotes = remotes.map(normalizeRemoteUrl).filter((remote) => remote.length > 0);
+    const preferred = selectPreferredRemoteUrl(normalizedRemotes, PREFERRED_ORG);
+
+    if (preferred) {
+        return formatRepoKey(preferred);
+    }
+
+    outputChannel.appendLine(`weAudit: central sync repo key fallback for ${repoRoot} (no remotes found).`);
+    return hashRepoRoot(repoRoot);
+}
+
+/**
  * Read weAudit sync settings from workspace configuration only.
  */
 function readSyncSettings(): SyncSettings {
     const config = vscode.workspace.getConfiguration("weAudit");
+    const modeValue = readWorkspaceOrGlobalSetting(config, "sync.mode", DEFAULT_SYNC_MODE);
+    const mode: SyncMode = modeValue === "central-repo" ? "central-repo" : "repo-branch";
+    const isCentral = mode === "central-repo";
+    const centralRepoUrl = isCentral ? readWorkspaceOrGlobalSetting(config, "sync.centralRepoUrl", "") : "";
+    const repoKeyOverride = isCentral ? readWorkspaceOrGlobalSetting(config, "sync.repoKeyOverride", "") : "";
+
     return {
-        enabled: readWorkspaceSetting(config, "sync.enabled", false),
+        enabled: isCentral ? readWorkspaceOrGlobalSetting(config, "sync.enabled", false) : readWorkspaceSetting(config, "sync.enabled", false),
+        mode,
         branchName: readWorkspaceSetting(config, "sync.branchName", DEFAULT_BRANCH_NAME),
         remoteName: readWorkspaceSetting(config, "sync.remoteName", DEFAULT_REMOTE_NAME),
-        pollMinutes: readWorkspaceSetting(config, "sync.pollMinutes", DEFAULT_POLL_MINUTES),
-        debounceMs: readWorkspaceSetting(config, "sync.debounceMs", DEFAULT_DEBOUNCE_MS),
+        pollMinutes: isCentral
+            ? readWorkspaceOrGlobalSetting(config, "sync.pollMinutes", DEFAULT_POLL_MINUTES)
+            : readWorkspaceSetting(config, "sync.pollMinutes", DEFAULT_POLL_MINUTES),
+        debounceMs: isCentral
+            ? readWorkspaceOrGlobalSetting(config, "sync.debounceMs", DEFAULT_DEBOUNCE_MS)
+            : readWorkspaceSetting(config, "sync.debounceMs", DEFAULT_DEBOUNCE_MS),
+        centralRepoUrl: centralRepoUrl.trim(),
+        centralBranch: isCentral ? readWorkspaceOrGlobalSetting(config, "sync.centralBranch", DEFAULT_CENTRAL_BRANCH) : DEFAULT_CENTRAL_BRANCH,
+        repoKeyOverride: repoKeyOverride.trim(),
     };
 }
 
@@ -128,7 +296,7 @@ function getCurrentUsername(): string {
  * Manages git-based auto-sync sessions across workspace roots.
  */
 export class GitAutoSyncManager implements vscode.Disposable {
-    private sessions = new Map<string, GitSyncSession>();
+    private sessions = new Map<string, SyncSession>();
     private readonly outputChannel: vscode.OutputChannel;
     private readonly disposables: vscode.Disposable[] = [];
 
@@ -168,6 +336,10 @@ export class GitAutoSyncManager implements vscode.Disposable {
             vscode.window.showInformationMessage("weAudit: Auto sync is disabled. Enable it in settings to use Sync Now.");
             return;
         }
+        if (settings.mode === "central-repo" && !settings.centralRepoUrl) {
+            vscode.window.showInformationMessage("weAudit: Central sync is enabled but no central repo URL is configured.");
+            return;
+        }
 
         const sessions = Array.from(this.sessions.values());
         if (sessions.length === 0) {
@@ -205,14 +377,54 @@ export class GitAutoSyncManager implements vscode.Disposable {
             return;
         }
 
-        const repoMap = await this.collectRepoMap(vscode.workspace.workspaceFolders.map((folder) => folder.uri.fsPath));
+        const workspaceRoots = vscode.workspace.workspaceFolders.map((folder) => folder.uri.fsPath);
+        const repoMap = await this.collectRepoMap(workspaceRoots);
         const baseWorktreeDir = path.join(this.context.globalStorageUri.fsPath, "git-sync");
         await ensureDirectory(baseWorktreeDir);
 
-        for (const [repoRoot, workspaceRoots] of repoMap.entries()) {
+        if (settings.mode === "central-repo") {
+            if (!settings.centralRepoUrl) {
+                this.outputChannel.appendLine("weAudit: central sync is enabled but no central repo URL is configured.");
+                return;
+            }
+            if (repoMap.size === 0) {
+                this.outputChannel.appendLine("weAudit: central sync enabled but no git repositories were found.");
+                return;
+            }
+            if (settings.repoKeyOverride && repoMap.size > 1) {
+                this.outputChannel.appendLine("weAudit: repoKeyOverride applies to all repos; multiple repos may collide.");
+            }
+
+            const workspaceMappings = await this.buildCentralMappings(repoMap, settings.repoKeyOverride);
+            if (workspaceMappings.length === 0) {
+                this.outputChannel.appendLine("weAudit: central sync enabled but no workspace roots are eligible.");
+                return;
+            }
+
+            const session = new CentralGitSyncSession({
+                workspaceMappings,
+                worktreeBaseDir: baseWorktreeDir,
+                settings,
+                outputChannel: this.outputChannel,
+                onSyncSuccess: (): void => {
+                    void this.recordSyncSuccess();
+                },
+            });
+            try {
+                await session.initialize();
+                this.sessions.set("central", session);
+            } catch (error) {
+                this.outputChannel.appendLine(
+                    `weAudit: central sync session disabled: ${error instanceof Error ? error.message : String(error)}`,
+                );
+            }
+            return;
+        }
+
+        for (const [repoRoot, repoWorkspaceRoots] of repoMap.entries()) {
             const session = new GitSyncSession({
                 repoRoot,
-                workspaceRoots,
+                workspaceRoots: repoWorkspaceRoots,
                 worktreeBaseDir: baseWorktreeDir,
                 settings,
                 outputChannel: this.outputChannel,
@@ -229,6 +441,32 @@ export class GitAutoSyncManager implements vscode.Disposable {
                 );
             }
         }
+    }
+
+    /**
+     * Build mappings for central repo sync based on repository roots.
+     */
+    private async buildCentralMappings(
+        repoMap: Map<string, string[]>,
+        repoKeyOverride: string,
+    ): Promise<CentralWorkspaceMapping[]> {
+        const mappings: CentralWorkspaceMapping[] = [];
+        for (const [repoRoot, workspaceRoots] of repoMap.entries()) {
+            const repoKey = await deriveRepoKey(repoRoot, repoKeyOverride, this.outputChannel);
+            for (const workspaceRoot of workspaceRoots) {
+                const repoRelativeRoot = path.relative(repoRoot, workspaceRoot);
+                if (repoRelativeRoot.startsWith("..") || path.isAbsolute(repoRelativeRoot)) {
+                    continue;
+                }
+                mappings.push({
+                    workspaceRoot,
+                    repoRoot,
+                    repoRelativeRoot,
+                    repoKey,
+                });
+            }
+        }
+        return mappings;
     }
 
     /**
@@ -286,10 +524,25 @@ type GitSyncSessionOptions = {
     onSyncSuccess: () => void;
 };
 
+type CentralWorkspaceMapping = {
+    workspaceRoot: string;
+    repoRoot: string;
+    repoRelativeRoot: string;
+    repoKey: string;
+};
+
+type CentralGitSyncSessionOptions = {
+    workspaceMappings: CentralWorkspaceMapping[];
+    worktreeBaseDir: string;
+    settings: SyncSettings;
+    outputChannel: vscode.OutputChannel;
+    onSyncSuccess: () => void;
+};
+
 /**
  * Handles git-based sync for a single repository root.
  */
-class GitSyncSession implements vscode.Disposable {
+class GitSyncSession implements SyncSession {
     private readonly repoRoot: string;
     private readonly workspaceMappings: WorkspaceRootMapping[];
     private readonly worktreePath: string;
@@ -670,6 +923,437 @@ class GitSyncSession implements vscode.Disposable {
         } catch (_error) {
             return [];
         }
+    }
+
+    /**
+     * Merge a dirty snapshot back into the live dirty set.
+     */
+    private mergeDirty(dirtySnapshot: Set<string>): void {
+        for (const file of dirtySnapshot) {
+            this.dirtyFiles.add(file);
+        }
+    }
+}
+
+/**
+ * Handles centralized git sync across multiple repositories.
+ */
+class CentralGitSyncSession implements SyncSession {
+    private readonly workspaceMappings: CentralWorkspaceMapping[];
+    private readonly repoPath: string;
+    private readonly settings: SyncSettings;
+    private readonly outputChannel: vscode.OutputChannel;
+    private readonly onSyncSuccess: () => void;
+    private readonly watchers: vscode.FileSystemWatcher[] = [];
+    private readonly dirtyFiles = new Set<string>();
+    private syncQueue: Promise<void> = Promise.resolve();
+    private debounceTimer: NodeJS.Timeout | undefined;
+    private pollTimer: NodeJS.Timeout | undefined;
+    private suppressEventsUntil = 0;
+
+    constructor(options: CentralGitSyncSessionOptions) {
+        this.workspaceMappings = options.workspaceMappings;
+        this.settings = options.settings;
+        this.outputChannel = options.outputChannel;
+        this.onSyncSuccess = options.onSyncSuccess;
+        const centralRepoUrl = this.settings.centralRepoUrl.trim();
+        this.repoPath = path.join(options.worktreeBaseDir, "central", hashValue(centralRepoUrl));
+    }
+
+    /**
+     * Initialize the central repo, watchers, and polling timer.
+     */
+    async initialize(): Promise<void> {
+        await this.ensureCentralRepo();
+        const seededDirty = this.seedLocalUserFile();
+        this.setupWatchers();
+        this.startPolling();
+        if (seededDirty) {
+            void this.enqueue(() => this.performLocalSync());
+        } else {
+            void this.enqueue(() => this.performPollSync());
+        }
+    }
+
+    /**
+     * Dispose watchers and timers for this session.
+     */
+    dispose(): void {
+        for (const watcher of this.watchers) {
+            watcher.dispose();
+        }
+        this.watchers.length = 0;
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+            this.debounceTimer = undefined;
+        }
+        if (this.pollTimer) {
+            clearInterval(this.pollTimer);
+            this.pollTimer = undefined;
+        }
+    }
+
+    /**
+     * Trigger a manual sync of the central repository.
+     */
+    syncNow(): Promise<void> {
+        return this.enqueue(() => this.performLocalSync());
+    }
+
+    /**
+     * Seed the dirty set with the current user's .weaudit file if it exists.
+     */
+    private seedLocalUserFile(): boolean {
+        const username = getCurrentUsername();
+        let seeded = false;
+        for (const mapping of this.workspaceMappings) {
+            const userFile = path.join(mapping.workspaceRoot, ".vscode", `${username}${SERIALIZED_FILE_EXTENSION}`);
+            if (fs.existsSync(userFile)) {
+                this.dirtyFiles.add(userFile);
+                seeded = true;
+            }
+        }
+        return seeded;
+    }
+
+    /**
+     * Set up file watchers for each workspace root.
+     */
+    private setupWatchers(): void {
+        for (const mapping of this.workspaceMappings) {
+            const pattern = new vscode.RelativePattern(mapping.workspaceRoot, `.vscode/*${SERIALIZED_FILE_EXTENSION}`);
+            const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+            watcher.onDidCreate((uri) => this.onWorkspaceFileChange(uri.fsPath));
+            watcher.onDidChange((uri) => this.onWorkspaceFileChange(uri.fsPath));
+            watcher.onDidDelete((uri) => this.onWorkspaceFileChange(uri.fsPath));
+            this.watchers.push(watcher);
+        }
+    }
+
+    /**
+     * Start the polling timer that pulls remote updates.
+     */
+    private startPolling(): void {
+        const pollMs = Math.max(1, this.settings.pollMinutes) * 60 * 1000;
+        this.pollTimer = setInterval(() => {
+            void this.enqueue(() => this.performPollSync());
+        }, pollMs);
+    }
+
+    /**
+     * Enqueue a sync task to run sequentially.
+     */
+    private enqueue(task: () => Promise<void>): Promise<void> {
+        this.syncQueue = this.syncQueue
+            .then(task)
+            .catch((error) => {
+                this.outputChannel.appendLine(`weAudit: central sync error: ${error instanceof Error ? error.message : String(error)}`);
+            });
+        return this.syncQueue;
+    }
+
+    /**
+     * Handle a local .weaudit file change event.
+     */
+    private onWorkspaceFileChange(filePath: string): void {
+        if (Date.now() < this.suppressEventsUntil) {
+            return;
+        }
+        this.dirtyFiles.add(filePath);
+        if (this.debounceTimer) {
+            clearTimeout(this.debounceTimer);
+        }
+        this.debounceTimer = setTimeout(() => {
+            void this.enqueue(() => this.performLocalSync());
+        }, this.settings.debounceMs);
+    }
+
+    /**
+     * Ensure the central repository exists with the configured remote and branch.
+     */
+    private async ensureCentralRepo(): Promise<void> {
+        await ensureDirectory(this.repoPath);
+        if (!fs.existsSync(path.join(this.repoPath, ".git"))) {
+            await runGit(["init"], this.repoPath);
+        }
+        await this.ensureCentralRemote();
+        await this.ensureCentralBranch();
+    }
+
+    /**
+     * Ensure the central remote is configured for the local repo.
+     */
+    private async ensureCentralRemote(): Promise<void> {
+        const remoteUrl = this.settings.centralRepoUrl.trim();
+        try {
+            const current = await runGit(["remote", "get-url", CENTRAL_REMOTE_NAME], this.repoPath);
+            if (current.trim() !== remoteUrl) {
+                await runGit(["remote", "set-url", CENTRAL_REMOTE_NAME, remoteUrl], this.repoPath);
+            }
+        } catch (_error) {
+            await runGit(["remote", "add", CENTRAL_REMOTE_NAME, remoteUrl], this.repoPath);
+        }
+    }
+
+    /**
+     * Ensure the configured central branch exists locally.
+     */
+    private async ensureCentralBranch(): Promise<void> {
+        let currentBranch = "";
+        try {
+            currentBranch = await runGit(["rev-parse", "--abbrev-ref", "HEAD"], this.repoPath);
+        } catch (_error) {
+            currentBranch = "";
+        }
+
+        if (currentBranch.trim() === this.settings.centralBranch) {
+            return;
+        }
+
+        const branchExists = await this.remoteBranchExists();
+        if (branchExists) {
+            await runGit(["fetch", CENTRAL_REMOTE_NAME, this.settings.centralBranch], this.repoPath);
+            await runGit(
+                ["checkout", "-B", this.settings.centralBranch, `${CENTRAL_REMOTE_NAME}/${this.settings.centralBranch}`],
+                this.repoPath,
+            );
+        } else {
+            await runGit(["checkout", "-B", this.settings.centralBranch], this.repoPath);
+        }
+    }
+
+    /**
+     * Check if the central sync branch exists on the remote.
+     */
+    private async remoteBranchExists(): Promise<boolean> {
+        try {
+            const output = await runGit(
+                ["ls-remote", "--heads", CENTRAL_REMOTE_NAME, this.settings.centralBranch],
+                this.repoPath,
+            );
+            return output.trim().length > 0;
+        } catch (_error) {
+            return false;
+        }
+    }
+
+    /**
+     * Perform a local sync: pull remote, apply remote changes, then commit/push local changes.
+     */
+    private async performLocalSync(): Promise<void> {
+        const dirtySnapshot = new Set(this.dirtyFiles);
+        this.dirtyFiles.clear();
+        let shouldRecordSuccess = false;
+
+        try {
+            await this.ensureCentralRepo();
+            const hasRemote = await this.pullRemote();
+            if (hasRemote) {
+                const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
+                if (appliedChanges) {
+                    await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+                    await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+                }
+                shouldRecordSuccess = true;
+            }
+
+            if (dirtySnapshot.size === 0) {
+                if (shouldRecordSuccess) {
+                    this.onSyncSuccess();
+                }
+                return;
+            }
+
+            await this.applyWorkspaceToCentral(dirtySnapshot);
+            const committed = await this.commitChanges(dirtySnapshot);
+            if (committed) {
+                await this.pushRemote();
+                shouldRecordSuccess = true;
+            }
+            if (shouldRecordSuccess) {
+                this.onSyncSuccess();
+            }
+        } catch (error) {
+            this.mergeDirty(dirtySnapshot);
+            throw error;
+        }
+    }
+
+    /**
+     * Perform a polling sync: pull remote and apply changes locally.
+     */
+    private async performPollSync(): Promise<void> {
+        await this.ensureCentralRepo();
+        const hasRemote = await this.pullRemote();
+        if (!hasRemote) {
+            return;
+        }
+        const appliedChanges = await this.applyRemoteToWorkspace(new Set<string>());
+        if (appliedChanges) {
+            await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+            await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+        }
+        this.onSyncSuccess();
+    }
+
+    /**
+     * Pull the latest central sync branch from the remote, if available.
+     */
+    private async pullRemote(): Promise<boolean> {
+        const branchExists = await this.remoteBranchExists();
+        if (!branchExists) {
+            return false;
+        }
+        await runGit(["pull", "--rebase", CENTRAL_REMOTE_NAME, this.settings.centralBranch], this.repoPath);
+        return true;
+    }
+
+    /**
+     * Push local commits to the central remote.
+     */
+    private async pushRemote(): Promise<void> {
+        await runGit(["push", "-u", CENTRAL_REMOTE_NAME, this.settings.centralBranch], this.repoPath);
+    }
+
+    /**
+     * Apply remote .weaudit files to the workspace, skipping dirty files.
+     */
+    private async applyRemoteToWorkspace(dirtySnapshot: Set<string>): Promise<boolean> {
+        let didApply = false;
+        this.suppressEventsUntil = Number.MAX_SAFE_INTEGER;
+
+        try {
+            for (const mapping of this.workspaceMappings) {
+                const workspaceVscodeDir = path.join(mapping.workspaceRoot, ".vscode");
+                const centralVscodeDir = path.join(
+                    this.repoPath,
+                    "repos",
+                    mapping.repoKey,
+                    mapping.repoRelativeRoot,
+                    ".vscode",
+                );
+
+                const [centralFiles, workspaceFiles] = await Promise.all([
+                    this.listWeauditFiles(centralVscodeDir),
+                    this.listWeauditFiles(workspaceVscodeDir),
+                ]);
+
+                const centralFileNames = new Set(centralFiles.map((file) => path.basename(file)));
+
+                for (const centralFile of centralFiles) {
+                    const fileName = path.basename(centralFile);
+                    const workspaceFile = path.join(workspaceVscodeDir, fileName);
+                    if (dirtySnapshot.has(workspaceFile)) {
+                        continue;
+                    }
+                    if (!(await filesAreIdentical(centralFile, workspaceFile))) {
+                        await ensureDirectory(workspaceVscodeDir);
+                        await fs.promises.copyFile(centralFile, workspaceFile);
+                        didApply = true;
+                    }
+                }
+
+                for (const workspaceFile of workspaceFiles) {
+                    const fileName = path.basename(workspaceFile);
+                    if (centralFileNames.has(fileName)) {
+                        continue;
+                    }
+                    if (dirtySnapshot.has(workspaceFile)) {
+                        continue;
+                    }
+                    await fs.promises.unlink(workspaceFile);
+                    didApply = true;
+                }
+            }
+        } finally {
+            this.suppressEventsUntil = Date.now() + SUPPRESS_EVENTS_MS;
+        }
+
+        return didApply;
+    }
+
+    /**
+     * Apply local workspace changes into the central repository, including deletions.
+     */
+    private async applyWorkspaceToCentral(dirtySnapshot: Set<string>): Promise<void> {
+        for (const workspaceFile of dirtySnapshot) {
+            const centralRelativePath = this.getCentralRelativePath(workspaceFile);
+            if (!centralRelativePath) {
+                continue;
+            }
+            const centralFile = path.join(this.repoPath, centralRelativePath);
+            const centralDir = path.dirname(centralFile);
+            if (fs.existsSync(workspaceFile)) {
+                await ensureDirectory(centralDir);
+                await fs.promises.copyFile(workspaceFile, centralFile);
+            } else if (fs.existsSync(centralFile)) {
+                await fs.promises.unlink(centralFile);
+            }
+        }
+    }
+
+    /**
+     * Stage and commit local changes in the central repository.
+     */
+    private async commitChanges(dirtySnapshot: Set<string>): Promise<boolean> {
+        const relativePaths = Array.from(dirtySnapshot)
+            .map((workspaceFile) => this.getCentralRelativePath(workspaceFile))
+            .filter((pathValue): pathValue is string => Boolean(pathValue));
+
+        const uniquePaths = Array.from(new Set(relativePaths));
+        if (uniquePaths.length === 0) {
+            return false;
+        }
+
+        await runGit(["add", "-f", "--", ...uniquePaths], this.repoPath);
+        const status = await runGit(["status", "--porcelain"], this.repoPath);
+        if (status.trim().length === 0) {
+            return false;
+        }
+        await runGit(["commit", "-m", SYNC_COMMIT_MESSAGE], this.repoPath);
+        return true;
+    }
+
+    /**
+     * List .weaudit files within a .vscode directory.
+     */
+    private async listWeauditFiles(vscodeDir: string): Promise<string[]> {
+        try {
+            const entries = await fs.promises.readdir(vscodeDir, { withFileTypes: true });
+            return entries
+                .filter((entry) => entry.isFile() && entry.name.endsWith(SERIALIZED_FILE_EXTENSION))
+                .map((entry) => path.join(vscodeDir, entry.name));
+        } catch (_error) {
+            return [];
+        }
+    }
+
+    /**
+     * Find the workspace mapping that contains a given file.
+     */
+    private getMappingForWorkspaceFile(filePath: string): CentralWorkspaceMapping | undefined {
+        for (const mapping of this.workspaceMappings) {
+            const relativePath = path.relative(mapping.workspaceRoot, filePath);
+            if (!relativePath.startsWith("..") && !path.isAbsolute(relativePath)) {
+                return mapping;
+            }
+        }
+        return undefined;
+    }
+
+    /**
+     * Convert a workspace file path into a central repo-relative path.
+     */
+    private getCentralRelativePath(filePath: string): string | undefined {
+        const mapping = this.getMappingForWorkspaceFile(filePath);
+        if (!mapping) {
+            return;
+        }
+        const workspaceRelativePath = path.relative(mapping.workspaceRoot, filePath);
+        if (workspaceRelativePath.startsWith("..") || path.isAbsolute(workspaceRelativePath)) {
+            return;
+        }
+        return path.join("repos", mapping.repoKey, mapping.repoRelativeRoot, workspaceRelativePath);
     }
 
     /**

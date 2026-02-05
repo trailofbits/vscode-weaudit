@@ -40,19 +40,27 @@ export interface WebviewIsReadyMessage {
 export interface UpdateSyncConfigMessage {
     command: "update-sync-config";
     enabled: boolean;
+    mode: "repo-branch" | "central-repo";
     remoteName: string;
     branchName: string;
     pollMinutes: number;
     debounceMs: number;
+    centralRepoUrl: string;
+    centralBranch: string;
+    repoKeyOverride: string;
 }
 
 export interface SetSyncConfigMessage {
     command: "set-sync-config";
     enabled: boolean;
+    mode: "repo-branch" | "central-repo";
     remoteName: string;
     branchName: string;
     pollMinutes: number;
     debounceMs: number;
+    centralRepoUrl: string;
+    centralBranch: string;
+    repoKeyOverride: string;
     lastSuccessAt?: string;
 }
 
