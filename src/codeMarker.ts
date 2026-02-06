@@ -33,7 +33,6 @@ import {
     isEnumValue,
     EntryType,
     RemoteAndPermalink,
-    validateSerializedData,
     createPathOrganizer,
     getEntryIndexFromArray,
     treeViewModeLabel,
@@ -48,6 +47,24 @@ import {
     RootPathAndLabel,
 } from "./types";
 import { normalizePathForOS } from "./utilities/normalizePath";
+import { parseDayLogJson, parseWeauditFile, serializeDayLog } from "./persistenceUtils";
+import {
+    addToResolvedEntries,
+    deleteAllResolvedEntries,
+    getUniqueAuthors,
+    removeEntryFromArray,
+    restoreAllEntries,
+    restoreEntryFromResolved,
+} from "./utilities/entryUtils";
+import { filterEntriesByAuthorAndRootPath, locationMatches, removeLocationFromEntry } from "./utilities/locationUtils";
+import {
+    adjustForEmptyLastLine,
+    adjustSelectionEndLine,
+    mergePartiallyAuditedRegions,
+    regionsOverlapOrAdjacent,
+    selectionContainedInRegion,
+    splitRegionOnDeselect,
+} from "./utilities/auditingUtils";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
@@ -132,13 +149,16 @@ class WARoot {
         if (!fs.existsSync(vscodeFolder)) {
             return;
         }
-        if (!fs.existsSync(path.join(vscodeFolder, DAY_LOG_FILENAME))) {
+        const dayLogPath = path.join(vscodeFolder, DAY_LOG_FILENAME);
+        if (!fs.existsSync(dayLogPath)) {
             return;
         }
 
-        const dayLogPath = path.join(vscodeFolder, DAY_LOG_FILENAME);
-        const data = JSON.parse(fs.readFileSync(dayLogPath, "utf8")) as Iterable<readonly [string, string[]]>;
-        this.markedFilesDayLog = new Map(data);
+        const fileContent = fs.readFileSync(dayLogPath, "utf8");
+        const parsed = parseDayLogJson(fileContent);
+        if (parsed !== null) {
+            this.markedFilesDayLog = parsed;
+        }
     }
 
     /**
@@ -712,7 +732,7 @@ class WARoot {
             fs.mkdirSync(vscodeFolder);
         }
         const dayLogPath = path.join(vscodeFolder, DAY_LOG_FILENAME);
-        fs.writeFileSync(dayLogPath, JSON.stringify(Array.from(this.markedFilesDayLog), null, 2));
+        fs.writeFileSync(dayLogPath, serializeDayLog(this.markedFilesDayLog));
     }
 
     /**
@@ -731,44 +751,22 @@ class WARoot {
 
         // Process each selection/location separately
         for (const location of locations) {
-            const alreadyMarked = this.partiallyAuditedFiles.findIndex(
-                (file) => file.path === relativePath && file.startLine <= location.startLine && file.endLine >= location.endLine,
-            );
+            const alreadyMarked = this.partiallyAuditedFiles.findIndex((file) => file.path === relativePath && selectionContainedInRegion(location, file));
 
             // this section is already marked. Remove it then
             if (alreadyMarked > -1) {
                 // Splits the existing entry into 2 and remove the location marked by the user
                 const previousMarkedEntry = this.partiallyAuditedFiles[alreadyMarked];
 
-                // same area has been selected so lets delete it
-                if (previousMarkedEntry.startLine === location.startLine && previousMarkedEntry.endLine === location.endLine) {
+                const result = splitRegionOnDeselect(previousMarkedEntry, location);
+                if (result.deleted) {
                     this.partiallyAuditedFiles.splice(alreadyMarked, 1);
-                } else {
-                    // not the same area so we need to split the entry or change it
-
-                    const locationClone = { ...previousMarkedEntry };
-
-                    // if either the end line or the start line is the same we don't need
-                    // to split the entry but can just adjust the current one
-                    let splitNeeded = true;
-                    if (previousMarkedEntry.endLine === location.endLine) {
-                        previousMarkedEntry.endLine = location.startLine - 1;
-                        splitNeeded = false;
-                    }
-
-                    if (previousMarkedEntry.startLine === location.startLine) {
-                        previousMarkedEntry.startLine = location.endLine + 1;
-                        splitNeeded = false;
-                    }
-
-                    if (splitNeeded) {
-                        previousMarkedEntry.endLine = location.startLine - 1;
-                        locationClone.startLine = location.endLine + 1;
-
-                        this.partiallyAuditedFiles.push(locationClone);
-                    }
-
-                    this.partiallyAuditedFiles[alreadyMarked] = previousMarkedEntry;
+                } else if (result.split && result.newRegion) {
+                    this.partiallyAuditedFiles.push({
+                        ...previousMarkedEntry,
+                        startLine: result.newRegion.startLine,
+                        endLine: result.newRegion.endLine,
+                    });
                 }
             } else {
                 this.partiallyAuditedFiles.push({
@@ -819,41 +817,7 @@ class WARoot {
      * Merge the PartiallyAuditedFiles in this workspace root.
      */
     private mergePartialAudits(): void {
-        const cleanedEntries: PartiallyAuditedFile[] = [];
-        // sort first by path and startLine for the merge to work
-        const sortedEntries = this.partiallyAuditedFiles.sort((a, b) => a.path.localeCompare(b.path) || a.startLine - b.startLine);
-        for (const entry of sortedEntries) {
-            // check if the current location is already partially audited
-            const partIdx = cleanedEntries.findIndex(
-                (file) =>
-                    // only merge entries for the same file
-                    file.path === entry.path &&
-                    // checks if the start is within bounds but the end is not
-                    ((file.startLine <= entry.startLine && file.endLine >= entry.startLine) ||
-                        // checks if the end is within bounds but the start is not
-                        (file.startLine <= entry.endLine && file.endLine >= entry.endLine) ||
-                        // checks if the location includes the entry
-                        (file.startLine >= entry.startLine && file.endLine <= entry.endLine) ||
-                        // checks adjacent entries
-                        file.endLine === entry.startLine - 1),
-            );
-            // update entry if necessary
-            if (partIdx > -1) {
-                const foundLocation = cleanedEntries[partIdx];
-                if (foundLocation.endLine < entry.endLine) {
-                    foundLocation.endLine = entry.endLine;
-                }
-                if (foundLocation.startLine > entry.startLine) {
-                    foundLocation.startLine = entry.startLine;
-                }
-
-                cleanedEntries[partIdx] = foundLocation;
-            } else {
-                cleanedEntries.push(entry);
-            }
-        }
-
-        this.partiallyAuditedFiles = cleanedEntries;
+        this.partiallyAuditedFiles = mergePartiallyAuditedRegions(this.partiallyAuditedFiles);
     }
 
     /**
@@ -866,9 +830,9 @@ class WARoot {
             return;
         }
         const data = fs.readFileSync(config.path).toString();
-        const parsedEntries = JSON.parse(data) as SerializedData;
+        const parsedEntries = parseWeauditFile(data);
 
-        if (!validateSerializedData(parsedEntries)) {
+        if (parsedEntries === null) {
             vscode.window.showErrorMessage(`weAudit: Error loading serialized data for ${config.username}. Filepath: ${config.path}`);
             return;
         }
@@ -2892,18 +2856,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param resolve whether to add the entry to the resolved entries list
      */
     deleteAndResolveFinding(entry: FullEntry, resolve: boolean): void {
-        const idx = getEntryIndexFromArray(entry, this.treeEntries);
-        if (idx === -1) {
+        const result = removeEntryFromArray(entry, this.treeEntries);
+        if (!result.success || !result.removedEntry) {
             console.log("error in deleteAndResolveFinding");
             return;
         }
-        const removed = this.treeEntries.splice(idx, 1)[0];
+        const removed = result.removedEntry;
         // depending on resolve, add the entry to the resolved entries list and refresh the resolved tree
         if (resolve) {
-            if (entry.details === undefined) {
-                entry.details = createDefaultEntryDetails();
-            }
-            this.resolvedEntries.push(removed);
+            addToResolvedEntries(removed, this.resolvedEntries);
             this.resolvedEntriesTree.refresh();
         }
 
@@ -2952,18 +2913,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param entry the entry to restore
      */
     restoreFinding(entry: FullEntry): void {
-        // consider the case of older entries without details
-        if (entry.details === undefined) {
-            entry.details = createDefaultEntryDetails();
-        }
-
-        this.treeEntries.push(entry);
-        const idx = getEntryIndexFromArray(entry, this.resolvedEntries);
-        if (idx === -1) {
+        const result = restoreEntryFromResolved(entry, this.treeEntries, this.resolvedEntries);
+        if (!result.success) {
             console.log("error in restoreFinding");
             return;
         }
-        this.resolvedEntries.splice(idx, 1);
         this.resolvedEntriesTree.refresh();
 
         this.refreshAndDecorateEntry(entry);
@@ -2975,12 +2929,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param entry the entry to delete
      */
     deleteResolvedFinding(entry: FullEntry): void {
-        const idx = getEntryIndexFromArray(entry, this.resolvedEntries);
-        if (idx === -1) {
+        const result = removeEntryFromArray(entry, this.resolvedEntries);
+        if (!result.success) {
             console.log("error in deleteResolvedFinding");
             return;
         }
-        this.resolvedEntries.splice(idx, 1);
         this.resolvedEntriesTree.refresh();
         void this.updateSavedData(entry.author);
     }
@@ -2989,14 +2942,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Deletes all resolved findings.
      */
     deleteAllResolvedFindings(): void {
-        if (this.resolvedEntries.length === 0) {
+        const authors = deleteAllResolvedEntries(this.resolvedEntries);
+        if (authors.length === 0) {
             return;
         }
 
-        // get the authors of the resolved findings without duplicates
-        const authors = this.resolvedEntries.map((entry) => entry.author).filter((value, index, self) => self.indexOf(value) === index);
-
-        this.resolvedEntries.splice(0, this.resolvedEntries.length);
         for (const author of authors) {
             void this.updateSavedData(author);
         }
@@ -3011,21 +2961,17 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        this.treeEntries = this.treeEntries.concat(this.resolvedEntries);
+        // Capture entries for refresh before moving them
+        const entriesToRefresh = [...this.resolvedEntries];
 
-        // get authors and paths tuples of the resolved findings
-        const authorSet: Set<string> = new Set();
-        for (const entry of this.resolvedEntries) {
-            authorSet.add(entry.author);
-        }
+        // Use utility to restore entries and get authors
+        const authors = restoreAllEntries(this.treeEntries, this.resolvedEntries);
 
-        // we share the same array as the resolvedFindings array, so we can't do `this.resolvedEntries = []`
-        const spliced = this.resolvedEntries.splice(0, this.resolvedEntries.length);
-        for (const author of authorSet) {
+        for (const author of authors) {
             void this.updateSavedData(author);
         }
 
-        for (const entry of spliced) {
+        for (const entry of entriesToRefresh) {
             this.refreshEntry(entry);
         }
         this.resolvedEntriesTree.refresh();
@@ -3130,27 +3076,20 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        for (let i = 0; i < parentEntry.locations.length; i++) {
-            const location = parentEntry.locations[i];
-            if (
-                location.path === entry.location.path &&
-                location.startLine === entry.location.startLine &&
-                location.endLine === entry.location.endLine &&
-                location.rootPath === entry.location.rootPath
-            ) {
-                parentEntry.locations.splice(i, 1);
-                if (parentEntry.locations.length === 0) {
-                    this.deleteFinding(parentEntry);
-                    this.refreshAndDecorateFromPath(location);
-                    return;
-                }
-
-                void this.updateSavedData(parentEntry.author);
-                // we only need to refresh the URI for the deleted location
-                this.refreshAndDecorateFromPath(entry.location);
-                return;
-            }
+        const result = removeLocationFromEntry(parentEntry.locations, entry.location);
+        if (!result.removed) {
+            return;
         }
+
+        if (result.shouldDeleteEntry) {
+            this.deleteFinding(parentEntry);
+            this.refreshAndDecorateFromPath(entry.location);
+            return;
+        }
+
+        void this.updateSavedData(parentEntry.author);
+        // we only need to refresh the URI for the deleted location
+        this.refreshAndDecorateFromPath(entry.location);
     }
 
     /**
@@ -3170,26 +3109,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @returns
      */
     getFilteredEntriesForSaving(username: string, root: WARoot): [FullEntry[], FullEntry[]] {
-        const filteredEntries = this.treeEntries.filter((entry) => {
-            let inWs = false;
-            for (const location of entry.locations) {
-                if (location.rootPath === root.rootPath) {
-                    inWs = true;
-                    break;
-                }
-            }
-            return entry.author === username && inWs;
-        });
-        const filteredResolvedEntries = this.resolvedEntries.filter((entry) => {
-            let inWs = false;
-            for (const location of entry.locations) {
-                if (location.rootPath === root.rootPath) {
-                    inWs = true;
-                    break;
-                }
-            }
-            return entry.author === username && inWs;
-        });
+        const filteredEntries = filterEntriesByAuthorAndRootPath(this.treeEntries, username, root.rootPath);
+        const filteredResolvedEntries = filterEntriesByAuthorAndRootPath(this.resolvedEntries, username, root.rootPath);
         return [filteredEntries, filteredResolvedEntries];
     }
 

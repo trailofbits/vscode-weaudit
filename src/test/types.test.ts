@@ -8,6 +8,7 @@ import {
     FindingSeverity,
     FindingType,
     type FullEntry,
+    type FullLocation,
     type FullLocationEntry,
     type PathOrganizerEntry,
     type PartiallyAuditedFile,
@@ -17,10 +18,14 @@ import {
     configEntryEquals,
     createDefaultEntryDetails,
     createDefaultSerializedData,
+    createLocationEntry,
+    createPathOrganizer,
     entryEquals,
+    getEntryIndexFromArray,
     isConfigurationEntry,
     isEntry,
     isLocationEntry,
+    isOldEntry,
     isPathOrganizerEntry,
     isWorkspaceRootEntry,
     mergeTwoAuditedFileArrays,
@@ -643,6 +648,187 @@ describe("types.ts", () => {
                 root: { label: "root2" },
             };
             assert.strictEqual(configEntryEquals(a, b), false);
+        });
+    });
+
+    describe("createPathOrganizer", () => {
+        it("should create PathOrganizerEntry with correct pathLabel", () => {
+            const pathOrganizer = createPathOrganizer("src/test/file.ts");
+            assert.strictEqual(pathOrganizer.pathLabel, "src/test/file.ts");
+        });
+
+        it("should handle empty path", () => {
+            const pathOrganizer = createPathOrganizer("");
+            assert.strictEqual(pathOrganizer.pathLabel, "");
+        });
+
+        it("should handle path with special characters", () => {
+            const pathOrganizer = createPathOrganizer("src/[test]/file (1).ts");
+            assert.strictEqual(pathOrganizer.pathLabel, "src/[test]/file (1).ts");
+        });
+    });
+
+    describe("createLocationEntry", () => {
+        function createTestFullEntry(): FullEntry {
+            return {
+                label: "Test Entry",
+                entryType: EntryType.Finding,
+                author: "testuser",
+                details: createDefaultEntryDetails(),
+                locations: [
+                    {
+                        path: "src/test.ts",
+                        startLine: 1,
+                        endLine: 10,
+                        label: "Main location",
+                        description: "",
+                        rootPath: "/workspace/root",
+                    },
+                ],
+            };
+        }
+
+        function createTestFullLocation(): FullLocation {
+            return {
+                path: "src/other.ts",
+                startLine: 20,
+                endLine: 30,
+                label: "Additional location",
+                description: "Some description",
+                rootPath: "/workspace/root",
+            };
+        }
+
+        it("should create FullLocationEntry linking location to parent", () => {
+            const parentEntry = createTestFullEntry();
+            const location = createTestFullLocation();
+
+            const locationEntry = createLocationEntry(location, parentEntry);
+
+            assert.strictEqual(locationEntry.parentEntry, parentEntry);
+            assert.strictEqual(locationEntry.location, location);
+        });
+
+        it("should preserve location data (path, startLine, endLine, label)", () => {
+            const parentEntry = createTestFullEntry();
+            const location = createTestFullLocation();
+
+            const locationEntry = createLocationEntry(location, parentEntry);
+
+            assert.strictEqual(locationEntry.location.path, "src/other.ts");
+            assert.strictEqual(locationEntry.location.startLine, 20);
+            assert.strictEqual(locationEntry.location.endLine, 30);
+            assert.strictEqual(locationEntry.location.label, "Additional location");
+            assert.strictEqual(locationEntry.location.rootPath, "/workspace/root");
+        });
+
+        it("should maintain reference to parent entry", () => {
+            const parentEntry = createTestFullEntry();
+            const location = createTestFullLocation();
+
+            const locationEntry = createLocationEntry(location, parentEntry);
+
+            // Verify we can access parent entry properties
+            assert.strictEqual(locationEntry.parentEntry.label, "Test Entry");
+            assert.strictEqual(locationEntry.parentEntry.entryType, EntryType.Finding);
+        });
+    });
+
+    describe("getEntryIndexFromArray", () => {
+        function createEntry(label: string, path = "src/test.ts", startLine = 1, endLine = 10): Entry {
+            return {
+                label,
+                entryType: EntryType.Finding,
+                author: "testuser",
+                details: createDefaultEntryDetails(),
+                locations: [{ path, startLine, endLine, label: "L", description: "" }],
+            };
+        }
+
+        it("should return index when entry found", () => {
+            const entry = createEntry("Target", "src/target.ts");
+            const array = [createEntry("First", "src/first.ts"), entry, createEntry("Third", "src/third.ts")];
+
+            const index = getEntryIndexFromArray(entry, array);
+
+            assert.strictEqual(index, 1);
+        });
+
+        it("should return -1 when entry not found", () => {
+            const entry = createEntry("NotInArray", "src/notfound.ts");
+            const array = [createEntry("First", "src/first.ts"), createEntry("Second", "src/second.ts")];
+
+            const index = getEntryIndexFromArray(entry, array);
+
+            assert.strictEqual(index, -1);
+        });
+
+        it("should return -1 for empty array", () => {
+            const entry = createEntry("Test");
+            const array: Entry[] = [];
+
+            const index = getEntryIndexFromArray(entry, array);
+
+            assert.strictEqual(index, -1);
+        });
+
+        it("should use entryEquals for comparison (matching by location, author, label, entryType)", () => {
+            // Create two separate entry objects with same data - should match
+            const entry1 = createEntry("Same", "src/same.ts", 1, 10);
+            const entry2 = createEntry("Same", "src/same.ts", 1, 10);
+            const array = [entry1];
+
+            const index = getEntryIndexFromArray(entry2, array);
+
+            assert.strictEqual(index, 0);
+        });
+
+        it("should return first matching index when duplicates exist", () => {
+            const entry = createEntry("Duplicate", "src/dup.ts");
+            const array = [createEntry("Duplicate", "src/dup.ts"), createEntry("Duplicate", "src/dup.ts")];
+
+            const index = getEntryIndexFromArray(entry, array);
+
+            assert.strictEqual(index, 0);
+        });
+    });
+
+    describe("isOldEntry", () => {
+        it("should return true for Entry without rootPath in locations", () => {
+            const oldEntry: Entry = {
+                label: "Old Entry",
+                entryType: EntryType.Finding,
+                author: "testuser",
+                details: createDefaultEntryDetails(),
+                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "L", description: "" }],
+            };
+
+            assert.strictEqual(isOldEntry(oldEntry), true);
+        });
+
+        it("should return false for FullEntry with rootPath", () => {
+            const fullEntry: FullEntry = {
+                label: "Full Entry",
+                entryType: EntryType.Finding,
+                author: "testuser",
+                details: createDefaultEntryDetails(),
+                locations: [{ path: "src/test.ts", startLine: 1, endLine: 10, label: "L", description: "", rootPath: "/root" }],
+            };
+
+            assert.strictEqual(isOldEntry(fullEntry), false);
+        });
+
+        it("should return true for Entry with empty locations array", () => {
+            const entryWithNoLocations: Entry = {
+                label: "No Locations",
+                entryType: EntryType.Finding,
+                author: "testuser",
+                details: createDefaultEntryDetails(),
+                locations: [],
+            };
+
+            // When there are no locations, locations[0]?.rootPath is undefined
+            assert.strictEqual(isOldEntry(entryWithNoLocations), true);
         });
     });
 });
