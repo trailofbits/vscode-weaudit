@@ -2816,7 +2816,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             // Include location section if there's a label or description
             if (location.label !== "" || location.description !== "") {
                 locationDescriptions += `\n\n---\n`;
-                locationDescriptions += `#### Location ${i + 1}${location.label ? ` ${location.label}` : ""}\n`;
+                locationDescriptions += `#### Location ${i + 1} ${location.label ?? ""}\n`;
                 if (location.description !== "") {
                     locationDescriptions += `${location.description}\n\n`;
                 }
