@@ -33,6 +33,14 @@ const gitConfigWebviewConfig = {
     outfile: "./out/gitConfigWebview.js",
 };
 
+const syncConfigWebviewConfig = {
+    ...baseConfig,
+    target: "es2020",
+    format: "esm",
+    entryPoints: ["./src/webview/syncConfigMain.ts"],
+    outfile: "./out/syncConfigWebview.js",
+};
+
 const watchPlugin = {
     name: "watch-plugin",
     setup(build) {
@@ -65,15 +73,21 @@ const watchPlugin = {
                 ...gitConfigWebviewConfig,
                 plugins: [watchPlugin],
             });
+            const syncConfigWebviewContext = await context({
+                ...syncConfigWebviewConfig,
+                plugins: [watchPlugin],
+            });
 
             await extensionContext.watch();
             await webviewContext.watch();
             await gitConfigWebviewContext.watch();
+            await syncConfigWebviewContext.watch();
         } else {
             // Build extension and webview code
             await build(extensionConfig);
             await build(webviewConfig);
             await build(gitConfigWebviewConfig);
+            await build(syncConfigWebviewConfig);
             console.log("build complete");
         }
     } catch (err) {

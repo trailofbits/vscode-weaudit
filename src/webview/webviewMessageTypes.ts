@@ -1,10 +1,24 @@
-export type WebviewMessage = UpdateEntryMessage | UpdateRepositoryMessage | WebviewIsReadyMessage | ChooseWorkspaceRootMessage | SetWorkspaceRootsMessage;
+export type WebviewMessage =
+    | UpdateEntryMessage
+    | DetailsActionMessage
+    | UpdateRepositoryMessage
+    | UpdateSyncConfigMessage
+    | SyncNowMessage
+    | SetSyncConfigMessage
+    | WebviewIsReadyMessage
+    | ChooseWorkspaceRootMessage
+    | SetWorkspaceRootsMessage;
 
 export interface UpdateEntryMessage {
     command: "update-entry";
     field: string;
     value: string;
     isPersistent: boolean;
+}
+
+export interface DetailsActionMessage {
+    command: "details-action";
+    action: "mark-true-positive" | "mark-false-positive" | "resolve-note" | "open-github-issue";
 }
 
 export interface UpdateRepositoryMessage {
@@ -27,4 +41,35 @@ export interface SetWorkspaceRootsMessage {
 
 export interface WebviewIsReadyMessage {
     command: "webview-ready";
+}
+
+export interface UpdateSyncConfigMessage {
+    command: "update-sync-config";
+    enabled: boolean;
+    mode: "repo-branch" | "central-repo";
+    remoteName: string;
+    branchName: string;
+    pollMinutes: number;
+    debounceMs: number;
+    centralRepoUrl: string;
+    centralBranch: string;
+    repoKeyOverride: string;
+}
+
+export interface SetSyncConfigMessage {
+    command: "set-sync-config";
+    enabled: boolean;
+    mode: "repo-branch" | "central-repo";
+    remoteName: string;
+    branchName: string;
+    pollMinutes: number;
+    debounceMs: number;
+    centralRepoUrl: string;
+    centralBranch: string;
+    repoKeyOverride: string;
+    lastSuccessAt?: string;
+}
+
+export interface SyncNowMessage {
+    command: "sync-now";
 }

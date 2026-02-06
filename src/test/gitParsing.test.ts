@@ -217,4 +217,104 @@ describe("Git Config Parsing Logic", () => {
             assert.strictEqual(result, undefined);
         });
     });
+
+    describe("Central sync repo key selection", () => {
+        /**
+         * Normalize a remote URL into a stable https form without credentials.
+         */
+        function normalizeRemoteUrl(remoteUrl: string): string {
+            let value = remoteUrl.trim();
+            if (value.length === 0) {
+                return "";
+            }
+
+            const scpLikeMatch = value.match(/^[^@]+@([^:]+):(.+)$/);
+            if (scpLikeMatch) {
+                value = `https://${scpLikeMatch[1]}/${scpLikeMatch[2]}`;
+            }
+
+            if (value.startsWith("ssh://")) {
+                try {
+                    const parsed = new URL(value);
+                    value = `https://${parsed.host}${parsed.pathname}`;
+                } catch (_error) {
+                    return value;
+                }
+            }
+
+            if (value.startsWith("git://")) {
+                value = `https://${value.slice("git://".length)}`;
+            }
+
+            if (value.startsWith("http://") || value.startsWith("https://")) {
+                try {
+                    const parsed = new URL(value);
+                    value = `https://${parsed.host}${parsed.pathname}`;
+                } catch (_error) {
+                    return value;
+                }
+            }
+
+            if (value.endsWith(".git")) {
+                value = value.slice(0, -".git".length);
+            }
+
+            return value.replace(/\/+$/, "");
+        }
+
+        /**
+         * Convert a normalized remote URL into a filesystem-safe repo key.
+         */
+        function formatRepoKey(normalizedUrl: string): string {
+            const withoutScheme = normalizedUrl.replace(/^[a-z]+:\/\//i, "");
+            const sanitized = withoutScheme.replace(/[^a-zA-Z0-9._-]+/g, "_").replace(/^_+|_+$/g, "");
+            return sanitized;
+        }
+
+        /**
+         * Check if a normalized remote URL belongs to the preferred GitHub organization.
+         */
+        function isPreferredOrgRemote(normalizedUrl: string, orgName: string): boolean {
+            try {
+                const parsed = new URL(normalizedUrl);
+                return parsed.hostname.toLowerCase() === "github.com" && parsed.pathname.toLowerCase().startsWith(`/${orgName}/`);
+            } catch (_error) {
+                return normalizedUrl.toLowerCase().includes(`github.com/${orgName.toLowerCase()}/`);
+            }
+        }
+
+        /**
+         * Select the preferred remote URL, prioritizing a specific GitHub organization.
+         */
+        function selectPreferredRemoteUrl(normalizedRemotes: string[], orgName: string): string | undefined {
+            for (const remote of normalizedRemotes) {
+                if (isPreferredOrgRemote(remote, orgName)) {
+                    return remote;
+                }
+            }
+            return normalizedRemotes[0];
+        }
+
+        it("should prefer trailofbits remote when present", () => {
+            const remotes = [normalizeRemoteUrl("https://github.com/client/project.git"), normalizeRemoteUrl("git@github.com:trailofbits/audit-repo.git")];
+            const selected = selectPreferredRemoteUrl(remotes, "trailofbits");
+            assert.strictEqual(selected, "https://github.com/trailofbits/audit-repo");
+        });
+
+        it("should normalize SSH remotes and strip .git suffix", () => {
+            const normalized = normalizeRemoteUrl("git@github.com:trailofbits/vscode-weaudit.git");
+            assert.strictEqual(normalized, "https://github.com/trailofbits/vscode-weaudit");
+        });
+
+        it("should strip credentials from https remotes", () => {
+            const normalized = normalizeRemoteUrl("https://user:token@github.com/org/repo.git");
+            assert.strictEqual(normalized, "https://github.com/org/repo");
+        });
+
+        it("should format repo keys as safe slugs", () => {
+            const normalized = "https://github.com/trailofbits/vscode-weaudit";
+            const repoKey = formatRepoKey(normalized);
+            assert.strictEqual(repoKey, "github.com_trailofbits_vscode-weaudit");
+        });
+    });
 });

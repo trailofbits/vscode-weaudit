@@ -22,7 +22,7 @@
     },
     "icon": "media/icon.png",
     "engines": {
-        "vscode": "^1.107.0"
+        "vscode": "^1.108.0"
     },
     "activationEvents": [
         "onStartupFinished",
@@ -61,6 +61,13 @@
                     "type": "webview",
                     "id": "gitConfig",
                     "name": "Repository Configuration",
+                    "visibility": "collapsed",
+                    "contextualTitle": "weAudit"
+                },
+                {
+                    "type": "webview",
+                    "id": "syncConfig",
+                    "name": "Sync Configuration",
                     "visibility": "collapsed",
                     "contextualTitle": "weAudit"
                 },
@@ -134,8 +141,18 @@
             },
             {
                 "command": "weAudit.resolveFinding",
-                "title": "Resolve Finding",
+                "title": "Resolve Note",
                 "icon": "$(pass)"
+            },
+            {
+                "command": "weAudit.markTruePositive",
+                "title": "Mark True Positive",
+                "icon": "$(check)"
+            },
+            {
+                "command": "weAudit.markFalsePositive",
+                "title": "Mark False Positive",
+                "icon": "$(close)"
             },
             {
                 "command": "weAudit.editEntryTitle",
@@ -155,7 +172,7 @@
             {
                 "command": "weAudit.restoreFinding",
                 "title": "Restore Finding",
-                "icon": "$(check)"
+                "icon": "$(reply)"
             },
             {
                 "command": "weAudit.deleteFinding",
@@ -240,6 +257,10 @@
             {
                 "command": "weAudit.toggleFindingsHighlighting",
                 "title": "weAudit: Toggle Findings Highlighting"
+            },
+            {
+                "command": "weAudit.syncNow",
+                "title": "weAudit: Sync Findings Now"
             }
         ],
         "keybindings": [
@@ -301,6 +322,14 @@
                 },
                 {
                     "command": "weAudit.resolveFinding",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.markTruePositive",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.markFalsePositive",
                     "when": "false"
                 },
                 {
@@ -388,6 +417,11 @@
                     "group": "navigation@0"
                 },
                 {
+                    "command": "weAudit.syncNow",
+                    "when": "view == syncConfig",
+                    "group": "navigation@0"
+                },
+                {
                     "command": "weAudit.openGithubIssueFromDetails",
                     "when": "view == findingDetails && weAudit.findingDetailsHasEntry",
                     "group": "navigation"
@@ -416,13 +450,23 @@
                 },
                 {
                     "command": "weAudit.resolveFinding",
-                    "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
+                    "when": "view == codeMarker && viewItem == note",
                     "group": "inline@5"
+                },
+                {
+                    "command": "weAudit.markTruePositive",
+                    "when": "view == codeMarker && viewItem == finding",
+                    "group": "inline@5"
+                },
+                {
+                    "command": "weAudit.markFalsePositive",
+                    "when": "view == codeMarker && viewItem == finding",
+                    "group": "inline@6"
                 },
                 {
                     "command": "weAudit.deleteFinding",
                     "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
-                    "group": "inline@6"
+                    "group": "inline@7"
                 },
                 {
                     "command": "weAudit.deleteLocation",
@@ -528,6 +572,63 @@
                         "type": "string",
                         "default": "#145ceb55",
                         "description": "Background color for other user's notes (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
+                    }
+                }
+            },
+            {
+                "title": "Sync",
+                "order": 3,
+                "properties": {
+                    "weAudit.sync.enabled": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Enable git-based auto sync for .weaudit files."
+                    },
+                    "weAudit.sync.mode": {
+                        "type": "string",
+                        "enum": [
+                            "repo-branch",
+                            "central-repo"
+                        ],
+                        "default": "central-repo",
+                        "description": "Select whether to sync using a repo branch or a centralized sync repository."
+                    },
+                    "weAudit.sync.remoteName": {
+                        "type": "string",
+                        "default": "origin",
+                        "description": "The git remote to use for auto sync."
+                    },
+                    "weAudit.sync.branchName": {
+                        "type": "string",
+                        "default": "weaudit-sync",
+                        "description": "The branch name used for auto sync."
+                    },
+                    "weAudit.sync.centralRepoUrl": {
+                        "type": "string",
+                        "default": "git@github.com:trailofbits/weaudit-data.git",
+                        "description": "The centralized git repository URL used for multi-repo sync."
+                    },
+                    "weAudit.sync.centralBranch": {
+                        "type": "string",
+                        "default": "weaudit-sync",
+                        "description": "The branch name used in the centralized sync repository."
+                    },
+                    "weAudit.sync.repoKeyOverride": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Optional override for the repo key used in centralized sync (applies to all repos)."
+                    },
+                    "weAudit.sync.pollMinutes": {
+                        "type": "number",
+                        "default": 1,
+                        "minimum": 1,
+                        "description": "Polling interval (in minutes) for pulling remote .weaudit changes."
+                    },
+                    "weAudit.sync.debounceMs": {
+                        "type": "number",
+                        "default": 1000,
+                        "minimum": 0,
+                        "description": "Debounce delay (in milliseconds) before syncing local .weaudit changes."
                     }
                 }
             }

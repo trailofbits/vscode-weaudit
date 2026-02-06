@@ -32,6 +32,7 @@ import {
     FindingType,
     isEnumValue,
     EntryType,
+    EntryResolution,
     RemoteAndPermalink,
     validateSerializedData,
     createPathOrganizer,
@@ -46,6 +47,7 @@ import {
     WorkspaceRootEntry,
     configEntryEquals,
     RootPathAndLabel,
+    isEntryResolution,
 } from "./types";
 import { normalizePathForOS } from "./utilities/normalizePath";
 
@@ -1546,11 +1548,9 @@ class MultiRootManager {
      * Updates the saved data for the given user.
      * @param username the username to update the saved data for
      */
-    updateSavedData(username: string): void {
+    async updateSavedData(username: string): Promise<void> {
         //Iterate over all workspace roots
-        for (const root of this.roots) {
-            void root.updateSavedData(username);
-        }
+        await Promise.all(this.roots.map((root) => root.updateSavedData(username)));
     }
 
     /**
@@ -1625,6 +1625,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     private decorationManager: DecorationManager;
     private decorationsEnabled = true;
+
+    // Track in-flight save operations per username to avoid reloading stale data.
+    private savingCounts = new Map<string, number>();
 
     // Cached configuration for sorting entries alphabetically
     private sortEntriesAlphabetically: boolean;
@@ -1748,8 +1751,22 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.navigateToNextPartiallyAuditedRegion();
         });
 
+        // Add explicit TP/FN commands so findings aren't resolved like notes.
         vscode.commands.registerCommand("weAudit.resolveFinding", (node: FullEntry) => {
             this.resolveFinding(node);
+        });
+
+        vscode.commands.registerCommand("weAudit.markTruePositive", (node: FullEntry) => {
+            this.markTruePositive(node);
+        });
+
+        vscode.commands.registerCommand("weAudit.markFalsePositive", (node: FullEntry) => {
+            this.markFalsePositive(node);
+        });
+
+        // Legacy alias for backward compatibility.
+        vscode.commands.registerCommand("weAudit.markFalseNegative", (node: FullEntry) => {
+            this.markFalsePositive(node);
         });
 
         vscode.commands.registerCommand("weAudit.deleteFinding", (node: FullEntry) => {
@@ -2036,6 +2053,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             void this.exportFindingsInMarkdown();
         });
 
+        // Reload selected configs from disk to pick up external sync updates.
+        vscode.commands.registerCommand("weAudit.reloadSavedFindingsFromDisk", () => {
+            this.reloadSavedFindingsFromDisk();
+        });
+
         // Gets the filtered entries from the current tree that correspond to a specific username and workspace root
         vscode.commands.registerCommand("weAudit.getFilteredEntriesForSaving", (username: string, root: WARoot) => {
             return this.getFilteredEntriesForSaving(username, root);
@@ -2257,6 +2279,18 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // TODO: determine how to update the entry from the field string
         switch (field) {
+            case "resolution": {
+                // Route resolution changes through the unified helper so list placement stays consistent.
+                if (!isEntryResolution(value)) {
+                    return;
+                }
+                const normalizedResolution = this.normalizeResolutionForEntry(entry, value);
+                if (normalizedResolution === undefined) {
+                    return;
+                }
+                this.applyEntryResolution(entry, normalizedResolution, isPersistent);
+                return;
+            }
             case "severity":
                 entry.details.severity = isEnumValue(FindingSeverity, value) ? value : FindingSeverity.Undefined;
                 break;
@@ -2921,12 +2955,108 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     /**
-     * Deletes the entry from the tree entries list and adds it to the
-     * resolved entries list.
+     * Resolves a note and moves it to the resolved entries list.
+     * Findings must be marked as true positive or false negative instead.
      * @param entry the entry to resolve.
      */
     resolveFinding(entry: FullEntry): void {
-        this.deleteAndResolveFinding(entry, true);
+        // Notes can be resolved; findings must be triaged as TP/FN.
+        if (entry.entryType !== EntryType.Note) {
+            vscode.window.showInformationMessage("Findings cannot be resolved. Mark them as True Positive or False Positive instead.");
+            return;
+        }
+        this.applyEntryResolution(entry, EntryResolution.Resolved, true);
+    }
+
+    /**
+     * Marks a finding as a true positive and moves it to the resolved entries list.
+     * @param entry the finding to mark.
+     */
+    private markTruePositive(entry: FullEntry): void {
+        // Findings only: use TP to close the entry.
+        if (entry.entryType !== EntryType.Finding) {
+            vscode.window.showInformationMessage("Only findings can be marked as True Positive.");
+            return;
+        }
+        this.applyEntryResolution(entry, EntryResolution.TruePositive, true);
+    }
+
+    /**
+     * Marks a finding as a false negative and moves it to the resolved entries list.
+     * @param entry the finding to mark.
+     */
+    private markFalsePositive(entry: FullEntry): void {
+        // Findings only: use FP to close the entry.
+        if (entry.entryType !== EntryType.Finding) {
+            vscode.window.showInformationMessage("Only findings can be marked as False Positive.");
+            return;
+        }
+        this.applyEntryResolution(entry, EntryResolution.FalsePositive, true);
+    }
+
+    /**
+     * Normalizes a resolution choice to ensure it is valid for the entry type.
+     * @param entry The entry being updated.
+     * @param resolution The requested resolution.
+     * @returns The normalized resolution or undefined if it is not allowed.
+     */
+    private normalizeResolutionForEntry(entry: FullEntry, resolution: EntryResolution): EntryResolution | undefined {
+        if (entry.entryType === EntryType.Note) {
+            if (resolution === EntryResolution.Open || resolution === EntryResolution.Resolved) {
+                return resolution;
+            }
+            return;
+        }
+
+        if (resolution === EntryResolution.Open || resolution === EntryResolution.TruePositive || resolution === EntryResolution.FalsePositive) {
+            return resolution;
+        }
+        return;
+    }
+
+    /**
+     * Applies a resolution to an entry and moves it between active and resolved lists as needed.
+     * @param entry The entry to update.
+     * @param resolution The resolution to apply.
+     * @param persist Whether to persist the change immediately.
+     */
+    private applyEntryResolution(entry: FullEntry, resolution: EntryResolution, persist: boolean): void {
+        // Keep resolution state and list placement in sync.
+        if (entry.details === undefined) {
+            entry.details = createDefaultEntryDetails();
+        }
+        entry.details.resolution = resolution;
+
+        const shouldBeResolved = resolution !== EntryResolution.Open;
+        const treeIndex = getEntryIndexFromArray(entry, this.treeEntries);
+        const resolvedIndex = getEntryIndexFromArray(entry, this.resolvedEntries);
+
+        if (shouldBeResolved) {
+            if (treeIndex !== -1) {
+                const removed = this.treeEntries.splice(treeIndex, 1)[0];
+                if (resolvedIndex === -1) {
+                    this.resolvedEntries.push(removed);
+                }
+            } else if (resolvedIndex === -1) {
+                this.resolvedEntries.push(entry);
+            }
+        } else {
+            if (resolvedIndex !== -1) {
+                const removed = this.resolvedEntries.splice(resolvedIndex, 1)[0];
+                if (treeIndex === -1) {
+                    this.treeEntries.push(removed);
+                }
+            } else if (treeIndex === -1) {
+                this.treeEntries.push(entry);
+            }
+        }
+
+        this.resolvedEntriesTree.refresh();
+        this.refreshAndDecorateEntry(entry);
+
+        if (persist) {
+            void this.updateSavedData(entry.author);
+        }
     }
 
     /**
@@ -2957,17 +3087,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             entry.details = createDefaultEntryDetails();
         }
 
-        this.treeEntries.push(entry);
-        const idx = getEntryIndexFromArray(entry, this.resolvedEntries);
-        if (idx === -1) {
-            console.log("error in restoreFinding");
-            return;
-        }
-        this.resolvedEntries.splice(idx, 1);
-        this.resolvedEntriesTree.refresh();
-
-        this.refreshAndDecorateEntry(entry);
-        void this.updateSavedData(entry.author);
+        // Restoring always reopens the entry so it returns to the active list.
+        this.applyEntryResolution(entry, EntryResolution.Open, true);
     }
 
     /**
@@ -3011,8 +3132,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        this.treeEntries = this.treeEntries.concat(this.resolvedEntries);
-
         // get authors and paths tuples of the resolved findings
         const authorSet: Set<string> = new Set();
         for (const entry of this.resolvedEntries) {
@@ -3026,6 +3145,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         for (const entry of spliced) {
+            // Restoring reopens entries so they reappear in the active list.
+            entry.details.resolution = EntryResolution.Open;
+            this.treeEntries.push(entry);
             this.refreshEntry(entry);
         }
         this.resolvedEntriesTree.refresh();
@@ -3073,12 +3195,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 return;
             }
 
+            const commitHash = this.getCommitHashForLocations(locations);
             const entry: FullEntry = {
                 label: title,
                 entryType: entryType,
                 author: this.username,
                 locations: locations,
-                details: createDefaultEntryDetails(),
+                details: createDefaultEntryDetails(commitHash),
             };
             this.treeEntries.push(entry);
             void this.updateSavedData(this.username);
@@ -3094,7 +3217,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             entryType: locationEntry.parentEntry.entryType,
             author: this.username,
             locations: [locationEntry.location],
-            details: createDefaultEntryDetails(),
+            details: createDefaultEntryDetails(this.getCommitHashForLocations([locationEntry.location])),
         };
         this.treeEntries.push(entry);
         void this.updateSavedData(this.username);
@@ -3116,6 +3239,21 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         return locations;
+    }
+
+    /**
+     * Resolve the git commit hash for the workspace root of the provided locations.
+     * Uses the first location as the root reference.
+     */
+    private getCommitHashForLocations(locations: FullLocation[]): string {
+        if (locations.length === 0) {
+            return "";
+        }
+        const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(locations[0].rootPath);
+        if (wsRoot === undefined) {
+            return "";
+        }
+        return wsRoot.findGitSha() ?? "";
     }
 
     /**
@@ -3158,7 +3296,40 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param username the username to update the saved data for
      */
     updateSavedData(username: string): void {
-        this.workspaces.updateSavedData(username);
+        this.incrementSaving(username);
+        void this.workspaces.updateSavedData(username).finally(() => {
+            this.decrementSaving(username);
+        });
+    }
+
+    /**
+     * Mark that a save operation is starting for a given username.
+     */
+    private incrementSaving(username: string): void {
+        const current = this.savingCounts.get(username) ?? 0;
+        this.savingCounts.set(username, current + 1);
+    }
+
+    /**
+     * Mark that a save operation has finished for a given username.
+     */
+    private decrementSaving(username: string): void {
+        const current = this.savingCounts.get(username);
+        if (current === undefined) {
+            return;
+        }
+        if (current <= 1) {
+            this.savingCounts.delete(username);
+        } else {
+            this.savingCounts.set(username, current - 1);
+        }
+    }
+
+    /**
+     * Check whether a save operation is in progress for a given username.
+     */
+    private isSaving(username: string): boolean {
+        return (this.savingCounts.get(username) ?? 0) > 0;
     }
 
     /**
@@ -3382,6 +3553,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             partiallyAuditedFile.path = normalizePathForOS(rootPath, partiallyAuditedFile.path);
         });
 
+        this.ensureEntryDetailsProvenance(fullParsedEntries.treeEntries);
+        this.ensureEntryDetailsProvenance(fullParsedEntries.resolvedEntries);
+        // Ensure resolution defaults for legacy data and keep list placement consistent.
+        this.ensureEntryDetailsResolution(fullParsedEntries.treeEntries, fullParsedEntries.resolvedEntries);
+
         if (update) {
             if (add) {
                 // Remove potential entries of username which appear on the tree.
@@ -3441,6 +3617,126 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.markPathMapDirty();
 
         return fullParsedEntries;
+    }
+
+    /**
+     * Reload all selected configurations from disk to keep the tree in sync with external changes.
+     */
+    reloadSavedFindingsFromDisk(): void {
+        const selectedConfigs = this.workspaces.getSelectedConfigurations();
+        for (const config of selectedConfigs) {
+            if (this.isSaving(config.username)) {
+                continue;
+            }
+            if (!fs.existsSync(config.path)) {
+                // If a synced file disappeared, clear the in-memory entries for that user/root.
+                this.removeEntriesForConfig(config);
+                continue;
+            }
+            this.loadSavedDataFromConfig(config, true, false);
+            this.loadSavedDataFromConfig(config, true, true);
+        }
+
+        vscode.commands.executeCommand("weAudit.refreshSavedFindings", selectedConfigs);
+        this.resolvedEntriesTree.setResolvedEntries(this.resolvedEntries);
+        this.refreshTree();
+        this.decorate();
+    }
+
+    /**
+     * Ensure all entry details include a provenance value.
+     */
+    private ensureEntryDetailsProvenance(entries: FullEntry[]): void {
+        for (const entry of entries) {
+            const provenance = entry.details.provenance;
+            const legacyCommitHash = (entry.details as { commitHash?: string }).commitHash;
+            if (provenance === undefined) {
+                entry.details.provenance = this.createDefaultProvenance("human", legacyCommitHash);
+            } else if (typeof provenance === "string") {
+                entry.details.provenance = this.createDefaultProvenance(provenance, legacyCommitHash);
+            } else {
+                entry.details.provenance = {
+                    source: provenance.source ?? "human",
+                    created: provenance.created ?? new Date().toISOString(),
+                    campaign: provenance.campaign ?? null,
+                    commitHash: provenance.commitHash ?? legacyCommitHash ?? "",
+                };
+            }
+            if (legacyCommitHash !== undefined) {
+                delete (entry.details as { commitHash?: string }).commitHash;
+            }
+        }
+    }
+
+    /**
+     * Ensure all entries have a resolution value consistent with their current list placement.
+     * @param openEntries Entries in the active list.
+     * @param resolvedEntries Entries in the resolved list.
+     */
+    private ensureEntryDetailsResolution(openEntries: FullEntry[], resolvedEntries: FullEntry[]): void {
+        for (const entry of openEntries) {
+            // Active entries must be open to keep the tree and decorations consistent.
+            if (!isEntryResolution(entry.details.resolution) || entry.details.resolution !== EntryResolution.Open) {
+                entry.details.resolution = EntryResolution.Open;
+            }
+        }
+
+        for (const entry of resolvedEntries) {
+            if (entry.entryType === EntryType.Note) {
+                // Notes resolve to a single terminal state.
+                entry.details.resolution = EntryResolution.Resolved;
+                continue;
+            }
+
+            // Legacy resolved findings default to Unclassified unless already triaged.
+            const resolutionValue = String(entry.details.resolution);
+            if (resolutionValue === "False Negative") {
+                entry.details.resolution = EntryResolution.FalsePositive;
+            }
+
+            if (
+                entry.details.resolution !== EntryResolution.TruePositive &&
+                entry.details.resolution !== EntryResolution.FalsePositive &&
+                entry.details.resolution !== EntryResolution.Unclassified
+            ) {
+                entry.details.resolution = EntryResolution.Unclassified;
+            }
+        }
+    }
+
+    /**
+     * Build a provenance object for extension-created findings/notes.
+     */
+    private createDefaultProvenance(source: string, commitHash?: string): { source: string; created: string; campaign: string | null; commitHash: string } {
+        return {
+            source,
+            created: new Date().toISOString(),
+            campaign: null,
+            commitHash: commitHash ?? "",
+        };
+    }
+
+    /**
+     * Remove entries for a config's username within its workspace root from in-memory state.
+     */
+    private removeEntriesForConfig(config: ConfigurationEntry): void {
+        const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(config.path);
+        if (wsRoot === undefined) {
+            return;
+        }
+        this.treeEntries = this.treeEntries.filter(
+            (entry) =>
+                entry.author !== config.username ||
+                entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
+        );
+        wsRoot.filterAudited(config.username);
+        wsRoot.filterPartiallyAudited(config.username);
+        this.resolvedEntries = this.resolvedEntries.filter(
+            (entry) =>
+                entry.author !== config.username ||
+                entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
+        );
+        this.markPathMapDirty();
     }
 
     /**
@@ -3742,6 +4038,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             if (entry.location.endLine !== entry.location.startLine) {
                 description += "-" + (entry.location.endLine + 1).toString();
             }
+            description += " (" + entry.parentEntry.author + ")";
             let mainLabel: string;
             if (this.treeViewMode === TreeViewMode.List) {
                 mainLabel = entry.location.label;
@@ -3786,9 +4083,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const basePath = path.basename(mainLocation.path);
         treeItem.description = basePath + ":" + (mainLocation.startLine + 1).toString();
 
-        if (entry.author !== this.username) {
-            treeItem.description += " (" + entry.author + ")";
-        }
+        treeItem.description += " (" + entry.author + ")";
 
         treeItem.command = {
             command: "weAudit.openFileLines",
@@ -4385,8 +4680,11 @@ export class AuditMarker {
             entry.details = createDefaultEntryDetails();
         }
 
+        // Active entries should always present an open resolution in the details view.
+        entry.details.resolution = EntryResolution.Open;
+
         // Fills the Finding details webview with the currently selected entry details
-        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details, entry.label);
+        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details, entry.label, entry.entryType);
     }
 
     /**

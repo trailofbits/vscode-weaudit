@@ -15,7 +15,8 @@ Guidelines for autonomous contributors working on this repository.
    - Whether it’s TypeScript, shell scripts, or build helpers, any newly introduced function or class must include a concise docstring explaining its role. Update existing docstrings when behavior changes.
 
 5. **Tests and validation**
-   - Run any available automated checks relevant to your change (unit tests, linting, packaging). If something can’t be run in the current environment, clearly state what remains unverified.
+   - Always run the test suite, linter, and formatter before considering a coding task complete. If something can’t be run in the current environment, clearly state what remains unverified.
+   - Run any other available automated checks relevant to your change (e.g., packaging). If something can’t be run in the current environment, clearly state what remains unverified.
 
 6. **Commit messaging**
    - When suggesting or creating commit titles, always follow the [Conventional Commits](https://www.conventionalcommits.org/) format (e.g., `feat: add highlight toggle command`). Include scope when it adds clarity.

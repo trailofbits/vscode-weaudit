@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import * as crypto from "crypto";
 
 import { getUri } from "../utilities/getUri";
-import { EntryDetails } from "../types";
+import { EntryDetails, EntryResolution, EntryType } from "../types";
 import { WebviewMessage } from "../webview/webviewMessageTypes";
 import htmlBody from "./findingDetails.html";
 
@@ -14,8 +14,8 @@ export function activateFindingDetailsWebview(context: vscode.ExtensionContext):
 
     // Register commands
     context.subscriptions.push(
-        vscode.commands.registerCommand("weAudit.setWebviewFindingDetails", (entry: EntryDetails, title: string) => {
-            provider.setFindingDetails(entry, title);
+        vscode.commands.registerCommand("weAudit.setWebviewFindingDetails", (entry: EntryDetails, title: string, entryType: EntryType) => {
+            provider.setFindingDetails(entry, title, entryType);
         }),
     );
 
@@ -58,8 +58,9 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
     /**
      * Set finding details in the webview
      */
-    public setFindingDetails(entry: EntryDetails, title: string): void {
+    public setFindingDetails(entry: EntryDetails, title: string, entryType: EntryType): void {
         if (this._view) {
+            const resolution = entry.resolution ?? EntryResolution.Open;
             this._view.webview.postMessage({
                 command: "set-finding-details",
                 severity: entry.severity,
@@ -68,6 +69,9 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                 description: entry.description,
                 exploit: entry.exploit,
                 recommendation: entry.recommendation,
+                provenance: typeof entry.provenance === "object" ? entry.provenance.source : (entry.provenance ?? "human"),
+                entryType: entryType === EntryType.Finding ? "finding" : "note",
+                resolution: resolution,
                 title: title,
             });
 
@@ -129,6 +133,23 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                     case "update-entry":
                         vscode.commands.executeCommand("weAudit.updateCurrentSelectedEntry", message.field, message.value, message.isPersistent);
                         return;
+                    case "details-action": {
+                        switch (message.action) {
+                            case "mark-true-positive":
+                                vscode.commands.executeCommand("weAudit.updateCurrentSelectedEntry", "resolution", "True Positive", true);
+                                return;
+                            case "mark-false-positive":
+                                vscode.commands.executeCommand("weAudit.updateCurrentSelectedEntry", "resolution", "False Positive", true);
+                                return;
+                            case "resolve-note":
+                                vscode.commands.executeCommand("weAudit.updateCurrentSelectedEntry", "resolution", "Resolved", true);
+                                return;
+                            case "open-github-issue":
+                                vscode.commands.executeCommand("weAudit.openGithubIssueFromDetails");
+                                return;
+                        }
+                        return;
+                    }
                     case "webview-ready":
                         // When the webview reports it's ready, update with current data
                         vscode.commands.executeCommand("weAudit.showSelectedEntryInFindingDetails");
