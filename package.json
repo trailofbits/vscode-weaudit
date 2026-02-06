@@ -575,7 +575,7 @@
         "mocha": "^11.3.0",
         "ts-node": "^10.9.2",
         "typescript": "^5.9.3",
-        "vscode-extension-tester": "^8.19.0"
+        "vscode-extension-tester": "^8.21.0"
     },
     "dependencies": {
         "@vscode/webview-ui-toolkit": "^1.4.0",
