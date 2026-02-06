@@ -1645,7 +1645,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.treeViewMode = TreeViewMode.List;
         this.loadTreeViewModeConfiguration();
 
-        this.sortEntriesAlphabetically = vscode.workspace.getConfiguration("weAudit").get<boolean>("general.sortEntriesAlphabetically", false);
+        this.sortEntriesAlphabetically = this.loadSortEntriesConfiguration();
 
         this.username = this.setUsernameConfigOrDefault();
         this.findAndLoadConfigurationUsernames();
@@ -2305,10 +2305,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     /**
      * Loads the sort entries alphabetically setting from the configuration,
      * refreshing the tree.
+     *
+     * Returns the current value of the setting after loading it from the configuration.
      */
-    loadSortEntriesConfiguration(): void {
+    loadSortEntriesConfiguration(): boolean {
         this.sortEntriesAlphabetically = vscode.workspace.getConfiguration("weAudit").get<boolean>("general.sortEntriesAlphabetically", false);
         this.refreshTree();
+        return this.sortEntriesAlphabetically;
     }
 
     getTreeViewMode(): TreeViewMode {
