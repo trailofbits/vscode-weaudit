@@ -602,7 +602,7 @@
                     },
                     "weAudit.sync.centralRepoUrl": {
                         "type": "string",
-                        "default": "",
+                        "default": "git@github.com:trailofbits/weaudit-data.git",
                         "description": "The centralized git repository URL used for multi-repo sync."
                     },
                     "weAudit.sync.centralBranch": {
