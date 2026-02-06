@@ -1,12 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-import {
-    provideVSCodeDesignSystem,
-    vsCodeDropdown,
-    vsCodeTextArea,
-    vsCodeOption,
-    vsCodeTextField,
-    vsCodeButton,
-} from "@vscode/webview-ui-toolkit";
+import { provideVSCodeDesignSystem, vsCodeDropdown, vsCodeTextArea, vsCodeOption, vsCodeTextField, vsCodeButton } from "@vscode/webview-ui-toolkit";
 import { TextArea, Dropdown, TextField, Button } from "@vscode/webview-ui-toolkit";
 import { DetailsActionMessage, UpdateEntryMessage } from "./webviewMessageTypes";
 

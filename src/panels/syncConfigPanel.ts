@@ -29,7 +29,10 @@ class SyncConfigProvider implements vscode.WebviewViewProvider {
     private _disposables: vscode.Disposable[] = [];
     private _view?: vscode.WebviewView;
 
-    constructor(private readonly _extensionUri: vscode.Uri, private readonly _workspaceState: vscode.Memento) {
+    constructor(
+        private readonly _extensionUri: vscode.Uri,
+        private readonly _workspaceState: vscode.Memento,
+    ) {
         vscode.workspace.onDidChangeConfiguration(
             (event) => {
                 if (event.affectsConfiguration("weAudit.sync")) {
@@ -155,12 +158,9 @@ class SyncConfigProvider implements vscode.WebviewViewProvider {
         const currentCentralRepoUrl = readGlobalSetting(config, "sync.centralRepoUrl", "");
         const currentCentralBranch = readGlobalSetting(config, "sync.centralBranch", DEFAULT_CENTRAL_BRANCH);
         const currentRepoKeyOverride = readGlobalSetting(config, "sync.repoKeyOverride", "");
-        const shouldUpdateCentralRepo =
-            isCentral || message.centralRepoUrl.trim().length > 0 || currentCentralRepoUrl.trim().length === 0;
-        const shouldUpdateCentralBranch =
-            isCentral || message.centralBranch.trim().length > 0 || currentCentralBranch.trim().length === 0;
-        const shouldUpdateRepoKeyOverride =
-            isCentral || message.repoKeyOverride.trim().length > 0 || currentRepoKeyOverride.trim().length === 0;
+        const shouldUpdateCentralRepo = isCentral || message.centralRepoUrl.trim().length > 0 || currentCentralRepoUrl.trim().length === 0;
+        const shouldUpdateCentralBranch = isCentral || message.centralBranch.trim().length > 0 || currentCentralBranch.trim().length === 0;
+        const shouldUpdateRepoKeyOverride = isCentral || message.repoKeyOverride.trim().length > 0 || currentRepoKeyOverride.trim().length === 0;
 
         await config.update("sync.mode", mode, vscode.ConfigurationTarget.Workspace);
 
@@ -173,11 +173,7 @@ class SyncConfigProvider implements vscode.WebviewViewProvider {
             await config.update("sync.centralRepoUrl", message.centralRepoUrl, vscode.ConfigurationTarget.Global);
         }
         if (shouldUpdateCentralBranch) {
-            await config.update(
-                "sync.centralBranch",
-                message.centralBranch || DEFAULT_CENTRAL_BRANCH,
-                vscode.ConfigurationTarget.Global,
-            );
+            await config.update("sync.centralBranch", message.centralBranch || DEFAULT_CENTRAL_BRANCH, vscode.ConfigurationTarget.Global);
         }
         if (shouldUpdateRepoKeyOverride) {
             await config.update("sync.repoKeyOverride", message.repoKeyOverride || "", vscode.ConfigurationTarget.Global);

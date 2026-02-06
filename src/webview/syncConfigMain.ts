@@ -1,12 +1,4 @@
-import {
-    provideVSCodeDesignSystem,
-    vsCodeTextField,
-    vsCodeCheckbox,
-    vsCodeButton,
-    vsCodeDropdown,
-    vsCodeOption,
-    Dropdown,
-} from "@vscode/webview-ui-toolkit";
+import { provideVSCodeDesignSystem, vsCodeTextField, vsCodeCheckbox, vsCodeButton, vsCodeDropdown, vsCodeOption, Dropdown } from "@vscode/webview-ui-toolkit";
 import { TextField } from "@vscode/webview-ui-toolkit";
 import { WebviewIsReadyMessage, UpdateSyncConfigMessage, SyncNowMessage, SetSyncConfigMessage } from "./webviewMessageTypes";
 

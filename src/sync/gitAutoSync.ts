@@ -248,11 +248,7 @@ async function listRemoteUrls(repoRoot: string): Promise<string[]> {
 /**
  * Derive a repo key from git remotes, falling back to a hash of the repo root.
  */
-async function deriveRepoKey(
-    repoRoot: string,
-    repoKeyOverride: string,
-    outputChannel: vscode.OutputChannel,
-): Promise<string> {
+async function deriveRepoKey(repoRoot: string, repoKeyOverride: string, outputChannel: vscode.OutputChannel): Promise<string> {
     if (repoKeyOverride.trim().length > 0) {
         return formatRepoKey(repoKeyOverride.trim());
     }
@@ -427,9 +423,7 @@ export class GitAutoSyncManager implements vscode.Disposable {
                 await session.initialize();
                 this.sessions.set("central", session);
             } catch (error) {
-                this.outputChannel.appendLine(
-                    `weAudit: central sync session disabled: ${error instanceof Error ? error.message : String(error)}`,
-                );
+                this.outputChannel.appendLine(`weAudit: central sync session disabled: ${error instanceof Error ? error.message : String(error)}`);
             }
             return;
         }
@@ -449,9 +443,7 @@ export class GitAutoSyncManager implements vscode.Disposable {
                 await session.initialize();
                 this.sessions.set(repoRoot, session);
             } catch (error) {
-                this.outputChannel.appendLine(
-                    `weAudit: sync session disabled for ${repoRoot}: ${error instanceof Error ? error.message : String(error)}`,
-                );
+                this.outputChannel.appendLine(`weAudit: sync session disabled for ${repoRoot}: ${error instanceof Error ? error.message : String(error)}`);
             }
         }
     }
@@ -459,10 +451,7 @@ export class GitAutoSyncManager implements vscode.Disposable {
     /**
      * Build mappings for central repo sync based on repository roots.
      */
-    private async buildCentralMappings(
-        repoMap: Map<string, string[]>,
-        repoKeyOverride: string,
-    ): Promise<CentralWorkspaceMapping[]> {
+    private async buildCentralMappings(repoMap: Map<string, string[]>, repoKeyOverride: string): Promise<CentralWorkspaceMapping[]> {
         const mappings: CentralWorkspaceMapping[] = [];
         for (const [repoRoot, workspaceRoots] of repoMap.entries()) {
             const repoKey = await deriveRepoKey(repoRoot, repoKeyOverride, this.outputChannel);
@@ -683,11 +672,9 @@ class GitSyncSession implements SyncSession {
      * Enqueue a sync task to run sequentially.
      */
     private enqueue(task: () => Promise<void>): Promise<void> {
-        this.syncQueue = this.syncQueue
-            .then(task)
-            .catch((error) => {
-                this.outputChannel.appendLine(`weAudit: sync error in ${this.repoRoot}: ${error instanceof Error ? error.message : String(error)}`);
-            });
+        this.syncQueue = this.syncQueue.then(task).catch((error) => {
+            this.outputChannel.appendLine(`weAudit: sync error in ${this.repoRoot}: ${error instanceof Error ? error.message : String(error)}`);
+        });
         return this.syncQueue;
     }
 
@@ -750,10 +737,7 @@ class GitSyncSession implements SyncSession {
      */
     private async remoteBranchExists(): Promise<boolean> {
         try {
-            const output = await runGit(
-                ["ls-remote", "--heads", this.settings.remoteName, this.settings.branchName],
-                this.repoRoot,
-            );
+            const output = await runGit(["ls-remote", "--heads", this.settings.remoteName, this.settings.branchName], this.repoRoot);
             return output.trim().length > 0;
         } catch (_error) {
             return false;
@@ -846,42 +830,39 @@ class GitSyncSession implements SyncSession {
         let didApply = false;
 
         for (const mapping of this.workspaceMappings) {
-                const workspaceVscodeDir = path.join(mapping.workspaceRoot, ".vscode");
-                const worktreeVscodeDir = path.join(this.worktreePath, mapping.repoRelativeRoot, ".vscode");
+            const workspaceVscodeDir = path.join(mapping.workspaceRoot, ".vscode");
+            const worktreeVscodeDir = path.join(this.worktreePath, mapping.repoRelativeRoot, ".vscode");
 
-                const [worktreeFiles, workspaceFiles] = await Promise.all([
-                    this.listWeauditFiles(worktreeVscodeDir),
-                    this.listWeauditFiles(workspaceVscodeDir),
-                ]);
+            const [worktreeFiles, workspaceFiles] = await Promise.all([this.listWeauditFiles(worktreeVscodeDir), this.listWeauditFiles(workspaceVscodeDir)]);
 
-                const worktreeFileNames = new Set(worktreeFiles.map((file) => path.basename(file)));
+            const worktreeFileNames = new Set(worktreeFiles.map((file) => path.basename(file)));
 
-                for (const worktreeFile of worktreeFiles) {
-                    const fileName = path.basename(worktreeFile);
-                    const workspaceFile = path.join(workspaceVscodeDir, fileName);
-                    if (dirtySnapshot.has(workspaceFile)) {
-                        continue;
-                    }
-                    if (!(await filesAreIdentical(worktreeFile, workspaceFile))) {
-                        await ensureDirectory(workspaceVscodeDir);
-                        await this.recordSuppressedHash(worktreeFile, workspaceFile);
-                        await fs.promises.copyFile(worktreeFile, workspaceFile);
-                        didApply = true;
-                    }
+            for (const worktreeFile of worktreeFiles) {
+                const fileName = path.basename(worktreeFile);
+                const workspaceFile = path.join(workspaceVscodeDir, fileName);
+                if (dirtySnapshot.has(workspaceFile)) {
+                    continue;
                 }
-
-                for (const workspaceFile of workspaceFiles) {
-                    const fileName = path.basename(workspaceFile);
-                    if (worktreeFileNames.has(fileName)) {
-                        continue;
-                    }
-                    if (dirtySnapshot.has(workspaceFile)) {
-                        continue;
-                    }
-                    this.recordSuppressedDeletion(workspaceFile);
-                    await fs.promises.unlink(workspaceFile);
+                if (!(await filesAreIdentical(worktreeFile, workspaceFile))) {
+                    await ensureDirectory(workspaceVscodeDir);
+                    await this.recordSuppressedHash(worktreeFile, workspaceFile);
+                    await fs.promises.copyFile(worktreeFile, workspaceFile);
                     didApply = true;
                 }
+            }
+
+            for (const workspaceFile of workspaceFiles) {
+                const fileName = path.basename(workspaceFile);
+                if (worktreeFileNames.has(fileName)) {
+                    continue;
+                }
+                if (dirtySnapshot.has(workspaceFile)) {
+                    continue;
+                }
+                this.recordSuppressedDeletion(workspaceFile);
+                await fs.promises.unlink(workspaceFile);
+                didApply = true;
+            }
         }
         return didApply;
     }
@@ -933,9 +914,7 @@ class GitSyncSession implements SyncSession {
     private async listWeauditFiles(vscodeDir: string): Promise<string[]> {
         try {
             const entries = await fs.promises.readdir(vscodeDir, { withFileTypes: true });
-            return entries
-                .filter((entry) => entry.isFile() && entry.name.endsWith(SERIALIZED_FILE_EXTENSION))
-                .map((entry) => path.join(vscodeDir, entry.name));
+            return entries.filter((entry) => entry.isFile() && entry.name.endsWith(SERIALIZED_FILE_EXTENSION)).map((entry) => path.join(vscodeDir, entry.name));
         } catch (_error) {
             return [];
         }
@@ -1045,9 +1024,7 @@ class CentralGitSyncSession implements SyncSession {
         this.log(`weAudit: central sync initializing (repoPath=${this.repoPath}, branch=${this.settings.centralBranch}).`);
         this.log(`weAudit: central sync mappings: ${this.workspaceMappings.length} workspace root(s).`);
         for (const mapping of this.workspaceMappings) {
-            this.log(
-                `weAudit: central sync mapping ${mapping.workspaceRoot} -> repos/${mapping.repoKey}/${mapping.repoRelativeRoot || "."}`,
-            );
+            this.log(`weAudit: central sync mapping ${mapping.workspaceRoot} -> repos/${mapping.repoKey}/${mapping.repoRelativeRoot || "."}`);
         }
         await this.ensureCentralRepo();
         const seededDirty = this.seedLocalUserFile();
@@ -1135,11 +1112,9 @@ class CentralGitSyncSession implements SyncSession {
      * Enqueue a sync task to run sequentially.
      */
     private enqueue(task: () => Promise<void>): Promise<void> {
-        this.syncQueue = this.syncQueue
-            .then(task)
-            .catch((error) => {
-                this.outputChannel.appendLine(`weAudit: central sync error: ${error instanceof Error ? error.message : String(error)}`);
-            });
+        this.syncQueue = this.syncQueue.then(task).catch((error) => {
+            this.outputChannel.appendLine(`weAudit: central sync error: ${error instanceof Error ? error.message : String(error)}`);
+        });
         return this.syncQueue;
     }
 
@@ -1210,10 +1185,7 @@ class CentralGitSyncSession implements SyncSession {
         const branchExists = await this.remoteBranchExists();
         if (branchExists) {
             await runGit(["fetch", CENTRAL_REMOTE_NAME, this.settings.centralBranch], this.repoPath);
-            await runGit(
-                ["checkout", "-B", this.settings.centralBranch, `${CENTRAL_REMOTE_NAME}/${this.settings.centralBranch}`],
-                this.repoPath,
-            );
+            await runGit(["checkout", "-B", this.settings.centralBranch, `${CENTRAL_REMOTE_NAME}/${this.settings.centralBranch}`], this.repoPath);
             this.log(`weAudit: central sync checked out ${this.settings.centralBranch} from remote.`);
         } else {
             await runGit(["checkout", "-B", this.settings.centralBranch], this.repoPath);
@@ -1226,10 +1198,7 @@ class CentralGitSyncSession implements SyncSession {
      */
     private async remoteBranchExists(): Promise<boolean> {
         try {
-            const output = await runGit(
-                ["ls-remote", "--heads", CENTRAL_REMOTE_NAME, this.settings.centralBranch],
-                this.repoPath,
-            );
+            const output = await runGit(["ls-remote", "--heads", CENTRAL_REMOTE_NAME, this.settings.centralBranch], this.repoPath);
             return output.trim().length > 0;
         } catch (_error) {
             return false;
@@ -1330,48 +1299,39 @@ class CentralGitSyncSession implements SyncSession {
         let didApply = false;
 
         for (const mapping of this.workspaceMappings) {
-                const workspaceVscodeDir = path.join(mapping.workspaceRoot, ".vscode");
-                const centralVscodeDir = path.join(
-                    this.repoPath,
-                    "repos",
-                    mapping.repoKey,
-                    mapping.repoRelativeRoot,
-                    ".vscode",
-                );
+            const workspaceVscodeDir = path.join(mapping.workspaceRoot, ".vscode");
+            const centralVscodeDir = path.join(this.repoPath, "repos", mapping.repoKey, mapping.repoRelativeRoot, ".vscode");
 
-                const [centralFiles, workspaceFiles] = await Promise.all([
-                    this.listWeauditFiles(centralVscodeDir),
-                    this.listWeauditFiles(workspaceVscodeDir),
-                ]);
+            const [centralFiles, workspaceFiles] = await Promise.all([this.listWeauditFiles(centralVscodeDir), this.listWeauditFiles(workspaceVscodeDir)]);
 
-                const centralFileNames = new Set(centralFiles.map((file) => path.basename(file)));
+            const centralFileNames = new Set(centralFiles.map((file) => path.basename(file)));
 
-                for (const centralFile of centralFiles) {
-                    const fileName = path.basename(centralFile);
-                    const workspaceFile = path.join(workspaceVscodeDir, fileName);
-                    if (dirtySnapshot.has(workspaceFile)) {
-                        continue;
-                    }
-                    if (!(await filesAreIdentical(centralFile, workspaceFile))) {
-                        await ensureDirectory(workspaceVscodeDir);
-                        await this.recordSuppressedHash(centralFile, workspaceFile);
-                        await fs.promises.copyFile(centralFile, workspaceFile);
-                        didApply = true;
-                    }
+            for (const centralFile of centralFiles) {
+                const fileName = path.basename(centralFile);
+                const workspaceFile = path.join(workspaceVscodeDir, fileName);
+                if (dirtySnapshot.has(workspaceFile)) {
+                    continue;
                 }
-
-                for (const workspaceFile of workspaceFiles) {
-                    const fileName = path.basename(workspaceFile);
-                    if (centralFileNames.has(fileName)) {
-                        continue;
-                    }
-                    if (dirtySnapshot.has(workspaceFile)) {
-                        continue;
-                    }
-                    this.recordSuppressedDeletion(workspaceFile);
-                    await fs.promises.unlink(workspaceFile);
+                if (!(await filesAreIdentical(centralFile, workspaceFile))) {
+                    await ensureDirectory(workspaceVscodeDir);
+                    await this.recordSuppressedHash(centralFile, workspaceFile);
+                    await fs.promises.copyFile(centralFile, workspaceFile);
                     didApply = true;
                 }
+            }
+
+            for (const workspaceFile of workspaceFiles) {
+                const fileName = path.basename(workspaceFile);
+                if (centralFileNames.has(fileName)) {
+                    continue;
+                }
+                if (dirtySnapshot.has(workspaceFile)) {
+                    continue;
+                }
+                this.recordSuppressedDeletion(workspaceFile);
+                await fs.promises.unlink(workspaceFile);
+                didApply = true;
+            }
         }
         return didApply;
     }
@@ -1428,9 +1388,7 @@ class CentralGitSyncSession implements SyncSession {
     private async listWeauditFiles(vscodeDir: string): Promise<string[]> {
         try {
             const entries = await fs.promises.readdir(vscodeDir, { withFileTypes: true });
-            return entries
-                .filter((entry) => entry.isFile() && entry.name.endsWith(SERIALIZED_FILE_EXTENSION))
-                .map((entry) => path.join(vscodeDir, entry.name));
+            return entries.filter((entry) => entry.isFile() && entry.name.endsWith(SERIALIZED_FILE_EXTENSION)).map((entry) => path.join(vscodeDir, entry.name));
         } catch (_error) {
             return [];
         }

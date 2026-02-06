@@ -296,10 +296,7 @@ describe("Git Config Parsing Logic", () => {
         }
 
         it("should prefer trailofbits remote when present", () => {
-            const remotes = [
-                normalizeRemoteUrl("https://github.com/client/project.git"),
-                normalizeRemoteUrl("git@github.com:trailofbits/audit-repo.git"),
-            ];
+            const remotes = [normalizeRemoteUrl("https://github.com/client/project.git"), normalizeRemoteUrl("git@github.com:trailofbits/audit-repo.git")];
             const selected = selectPreferredRemoteUrl(remotes, "trailofbits");
             assert.strictEqual(selected, "https://github.com/trailofbits/audit-repo");
         });

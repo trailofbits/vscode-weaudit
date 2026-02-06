@@ -3703,10 +3703,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     /**
      * Build a provenance object for extension-created findings/notes.
      */
-    private createDefaultProvenance(
-        source: string,
-        commitHash?: string,
-    ): { source: string; created: string; campaign: string | null; commitHash: string } {
+    private createDefaultProvenance(source: string, commitHash?: string): { source: string; created: string; campaign: string | null; commitHash: string } {
         return {
             source,
             created: new Date().toISOString(),

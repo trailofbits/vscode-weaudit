@@ -197,10 +197,7 @@ function validateEntryDetails(entryDetails: EntryDetails): boolean {
             typeof entryDetails.provenance.created === "string" &&
             (typeof entryDetails.provenance.campaign === "string" || entryDetails.provenance.campaign === null) &&
             typeof entryDetails.provenance.commitHash === "string");
-    const resolutionValid =
-        entryDetails.resolution === undefined ||
-        isEntryResolution(entryDetails.resolution) ||
-        entryDetails.resolution === "False Negative";
+    const resolutionValid = entryDetails.resolution === undefined || isEntryResolution(entryDetails.resolution) || entryDetails.resolution === "False Negative";
     return (
         entryDetails.severity !== undefined &&
         entryDetails.difficulty !== undefined &&
