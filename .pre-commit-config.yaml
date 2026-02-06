@@ -4,6 +4,7 @@ repos:
       hooks:
           - id: trailing-whitespace
           - id: end-of-file-fixer
+            exclude: '\.svg$'
           - id: check-yaml
           - id: check-added-large-files
             args: ["--maxkb=500"]
@@ -22,6 +23,7 @@ repos:
             entry: npx eslint --ext ts -c .eslintrc.cjs
             language: system
             types: [ts]
+            exclude: '^test/'
 
           - id: typecheck
             name: typecheck
