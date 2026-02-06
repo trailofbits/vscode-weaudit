@@ -39,7 +39,7 @@ export enum FindingSeverity {
  */
 export enum FindingDifficulty {
     Undetermined = "Undetermined",
-    NA = "N/A",
+    NA = "Not Applicable",
     Low = "Low",
     Medium = "Medium",
     High = "High",
@@ -67,6 +67,14 @@ export enum FindingType {
     Undefined = "",
 }
 /* eslint-enable @typescript-eslint/naming-convention */
+
+export function isEnumValue<T extends Record<string, string>>(enumObj: T, value: string): value is T[keyof T] {
+    const valid = Object.values(enumObj).includes(value);
+    if (!valid) {
+        console.log(`weAudit: Invalid enum value: "${value}"`);
+    }
+    return valid;
+}
 
 /**
  * This object is a representation of the codeMarker class without circular references between objects.

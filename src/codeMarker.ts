@@ -30,6 +30,7 @@ import {
     FindingDifficulty,
     FindingSeverity,
     FindingType,
+    isEnumValue,
     EntryType,
     RemoteAndPermalink,
     validateSerializedData,
@@ -2257,13 +2258,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // TODO: determine how to update the entry from the field string
         switch (field) {
             case "severity":
-                entry.details.severity = value as FindingSeverity;
+                entry.details.severity = isEnumValue(FindingSeverity, value) ? value : FindingSeverity.Undefined;
                 break;
             case "difficulty":
-                entry.details.difficulty = value as FindingDifficulty;
+                entry.details.difficulty = isEnumValue(FindingDifficulty, value) ? value : FindingDifficulty.Undefined;
                 break;
             case "type":
-                entry.details.type = value as FindingType;
+                entry.details.type = isEnumValue(FindingType, value) ? value : FindingType.Undefined;
                 break;
             case "description":
                 entry.details.description = value;
