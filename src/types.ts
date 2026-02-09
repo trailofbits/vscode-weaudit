@@ -126,7 +126,17 @@ export function createDefaultSerializedData(): SerializedData {
 
 export function validateSerializedData(data: SerializedData): boolean {
     // ignore clientRemote, gitRemote and gitSha as these are optional
-    if (data.treeEntries === undefined || data.auditedFiles === undefined || data.resolvedEntries === undefined) {
+    if (data.treeEntries === undefined || !Array.isArray(data.treeEntries)) {
+        return false;
+    }
+    // Backwards compatibility: allow older/third-party files to omit these fields.
+    if (data.auditedFiles === undefined) {
+        data.auditedFiles = [];
+    }
+    if (data.resolvedEntries === undefined) {
+        data.resolvedEntries = [];
+    }
+    if (!Array.isArray(data.auditedFiles) || !Array.isArray(data.resolvedEntries)) {
         return false;
     }
     for (const entry of data.treeEntries.concat(data.resolvedEntries)) {
@@ -140,6 +150,9 @@ export function validateSerializedData(data: SerializedData): boolean {
         }
     }
     if (data.partiallyAuditedFiles) {
+        if (!Array.isArray(data.partiallyAuditedFiles)) {
+            return false;
+        }
         for (const partiallyAuditedFile of data.partiallyAuditedFiles) {
             if (!validatepartiallyAuditedFile(partiallyAuditedFile)) {
                 return false;

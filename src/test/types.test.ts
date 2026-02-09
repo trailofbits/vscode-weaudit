@@ -133,16 +133,18 @@ describe("types.ts", () => {
             assert.strictEqual(validateSerializedData(data), false);
         });
 
-        it("should return false when auditedFiles is undefined", () => {
+        it("should default auditedFiles when missing", () => {
             const data = createValidSerializedData();
             (data as unknown as { auditedFiles: undefined }).auditedFiles = undefined;
-            assert.strictEqual(validateSerializedData(data), false);
+            assert.strictEqual(validateSerializedData(data), true);
+            assert.deepStrictEqual(data.auditedFiles, []);
         });
 
-        it("should return false when resolvedEntries is undefined", () => {
+        it("should default resolvedEntries when missing", () => {
             const data = createValidSerializedData();
             (data as unknown as { resolvedEntries: undefined }).resolvedEntries = undefined;
-            assert.strictEqual(validateSerializedData(data), false);
+            assert.strictEqual(validateSerializedData(data), true);
+            assert.deepStrictEqual(data.resolvedEntries, []);
         });
 
         it("should return false for entry with invalid entryType", () => {
