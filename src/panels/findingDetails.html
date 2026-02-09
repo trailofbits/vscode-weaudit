@@ -15,67 +15,52 @@
         <span id="provenance-value" class="detailValue"></span>
     </div>
 
-    <div class="detailsDiv" id="resolution-row-finding">
-        <span class="detailSpan">Resolution:</span>
-        <vscode-dropdown position="below" id="resolution-finding-dropdown">
-            <vscode-option>Open</vscode-option>
-            <vscode-option>True Positive</vscode-option>
-            <vscode-option>False Positive</vscode-option>
-        </vscode-dropdown>
-    </div>
+    <div class="detailsRow detailsRowCompact">
+        <div class="detailsDiv">
+            <span class="detailSpan">Severity:</span>
+            <vscode-dropdown position="below" id="severity-dropdown" class="detailsDropdown">
+                <vscode-option></vscode-option>
+                <vscode-option>Informational</vscode-option>
+                <vscode-option>Undetermined</vscode-option>
+                <vscode-option>Low</vscode-option>
+                <vscode-option>Medium</vscode-option>
+                <vscode-option>High</vscode-option>
+            </vscode-dropdown>
+        </div>
 
-    <div class="detailsDiv" id="resolution-row-note">
-        <span class="detailSpan">Resolution:</span>
-        <vscode-dropdown position="below" id="resolution-note-dropdown">
-            <vscode-option>Open</vscode-option>
-            <vscode-option>Resolved</vscode-option>
-        </vscode-dropdown>
-    </div>
-
-    <div class="detailsDiv">
-        <span class="detailSpan">Severity:</span>
-        <vscode-dropdown position="below" id="severity-dropdown">
-            <vscode-option></vscode-option>
-            <vscode-option>Informational</vscode-option>
-            <vscode-option>Undetermined</vscode-option>
-            <vscode-option>Low</vscode-option>
-            <vscode-option>Medium</vscode-option>
-            <vscode-option>High</vscode-option>
-        </vscode-dropdown>
-    </div>
-
-    <div class="detailsDiv">
-        <span class="detailSpan">Difficulty:</span>
-        <vscode-dropdown position="below" id="difficulty-dropdown">
-            <vscode-option></vscode-option>
-            <vscode-option>Undetermined</vscode-option>
-            <vscode-option>Not Applicable</vscode-option>
-            <vscode-option>Low</vscode-option>
-            <vscode-option>Medium</vscode-option>
-            <vscode-option>High</vscode-option>
-        </vscode-dropdown>
-    </div>
-    <div class="detailsDiv">
-        <span class="detailSpan">Type:</span>
-        <vscode-dropdown position="below" id="type-dropdown" width="100%">
-            <vscode-option></vscode-option>
-            <vscode-option>Access Controls</vscode-option>
-            <vscode-option>Auditing and Logging</vscode-option>
-            <vscode-option>Authentication</vscode-option>
-            <vscode-option>Configuration</vscode-option>
-            <vscode-option>Cryptography</vscode-option>
-            <vscode-option>Data Exposure</vscode-option>
-            <vscode-option>Data Validation</vscode-option>
-            <vscode-option>Denial of Service</vscode-option>
-            <vscode-option>Error Reporting</vscode-option>
-            <vscode-option>Patching</vscode-option>
-            <vscode-option>Session Management</vscode-option>
-            <vscode-option>Testing</vscode-option>
-            <vscode-option>Timing</vscode-option>
-            <vscode-option>Undefined Behavior</vscode-option>
-        </vscode-dropdown>
+        <div class="detailsDiv">
+            <span class="detailSpan">Difficulty:</span>
+            <vscode-dropdown position="below" id="difficulty-dropdown" class="detailsDropdown">
+                <vscode-option></vscode-option>
+                <vscode-option>Undetermined</vscode-option>
+                <vscode-option>Not Applicable</vscode-option>
+                <vscode-option>Low</vscode-option>
+                <vscode-option>Medium</vscode-option>
+                <vscode-option>High</vscode-option>
+            </vscode-dropdown>
+        </div>
+        <div class="detailsDiv">
+            <span class="detailSpan">Type:</span>
+            <vscode-dropdown position="below" id="type-dropdown" class="detailsDropdown">
+                <vscode-option></vscode-option>
+                <vscode-option>Access Controls</vscode-option>
+                <vscode-option>Auditing and Logging</vscode-option>
+                <vscode-option>Authentication</vscode-option>
+                <vscode-option>Configuration</vscode-option>
+                <vscode-option>Cryptography</vscode-option>
+                <vscode-option>Data Exposure</vscode-option>
+                <vscode-option>Data Validation</vscode-option>
+                <vscode-option>Denial of Service</vscode-option>
+                <vscode-option>Error Reporting</vscode-option>
+                <vscode-option>Patching</vscode-option>
+                <vscode-option>Session Management</vscode-option>
+                <vscode-option>Testing</vscode-option>
+                <vscode-option>Timing</vscode-option>
+                <vscode-option>Undefined Behavior</vscode-option>
+            </vscode-dropdown>
+        </div>
     </div>
     <div class="detailsDiv"><vscode-text-area placeholder="The finding details" id="description-area" rows="5">Description</vscode-text-area></div>
-    <div class="detailsDiv"><vscode-text-area placeholder="The exploit scenario" id="exploit-area" rows="5">Exploit Scenario</vscode-text-area></div>
-    <div class="detailsDiv"><vscode-text-area value="Short term, \nLong term,\n" id="recommendation-area" rows="5">Recommendations</vscode-text-area></div>
+    <div class="detailsDiv"><vscode-text-area placeholder="The exploit scenario" id="exploit-area" rows="2">Exploit Scenario</vscode-text-area></div>
+    <div class="detailsDiv"><vscode-text-area value="Short term, \nLong term,\n" id="recommendation-area" rows="2">Recommendations</vscode-text-area></div>
 </div>

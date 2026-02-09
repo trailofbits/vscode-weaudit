@@ -51,6 +51,7 @@ Findings and notes can be added to the current selection by calling the `weAudit
 ![Create Finding](media/readme/gifs/create_finding.gif)
 
 Clicking on a finding in the _List of Findings_ view will navigate to the region of code previously marked.
+In the _List of Findings_ view, finding icons are tinted by severity when a severity is set.
 
 A file with a finding will have a `!` annotation that is visible both in the file tree, and in the file name above the editor.
 
@@ -88,8 +89,10 @@ You can quickly navigate through all partially audited regions in your workspace
 ### Detailed Findings
 
 You can fill detailed information about a finding by clicking on it in the _List of Findings_ view in the sidebar. The respective _Finding Details_ panel will open, where you can fill the information.
-The panel also shows a read-only provenance field (defaulting to "human").
+The panel also shows a read-only provenance field (defaulting to "human"), with the author's username shown next to it.
+The Description, Exploit Scenario, and Recommendations fields auto-expand as you type, up to half the panel height, then scroll.
 The action buttons at the top let you triage findings (True/False Positive), resolve notes, or open a GitHub issue.
+Resolution changes are applied through those action buttons.
 
 ![Finding Details](media/readme/finding_details.png)
 
@@ -102,6 +105,7 @@ You can create a GitHub/Gitlab issue with the detailed findings information by c
 ### Multi-region Findings
 
 You can add multiple regions to a single finding or note. Once you select the code region to be added, call the `weAudit: Add Region to a Finding` and select the finding to add the region to from the quick pick menu. The regions will be highlighted in the editor, and the finding will be updated in the _List of Findings_ panel.
+In the _List of Findings_ view, multi-location entries are collapsed by default; expand them to see each location's label and description.
 
 ![Add Region to a Finding](media/readme/gifs/multi_region_finding.gif)
 

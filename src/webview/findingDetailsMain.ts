@@ -36,13 +36,6 @@ function main(): void {
     registerActionButton(markFalsePositiveButton, "mark-false-positive");
     registerActionButton(resolveNoteButton, "resolve-note");
 
-    const resolutionFindingRow = document.getElementById("resolution-row-finding") as HTMLDivElement;
-    const resolutionNoteRow = document.getElementById("resolution-row-note") as HTMLDivElement;
-    const resolutionFindingDropdown = document.getElementById("resolution-finding-dropdown") as Dropdown;
-    const resolutionNoteDropdown = document.getElementById("resolution-note-dropdown") as Dropdown;
-    resolutionFindingDropdown?.addEventListener("change", handlePersistentFieldChange);
-    resolutionNoteDropdown?.addEventListener("change", handlePersistentFieldChange);
-
     const severityDropdown = document.getElementById("severity-dropdown") as Dropdown;
     severityDropdown?.addEventListener("change", handlePersistentFieldChange);
 
@@ -58,24 +51,19 @@ function main(): void {
     // this is to avoid writing to disk on every keystroke
     // and to keep the state updated in case we open a gh issue before the change event fires
     const descriptionArea = document.getElementById("description-area") as TextArea;
-    descriptionArea?.addEventListener("change", handlePersistentFieldChange);
-    descriptionArea?.addEventListener("input", handleNonPersistentFieldChange);
+    registerAutoResizingTextArea(descriptionArea, handleNonPersistentFieldChange);
 
     const exploitArea = document.getElementById("exploit-area") as TextArea;
-    exploitArea?.addEventListener("change", handlePersistentFieldChange);
-    exploitArea?.addEventListener("input", handleNonPersistentFieldChange);
+    registerAutoResizingTextArea(exploitArea, handleNonPersistentFieldChange);
 
     const recommendationArea = document.getElementById("recommendation-area") as TextArea;
-    recommendationArea?.addEventListener("change", handlePersistentFieldChange);
-    recommendationArea?.addEventListener("input", handleNonPersistentFieldChange);
+    registerAutoResizingTextArea(recommendationArea, handleNonPersistentFieldChange);
 
     // container div with all the elements
     const containerDiv = document.getElementById("container-div") as HTMLDivElement;
 
     // start with the container hidden
     containerDiv.style.display = "none";
-    resolutionFindingRow.style.display = "none";
-    resolutionNoteRow.style.display = "none";
     findingActionsRow.style.display = "none";
     noteActionsRow.style.display = "none";
 
@@ -84,20 +72,16 @@ function main(): void {
         const message = event.data;
 
         switch (message.command) {
-            case "set-finding-details":
+            case "set-finding-details": {
                 containerDiv.style.display = "block";
                 titleField.value = message.title;
-                provenanceValue.textContent = message.provenance ?? "human";
-                setResolutionControls(
-                    message.entryType as string | undefined,
-                    message.resolution as string | undefined,
-                    findingActionsRow,
-                    noteActionsRow,
-                    resolutionFindingRow,
-                    resolutionNoteRow,
-                    resolutionFindingDropdown,
-                    resolutionNoteDropdown,
-                );
+                const provenance = (message.provenance ?? "human") as string;
+                const authorSuffix = message.author ? ` (${message.author})` : "";
+                provenanceValue.textContent = `${provenance}${authorSuffix}`;
+                const isFinding = message.entryType === "finding";
+                const isNote = message.entryType === "note";
+                findingActionsRow.style.display = isFinding ? "flex" : "none";
+                noteActionsRow.style.display = isNote ? "flex" : "none";
                 severityDropdown.value = message.severity;
                 difficultyDropdown.value = message.difficulty;
                 typeDropdown.value = message.type;
@@ -105,53 +89,20 @@ function main(): void {
                 descriptionArea.value = message.description;
                 exploitArea.value = message.exploit;
                 recommendationArea.value = message.recommendation;
+                scheduleTextAreaResize(descriptionArea);
+                scheduleTextAreaResize(exploitArea);
+                scheduleTextAreaResize(recommendationArea);
                 break;
+            }
 
             case "hide-finding-details":
                 containerDiv.style.display = "none";
                 provenanceValue.textContent = "";
-                resolutionFindingRow.style.display = "none";
-                resolutionNoteRow.style.display = "none";
                 findingActionsRow.style.display = "none";
                 noteActionsRow.style.display = "none";
                 break;
         }
     });
-}
-
-/**
- * Selects the appropriate resolution control and value for the current entry type.
- */
-function setResolutionControls(
-    entryType: string | undefined,
-    resolution: string | undefined,
-    findingActionsRow: HTMLDivElement,
-    noteActionsRow: HTMLDivElement,
-    resolutionFindingRow: HTMLDivElement,
-    resolutionNoteRow: HTMLDivElement,
-    resolutionFindingDropdown: Dropdown,
-    resolutionNoteDropdown: Dropdown,
-): void {
-    const isFinding = entryType === "finding";
-    const findingResolution = coerceResolutionValue(resolution, ["Open", "True Positive", "False Positive"], "Open");
-    const noteResolution = coerceResolutionValue(resolution, ["Open", "Resolved"], "Open");
-
-    findingActionsRow.style.display = isFinding ? "flex" : "none";
-    noteActionsRow.style.display = isFinding ? "none" : "flex";
-    resolutionFindingRow.style.display = isFinding ? "flex" : "none";
-    resolutionNoteRow.style.display = isFinding ? "none" : "flex";
-    resolutionFindingDropdown.value = findingResolution;
-    resolutionNoteDropdown.value = noteResolution;
-}
-
-/**
- * Returns a valid resolution value or a fallback when an invalid value is provided.
- */
-function coerceResolutionValue(value: string | undefined, allowed: string[], fallback: string): string {
-    if (value && allowed.includes(value)) {
-        return value;
-    }
-    return fallback;
 }
 
 function handleNonPersistentFieldChange(e: Event): void {
@@ -176,6 +127,63 @@ function handleFieldChange(e: Event, isPersistent: boolean): void {
     vscode.postMessage(message);
 }
 
+/**
+ * Resizes a VS Code webview text area to fit its content while keeping its initial height as a minimum.
+ * The description, exploit, and recommendation fields cap their growth and show a scrollbar after hitting the max height.
+ */
+function resizeTextAreaToContent(textArea: TextArea): boolean {
+    const control = textArea.shadowRoot?.querySelector("textarea") as HTMLTextAreaElement | null;
+    if (!control) {
+        return false;
+    }
+
+    const currentHeight = control.offsetHeight;
+    if ((!textArea.dataset.minHeight || textArea.dataset.minHeight === "0") && currentHeight > 0) {
+        textArea.dataset.minHeight = `${currentHeight}`;
+    }
+
+    const minHeight = Number(textArea.dataset.minHeight ?? "0");
+    const cappedTextAreaIds = new Set(["description-area", "exploit-area", "recommendation-area"]);
+    const maxHeight = cappedTextAreaIds.has(textArea.id) ? Math.max(Math.floor(window.innerHeight * 0.5), minHeight) : Number.POSITIVE_INFINITY;
+    control.style.height = "auto";
+    const desiredHeight = Math.max(control.scrollHeight, minHeight);
+    control.style.height = `${Math.min(desiredHeight, maxHeight)}px`;
+    if (cappedTextAreaIds.has(textArea.id)) {
+        control.style.overflowY = desiredHeight > maxHeight ? "auto" : "hidden";
+    } else {
+        control.style.overflowY = "";
+    }
+    return true;
+}
+
+/**
+ * Attempts to resize a text area on the next frame, retrying briefly if the shadow DOM isn't ready yet.
+ */
+function scheduleTextAreaResize(textArea: TextArea, attempt = 0): void {
+    requestAnimationFrame(() => {
+        if (resizeTextAreaToContent(textArea)) {
+            return;
+        }
+        if (attempt < 3) {
+            setTimeout(() => scheduleTextAreaResize(textArea, attempt + 1), 50);
+        }
+    });
+}
+
+/**
+ * Registers input/change handlers to auto-resize a webview text area as the user types.
+ */
+function registerAutoResizingTextArea(textArea: TextArea | null, onInput: (event: Event) => void): void {
+    if (!textArea) {
+        return;
+    }
+    textArea.addEventListener("change", handlePersistentFieldChange);
+    textArea.addEventListener("input", (event) => {
+        resizeTextAreaToContent(textArea);
+        onInput(event);
+    });
+    window.addEventListener("resize", () => resizeTextAreaToContent(textArea));
+}
 /**
  * Registers a button click listener that posts a details action message.
  */

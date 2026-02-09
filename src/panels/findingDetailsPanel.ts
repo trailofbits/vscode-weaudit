@@ -14,8 +14,8 @@ export function activateFindingDetailsWebview(context: vscode.ExtensionContext):
 
     // Register commands
     context.subscriptions.push(
-        vscode.commands.registerCommand("weAudit.setWebviewFindingDetails", (entry: EntryDetails, title: string, entryType: EntryType) => {
-            provider.setFindingDetails(entry, title, entryType);
+        vscode.commands.registerCommand("weAudit.setWebviewFindingDetails", (entry: EntryDetails, title: string, entryType: EntryType, author: string) => {
+            provider.setFindingDetails(entry, title, entryType, author);
         }),
     );
 
@@ -58,7 +58,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
     /**
      * Set finding details in the webview
      */
-    public setFindingDetails(entry: EntryDetails, title: string, entryType: EntryType): void {
+    public setFindingDetails(entry: EntryDetails, title: string, entryType: EntryType, author: string): void {
         if (this._view) {
             const resolution = entry.resolution ?? EntryResolution.Open;
             this._view.webview.postMessage({
@@ -70,6 +70,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                 exploit: entry.exploit,
                 recommendation: entry.recommendation,
                 provenance: typeof entry.provenance === "object" ? entry.provenance.source : (entry.provenance ?? "human"),
+                author: author,
                 entryType: entryType === EntryType.Finding ? "finding" : "note",
                 resolution: resolution,
                 title: title,

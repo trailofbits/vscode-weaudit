@@ -2292,6 +2292,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
             case "severity":
                 entry.details.severity = value as FindingSeverity;
+                this.refreshTree();
                 break;
             case "difficulty":
                 entry.details.difficulty = value as FindingDifficulty;
@@ -4034,7 +4035,18 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             if (entry.location.endLine !== entry.location.startLine) {
                 description += "-" + (entry.location.endLine + 1).toString();
             }
-            description += " (" + entry.parentEntry.author + ")";
+            // Show location label/description in the list to disambiguate multi-location findings.
+            const locationLabel = (entry.location.label ?? "").trim();
+            const locationDescription = (entry.location.description ?? "").trim();
+            let locationDetails = "";
+            if (locationLabel && locationDescription) {
+                locationDetails = `${locationLabel}: ${locationDescription}`;
+            } else {
+                locationDetails = locationLabel || locationDescription;
+            }
+            if (locationDetails) {
+                description += ` ${locationDetails}`;
+            }
             let mainLabel: string;
             if (this.treeViewMode === TreeViewMode.List) {
                 mainLabel = entry.location.label;
@@ -4064,14 +4076,34 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // if it's not a location entry or a path organizer entry, it's a normal entry
         const state =
             entry.locations && entry.locations.length > 1 && this.treeViewMode === TreeViewMode.List
-                ? vscode.TreeItemCollapsibleState.Expanded
+                ? vscode.TreeItemCollapsibleState.Collapsed
                 : vscode.TreeItemCollapsibleState.None;
         const treeItem = new vscode.TreeItem(entry.label, state);
 
         if (entry.entryType === EntryType.Note) {
             treeItem.iconPath = new vscode.ThemeIcon("bookmark");
         } else {
-            treeItem.iconPath = new vscode.ThemeIcon("bug");
+            // Tint the finding icon by severity to make the list easier to scan.
+            let severityColor: vscode.ThemeColor | undefined;
+            switch (entry.details.severity) {
+                case FindingSeverity.High:
+                    severityColor = new vscode.ThemeColor("problemsErrorIcon.foreground");
+                    break;
+                case FindingSeverity.Medium:
+                    severityColor = new vscode.ThemeColor("problemsWarningIcon.foreground");
+                    break;
+                case FindingSeverity.Low:
+                    severityColor = new vscode.ThemeColor("problemsInfoIcon.foreground");
+                    break;
+                case FindingSeverity.Informational:
+                    severityColor = new vscode.ThemeColor("descriptionForeground");
+                    break;
+                case FindingSeverity.Undetermined:
+                case FindingSeverity.Undefined:
+                    severityColor = undefined;
+                    break;
+            }
+            treeItem.iconPath = new vscode.ThemeIcon("bug", severityColor);
         }
 
         const mainLocation = entry.locations[0];
@@ -4682,7 +4714,7 @@ export class AuditMarker {
         entry.details.resolution = EntryResolution.Open;
 
         // Fills the Finding details webview with the currently selected entry details
-        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details, entry.label, entry.entryType);
+        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details, entry.label, entry.entryType, entry.author);
     }
 
     /**
