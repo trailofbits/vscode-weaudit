@@ -1,7 +1,7 @@
 import * as assert from "node:assert";
 
 /**
- * Tests for permalink generation logic used in codeMarker.ts:2577-2587
+ * Tests for permalink generation logic used in codeMarker.ts:2595-2603
  *
  * The actual getRemoteAndPermalink method is tightly coupled to VS Code API.
  * These tests verify the URL building logic and edge cases.
@@ -9,10 +9,10 @@ import * as assert from "node:assert";
 describe("Permalink Generation Logic", () => {
     /**
      * Generates a permalink based on the remote URL, SHA, and location.
-     * This mirrors the logic in codeMarker.ts:2577-2587
+     * This mirrors the logic in codeMarker.ts:2595-2603
      */
     function generatePermalink(gitRemote: string, sha: string, filePath: string, startLine: number, endLine: number): string {
-        // Parse hostname - mirrors URL.parse(gitRemote)?.hostname in codeMarker.ts:2577
+        // Parse hostname - mirrors URL.parse(gitRemote)?.hostname in codeMarker.ts:2595
         let remoteHost: string | null = null;
         try {
             remoteHost = new URL(gitRemote).hostname;
