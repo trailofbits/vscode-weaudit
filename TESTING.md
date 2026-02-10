@@ -92,6 +92,12 @@ Implemented in `test/ui/suite/commands.ui.test.ts`:
 - Create note with a custom title (`weAudit: New Note from Selection`)
 - Edit finding under cursor (`weAudit: Edit Finding Under Cursor`)
 - Add an additional region via QuickPick (`weAudit: Add Region to a Finding`)
+- Mark region as reviewed and toggle off (`weAudit: Mark Region as Reviewed`)
+- Mark file as reviewed and toggle off (`weAudit: Mark File as Reviewed`)
+- Navigate to next partially audited region (`weAudit: Navigate to Next Partially Audited Region`)
+- Delete finding under cursor — single location (`weAudit: Delete Location Under Cursor`)
+- Delete one location from multi-region finding (`weAudit: Delete Location Under Cursor`)
+- Toggle tree view mode and verify tree items (`weAudit: Toggle View Mode`)
 
 **Added extension-host tests (non-UI)**
 
@@ -111,16 +117,18 @@ Implemented under `test/extension/suite/`:
 
 From `package.json` and `src/codeMarker.ts`, the remaining UI-heavy commands worth adding coverage for:
 - QuickPick / QuickInput flows:
-  - `weAudit: Export Findings as Markdown` (`weAudit.exportFindingsInMarkdown`) – multi-select quick pick and opens markdown editor
-  - `weAudit: Add Region to a Finding with Label` (`weAudit.addRegionToAnEntryWithLabel`) – quick pick + label input box
   - `weAudit: Edit Repository URL (Client)` (`weAudit.editClientRemote`) – input box
   - `weAudit: Edit Repository URL (Audit)` (`weAudit.editAuditRemote`) – input box
   - `weAudit: Edit Git Commit Hash` (`weAudit.editGitHash`) – input box
 - Tree view / command palette UX:
   - `weAudit: Search and Filter Findings` (`weAudit.showFindingsSearchBar`) – triggers `list.find` on the tree view
-  - `Toggle View Mode` (`weAudit.toggleTreeViewMode`) – already covered in extension-host tests; UI coverage would verify the actual tree structure changes
-- Context menu & multi-step flows:
-  - `Resolve Finding` / `Restore Finding` / delete flows (`weAudit.resolveFinding`, `weAudit.restoreFinding`, `weAudit.deleteFinding`, `weAudit.deleteLocationUnderCursor`, `weAudit.deleteLocation`)
+- Context menu & multi-step flows (require tree view interaction, not command palette):
+  - `Resolve Finding` / `Restore Finding` (`weAudit.resolveFinding`, `weAudit.restoreFinding`)
+  - `Delete Finding` (`weAudit.deleteFinding`, `weAudit.deleteLocation`)
+- Export findings to markdown (`weAudit: Export Findings as Markdown`)
+- Add a labeled region via QuickPick + InputBox (`weAudit: Add Region to a Finding with Label`)
+
+
 
 **Not yet added (other command candidates)**
 

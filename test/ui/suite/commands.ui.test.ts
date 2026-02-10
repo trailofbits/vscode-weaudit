@@ -8,11 +8,13 @@ import { userInfo } from "os";
 interface SerializedEntry {
     label: string;
     entryType: number;
-    locations: Array<{ path: string; startLine: number; endLine: number }>;
+    locations: Array<{ path: string; startLine: number; endLine: number; label?: string }>;
 }
 
 interface SerializedData {
     treeEntries: SerializedEntry[];
+    auditedFiles?: Array<{ path: string; author?: string }>;
+    partiallyAuditedFiles?: Array<{ path: string; startLine: number; endLine: number; author?: string }>;
 }
 
 interface LineRange {
@@ -23,6 +25,7 @@ interface LineRange {
 const SAMPLE_WORKSPACE = path.resolve(__dirname, "../../../../test/extension/fixtures/sample-workspace");
 const SAMPLE_FILE = path.join(SAMPLE_WORKSPACE, "src", "sample.ts");
 const SAMPLE_FILE_BASENAME = path.basename(SAMPLE_FILE);
+const SAMPLE_RELATIVE_PATH = path.join("src", "sample.ts");
 const WORKSPACE_VSCODE_DIR = path.join(SAMPLE_WORKSPACE, ".vscode");
 const CURRENT_USERNAME = userInfo().username;
 const WEAUDIT_FILE = path.join(WORKSPACE_VSCODE_DIR, `${CURRENT_USERNAME}.weaudit`);
@@ -50,6 +53,17 @@ async function resetWorkspaceState(_workbench: Workbench): Promise<void> {
 }
 
 /**
+ * Reads the persisted `.weaudit` file from disk.
+ */
+async function readSerializedData(): Promise<SerializedData | undefined> {
+    if (!fs.existsSync(WEAUDIT_FILE)) {
+        return undefined;
+    }
+    const raw = await fs.promises.readFile(WEAUDIT_FILE, "utf-8");
+    return JSON.parse(raw) as SerializedData;
+}
+
+/**
  * Opens the sample file, using the file picker when needed.
  */
 async function openSampleFile(): Promise<TextEditor> {
@@ -72,6 +86,16 @@ async function openSampleFile(): Promise<TextEditor> {
         );
         return (await editorView.openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
     }
+}
+
+/**
+ * Selects a snippet of text in the sample file.
+ * Prefer this over line-range selection when the test needs stable single-line selections.
+ */
+async function selectTextInSampleFile(text: string, occurrence: number = 1): Promise<TextEditor> {
+    const editor = await openSampleFile();
+    await editor.selectText(text, occurrence);
+    return editor;
 }
 
 /**
@@ -133,11 +157,8 @@ async function createTestNote(workbench: Workbench, title: string, range: LineRa
  * Reads serialized entries from disk.
  */
 async function readSerializedEntries(): Promise<SerializedEntry[] | undefined> {
-    if (!fs.existsSync(WEAUDIT_FILE)) {
-        return undefined;
-    }
-    const raw = await fs.promises.readFile(WEAUDIT_FILE, "utf-8");
-    return (JSON.parse(raw) as SerializedData).treeEntries;
+    const data = await readSerializedData();
+    return data?.treeEntries;
 }
 
 /**
@@ -175,8 +196,6 @@ describe("weAudit Command UI Tests", () => {
         workbench = new Workbench();
         await VSBrowser.instance.openResources(SAMPLE_WORKSPACE);
         await VSBrowser.instance.waitForWorkbench(60_000);
-        await VSBrowser.instance.driver.sleep(3_000);
-        await openSampleFile();
     });
 
     beforeEach(async function () {
@@ -186,6 +205,9 @@ describe("weAudit Command UI Tests", () => {
 
     after(async function () {
         await resetWorkspaceState(workbench);
+        // Revert any unsaved editors to prevent "Save changes?" dialogs from
+        // blocking closeAllEditors.
+        await workbench.executeCommand("workbench.action.files.revertAll");
         const editorView = new EditorView();
         await editorView.closeAllEditors();
     });
@@ -261,6 +283,185 @@ describe("weAudit Command UI Tests", () => {
                 return (entry?.locations.length ?? 0) >= 2;
             });
             expect(hasSecondRegion).to.equal(true);
+        });
+
+        // it("adds a labeled region to an existing finding", async function () {
+        //     const title = `Labeled Region ${Date.now()}`;
+        //     await createTestFinding(workbench, title, DEFAULT_FINDING_RANGE);
+
+        //     await selectLines(SECONDARY_RANGE.start, SECONDARY_RANGE.end);
+        //     await workbench.executeCommand("weAudit: Add Region to a Finding with Label");
+
+        //     const picker = await InputBox.create();
+        //     await picker.selectQuickPick(title);
+
+        //     const labelInput = await InputBox.create();
+        //     const regionLabel = `region-label-${Date.now()}`;
+        //     await labelInput.setText(regionLabel);
+        //     await labelInput.confirm();
+
+        //     const hasLabeledRegion = await waitForCondition(async () => {
+        //         const entries = await readSerializedEntries();
+        //         const entry = entries?.find((candidate) => candidate.label === title);
+        //         if (!entry || entry.locations.length < 2) {
+        //             return false;
+        //         }
+        //         return entry.locations.some((loc) => loc.label === regionLabel);
+        //     });
+        //     expect(hasLabeledRegion).to.equal(true);
+        // });
+    });
+
+    describe("Auditing", () => {
+        it("marks a region as reviewed and toggles it off", async function () {
+            const beforeCount = (await readSerializedData())?.partiallyAuditedFiles?.length ?? 0;
+            await selectTextInSampleFile("Sample file");
+            await workbench.executeCommand("weAudit: Mark Region as Reviewed");
+
+            let createdRegion: { path: string; startLine: number; endLine: number } | undefined;
+            const created = await waitForCondition(async () => {
+                const data = await readSerializedData();
+                const regions = data?.partiallyAuditedFiles ?? [];
+                createdRegion = regions.find((region) => region.path === SAMPLE_RELATIVE_PATH);
+                return (data?.partiallyAuditedFiles?.length ?? 0) > beforeCount && createdRegion !== undefined;
+            });
+            expect(created).to.equal(true);
+            expect(createdRegion).to.not.equal(undefined);
+
+            await selectTextInSampleFile("Sample file");
+            await workbench.executeCommand("weAudit: Mark Region as Reviewed");
+
+            const removed = await waitForCondition(async () => {
+                const data = await readSerializedData();
+                const regions = data?.partiallyAuditedFiles ?? [];
+                return regions.length === beforeCount && regions.every((region) => region.path !== SAMPLE_RELATIVE_PATH);
+            });
+            expect(removed).to.equal(true);
+        });
+
+        it("marks a file as reviewed and toggles it off", async function () {
+            await workbench.executeCommand("weAudit: Mark File as Reviewed");
+
+            const added = await waitForCondition(async () => {
+                const data = await readSerializedData();
+                const audited = data?.auditedFiles ?? [];
+                return audited.some((file) => file.path === SAMPLE_RELATIVE_PATH);
+            });
+            expect(added).to.equal(true);
+
+            await workbench.executeCommand("weAudit: Mark File as Reviewed");
+
+            const removed = await waitForCondition(async () => {
+                const data = await readSerializedData();
+                const audited = data?.auditedFiles ?? [];
+                return !audited.some((file) => file.path === SAMPLE_RELATIVE_PATH);
+            });
+            expect(removed).to.equal(true);
+        });
+
+        it("navigates to the next partially audited region", async function () {
+            // Mark two regions as reviewed
+            await selectLines(DEFAULT_FINDING_RANGE.start, DEFAULT_FINDING_RANGE.end);
+            await workbench.executeCommand("weAudit: Mark Region as Reviewed");
+            await waitForCondition(async () => {
+                const data = await readSerializedData();
+                return (data?.partiallyAuditedFiles?.length ?? 0) >= 1;
+            });
+
+            await selectLines(SECONDARY_RANGE.start, SECONDARY_RANGE.end);
+            await workbench.executeCommand("weAudit: Mark Region as Reviewed");
+            await waitForCondition(async () => {
+                const data = await readSerializedData();
+                return (data?.partiallyAuditedFiles?.length ?? 0) >= 2;
+            });
+
+            // Move cursor away from both regions
+            await moveCursorTo(1);
+
+            await workbench.executeCommand("weAudit: Navigate to Next Partially Audited Region");
+
+            const editor = await openSampleFile();
+            const coords = await editor.getCoordinates();
+            const cursorLine = coords[0];
+
+            // The cursor should have moved into one of the two audited regions.
+            const inFirstRegion = cursorLine >= DEFAULT_FINDING_RANGE.start && cursorLine <= DEFAULT_FINDING_RANGE.end;
+            const inSecondRegion = cursorLine >= SECONDARY_RANGE.start && cursorLine <= SECONDARY_RANGE.end;
+            expect(inFirstRegion || inSecondRegion).to.equal(true);
+        });
+    });
+
+    describe("Delete commands", () => {
+        it("deletes a finding when cursor is on its range", async function () {
+            const title = `Deletable Finding ${Date.now()}`;
+            await createTestFinding(workbench, title, { start: 34, end: 36 });
+
+            // Verify the finding exists before deletion
+            const existsBefore = await waitForCondition(async () => {
+                const entries = await readSerializedEntries();
+                return entries?.some((entry) => entry.label === title) ?? false;
+            });
+            expect(existsBefore).to.equal(true);
+
+            await moveCursorTo(35);
+            await workbench.executeCommand("weAudit: Delete Location Under Cursor");
+
+            const deleted = await waitForCondition(async () => {
+                const entries = await readSerializedEntries();
+                return !(entries?.some((entry) => entry.label === title) ?? false);
+            });
+            expect(deleted).to.equal(true);
+        });
+
+        it("removes one location from a multi-region finding without deleting it", async function () {
+            const title = `MultiLoc Delete ${Date.now()}`;
+            await createTestFinding(workbench, title, { start: 37, end: 39 });
+
+            // Add a second region at lines 41-43
+            await selectLines(41, 43);
+            await workbench.executeCommand("weAudit: Add Region to a Finding");
+            const picker = await InputBox.create();
+            await picker.selectQuickPick(title);
+
+            const hasTwoRegions = await waitForCondition(async () => {
+                const entries = await readSerializedEntries();
+                const entry = entries?.find((e) => e.label === title);
+                return (entry?.locations.length ?? 0) >= 2;
+            });
+            expect(hasTwoRegions).to.equal(true);
+
+            // Delete the second location by placing cursor inside it
+            await moveCursorTo(42);
+            await workbench.executeCommand("weAudit: Delete Location Under Cursor");
+
+            const hasOneRegion = await waitForCondition(async () => {
+                const entries = await readSerializedEntries();
+                const entry = entries?.find((e) => e.label === title);
+                return entry !== undefined && entry.locations.length === 1;
+            });
+            expect(hasOneRegion).to.equal(true);
+        });
+    });
+
+    describe("Tree view", () => {
+        it("toggles between list and byFile view modes", async function () {
+            const title = `Tree Mode Finding ${Date.now()}`;
+            await createTestFinding(workbench, title, DEFAULT_FINDING_RANGE);
+
+            // Default mode is "list" — tree items should include the finding title directly
+            const listItems = await getWeAuditTreeItems(workbench);
+            expect(listItems.some((item) => item.includes(title))).to.equal(true);
+
+            // Toggle to "byFile" mode
+            await workbench.executeCommand("weAudit: Toggle View Mode");
+            await VSBrowser.instance.driver.sleep(500);
+
+            // In byFile mode, tree items should include a path-like organizer node
+            const byFileItems = await getWeAuditTreeItems(workbench);
+            expect(byFileItems.some((item) => item.includes("sample.ts"))).to.equal(true);
+
+            // Toggle back to "list" mode for clean state
+            await workbench.executeCommand("weAudit: Toggle View Mode");
         });
     });
 });
