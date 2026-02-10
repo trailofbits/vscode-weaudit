@@ -81,8 +81,8 @@ async function openSampleFile(): Promise<TextEditor> {
                     return false;
                 }
             },
-            10_000,
-            200,
+            20_000,
+            500,
         );
         return (await editorView.openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
     }
@@ -193,9 +193,17 @@ describe("weAudit Command UI Tests", () => {
     let workbench: Workbench;
 
     before(async function () {
+        this.timeout(120_000);
         workbench = new Workbench();
         await VSBrowser.instance.openResources(SAMPLE_WORKSPACE);
         await VSBrowser.instance.waitForWorkbench(60_000);
+
+        // Wait for the workspace to fully load before running tests.
+        // In CI the explorer may not be ready immediately after waitForWorkbench.
+        await VSBrowser.instance.driver.sleep(2000);
+
+        // Ensure the sample file can be opened before any test begins
+        await openSampleFile();
     });
 
     beforeEach(async function () {

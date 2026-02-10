@@ -1,9 +1,12 @@
 const { build, context } = require("esbuild");
 
+const isProduction =
+    process.argv.includes("--production") || process.env.NODE_ENV === "production";
+
 const baseConfig = {
     bundle: true,
-    minify: process.env.NODE_ENV === "production",
-    sourcemap: process.env.NODE_ENV !== "production",
+    minify: isProduction,
+    sourcemap: !isProduction,
 };
 
 const extensionConfig = {

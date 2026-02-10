@@ -536,7 +536,7 @@
     "scripts": {
         "vscode:prepublish": "npm run package",
         "compile": "node ./esbuild.js",
-        "package": "NODE_ENV=production node ./esbuild.js",
+        "package": "node ./esbuild.js --production",
         "watch": "node ./esbuild.js --watch",
         "lint": "eslint --ext ts --color -c .eslintrc.cjs src",
         "test": "npm run test:unit && npm run test:ext",
