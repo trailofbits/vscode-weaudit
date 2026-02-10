@@ -27,6 +27,28 @@ function getResolutionBadge(entry: FullEntry): string {
     return "UNCLASSIFIED";
 }
 
+/**
+ * Returns an emoji that reflects the resolution status for resolved findings.
+ * @param entry The resolved entry to label.
+ * @returns An emoji for the resolution, or an empty string when not applicable.
+ */
+function getResolutionEmoji(entry: FullEntry): string {
+    if (entry.entryType !== EntryType.Finding) {
+        return "";
+    }
+
+    if (entry.details?.resolution === EntryResolution.TruePositive) {
+        return "✅";
+    }
+
+    const resolutionValue = String(entry.details?.resolution);
+    if (entry.details?.resolution === EntryResolution.FalsePositive || resolutionValue === "False Positive" || resolutionValue === "False Negative") {
+        return "❌";
+    }
+
+    return "";
+}
+
 export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
     private resolvedEntries: FullEntry[];
 
@@ -59,7 +81,8 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
     }
 
     getTreeItem(entry: FullEntry): vscode.TreeItem {
-        const label = entry.label;
+        const resolutionEmoji = getResolutionEmoji(entry);
+        const label = resolutionEmoji ? `${resolutionEmoji} ${entry.label}` : entry.label;
         const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
         if (entry.entryType === EntryType.Note) {
             treeItem.iconPath = new vscode.ThemeIcon("bookmark");

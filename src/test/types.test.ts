@@ -55,7 +55,7 @@ describe("types.ts", () => {
             assert.strictEqual(details.type, FindingType.Undefined);
             assert.strictEqual(details.description, "");
             assert.strictEqual(details.exploit, "");
-            assert.strictEqual(details.recommendation, "Short term, \nLong term, \n");
+            assert.strictEqual(details.recommendation, "Short term,\nLong term,");
             assert.strictEqual(details.resolution, EntryResolution.Open);
             assert.ok(details.provenance);
             if (typeof details.provenance !== "object" || details.provenance === null) {

@@ -256,7 +256,7 @@ export function createDefaultEntryDetails(commitHash?: string): EntryDetails {
         type: FindingType.Undefined,
         description: "",
         exploit: "",
-        recommendation: "Short term, \nLong term, \n",
+        recommendation: "Short term,\nLong term,",
         resolution: EntryResolution.Open,
         provenance: {
             source: "human",
