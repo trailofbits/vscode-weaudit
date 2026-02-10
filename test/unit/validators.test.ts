@@ -336,22 +336,19 @@ describe("validateSerializedData", () => {
     });
 
     describe("invalid partiallyAuditedFile fields", () => {
-        // Note: validatepartiallyAuditedFile uses OR logic, so it passes if:
-        // (path && author) OR startLine OR endLine is defined
-        // This means partial data with coordinates still passes validation
+        // validatepartiallyAuditedFile uses AND logic: all of
+        // path, author, startLine, and endLine must be defined.
 
-        it("accepts partiallyAuditedFile with coordinates but missing path (OR logic)", () => {
-            // This passes because startLine is defined (OR logic in validator)
+        it("rejects partiallyAuditedFile missing path", () => {
             const data = createDefaultSerializedData();
             data.partiallyAuditedFiles = [{ author: "testuser", startLine: 0, endLine: 10 } as any];
-            expect(validateSerializedData(data)).to.equal(true);
+            expect(validateSerializedData(data)).to.equal(false);
         });
 
-        it("accepts partiallyAuditedFile with coordinates but missing author (OR logic)", () => {
-            // This passes because startLine is defined (OR logic in validator)
+        it("rejects partiallyAuditedFile missing author", () => {
             const data = createDefaultSerializedData();
             data.partiallyAuditedFiles = [{ path: "src/test.ts", startLine: 0, endLine: 10 } as any];
-            expect(validateSerializedData(data)).to.equal(true);
+            expect(validateSerializedData(data)).to.equal(false);
         });
 
         it("rejects partiallyAuditedFile with all fields undefined", () => {
@@ -360,16 +357,16 @@ describe("validateSerializedData", () => {
             expect(validateSerializedData(data)).to.equal(false);
         });
 
-        it("accepts partiallyAuditedFile with only startLine defined (OR logic)", () => {
+        it("rejects partiallyAuditedFile with only startLine defined", () => {
             const data = createDefaultSerializedData();
             data.partiallyAuditedFiles = [{ startLine: 5 } as any];
-            expect(validateSerializedData(data)).to.equal(true);
+            expect(validateSerializedData(data)).to.equal(false);
         });
 
-        it("accepts partiallyAuditedFile with only endLine defined (OR logic)", () => {
+        it("rejects partiallyAuditedFile with only endLine defined", () => {
             const data = createDefaultSerializedData();
             data.partiallyAuditedFiles = [{ endLine: 10 } as any];
-            expect(validateSerializedData(data)).to.equal(true);
+            expect(validateSerializedData(data)).to.equal(false);
         });
     });
 
