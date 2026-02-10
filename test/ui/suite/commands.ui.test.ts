@@ -34,6 +34,9 @@ const DAY_LOG_FILE = path.join(WORKSPACE_VSCODE_DIR, ".weauditdaylog");
 const DEFAULT_FINDING_RANGE: LineRange = { start: 5, end: 7 };
 const SECONDARY_RANGE: LineRange = { start: 11, end: 13 };
 
+/** Shared editor instance, set once in the `before` hook. */
+let editor!: TextEditor;
+
 /**
  * Deletes a file if it exists to keep the workspace clean between tests.
  */
@@ -60,7 +63,12 @@ async function readSerializedData(): Promise<SerializedData | undefined> {
         return undefined;
     }
     const raw = await fs.promises.readFile(WEAUDIT_FILE, "utf-8");
-    return JSON.parse(raw) as SerializedData;
+    try {
+        return JSON.parse(raw) as SerializedData;
+    } catch {
+        // File may be mid-write; treat as not yet available.
+        return undefined;
+    }
 }
 
 /**
@@ -92,17 +100,14 @@ async function openSampleFile(): Promise<TextEditor> {
  * Selects a snippet of text in the sample file.
  * Prefer this over line-range selection when the test needs stable single-line selections.
  */
-async function selectTextInSampleFile(text: string, occurrence: number = 1): Promise<TextEditor> {
-    const editor = await openSampleFile();
+async function selectTextInSampleFile(text: string, occurrence: number = 1): Promise<void> {
     await editor.selectText(text, occurrence);
-    return editor;
 }
 
 /**
  * Selects a range of lines by moving the caret with Shift+Arrow.
  */
-async function selectLines(startLine: number, endLine: number): Promise<TextEditor> {
-    const editor = await openSampleFile();
+async function selectLines(startLine: number, endLine: number): Promise<void> {
     await editor.setCursor(startLine, 1);
 
     const clampedEndLine = Math.max(endLine, startLine);
@@ -110,17 +115,14 @@ async function selectLines(startLine: number, endLine: number): Promise<TextEdit
     for (let i = 0; i < downMoves; i++) {
         await editor.typeText(Key.chord(Key.SHIFT, Key.ARROW_DOWN));
     }
-    return editor;
 }
 
 /**
  * Moves the caret to a single location, clearing any selection.
  */
-async function moveCursorTo(line: number, column: number = 1): Promise<TextEditor> {
-    const editor = await openSampleFile();
+async function moveCursorTo(line: number, column: number = 1): Promise<void> {
     await editor.setCursor(line, column);
     await VSBrowser.instance.driver.actions({ bridge: true }).sendKeys(Key.ESCAPE).perform();
-    return editor;
 }
 
 /**
@@ -202,13 +204,12 @@ describe("weAudit Command UI Tests", () => {
         // In CI the explorer may not be ready immediately after waitForWorkbench.
         await VSBrowser.instance.driver.sleep(2000);
 
-        // Ensure the sample file can be opened before any test begins
-        await openSampleFile();
+        // Open the sample file once and keep a reference for the entire suite
+        editor = await openSampleFile();
     });
 
     beforeEach(async function () {
         await resetWorkspaceState(workbench);
-        await openSampleFile();
     });
 
     after(async function () {
@@ -388,7 +389,6 @@ describe("weAudit Command UI Tests", () => {
 
             await workbench.executeCommand("weAudit: Navigate to Next Partially Audited Region");
 
-            const editor = await openSampleFile();
             const coords = await editor.getCoordinates();
             const cursorLine = coords[0];
 

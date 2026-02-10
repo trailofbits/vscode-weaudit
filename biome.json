@@ -13,6 +13,6 @@
         "enabled": false
     },
     "files": {
-        "includes": ["src/**", "*.ts", "*.js", "*.json", "*.cjs", "*.mjs"]
+        "includes": ["src/**", "test/**", "*.ts", "*.js", "*.json", "*.cjs", "*.mjs"]
     }
 }
