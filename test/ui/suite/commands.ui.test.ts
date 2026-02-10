@@ -75,24 +75,27 @@ async function readSerializedData(): Promise<SerializedData | undefined> {
  * Opens the sample file, using the file picker when needed.
  */
 async function openSampleFile(): Promise<TextEditor> {
-    const editorView = new EditorView();
+    // Try the fast path first: the tab is already open.
     try {
-        return (await editorView.openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
+        return (await new EditorView().openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
     } catch {
-        await VSBrowser.instance.openResources(SAMPLE_FILE);
+        // Tab not open yet — ask VS Code to open the file and poll until the
+        // tab appears.  On CI (xvfb) the workspace may still be initialising,
+        // so we re-issue openResources on every retry to be safe.
         await waitForCondition(
             async () => {
                 try {
-                    await editorView.openEditor(SAMPLE_FILE_BASENAME);
+                    await VSBrowser.instance.openResources(SAMPLE_FILE);
+                    await new EditorView().openEditor(SAMPLE_FILE_BASENAME);
                     return true;
                 } catch {
                     return false;
                 }
             },
-            20_000,
-            500,
+            30_000,
+            1_000,
         );
-        return (await editorView.openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
+        return (await new EditorView().openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
     }
 }
 
@@ -210,15 +213,6 @@ describe("weAudit Command UI Tests", () => {
 
     beforeEach(async function () {
         await resetWorkspaceState(workbench);
-    });
-
-    after(async function () {
-        await resetWorkspaceState(workbench);
-        // Revert any unsaved editors to prevent "Save changes?" dialogs from
-        // blocking closeAllEditors.
-        await workbench.executeCommand("workbench.action.files.revertAll");
-        const editorView = new EditorView();
-        await editorView.closeAllEditors();
     });
 
     describe("Findings & Notes", () => {
