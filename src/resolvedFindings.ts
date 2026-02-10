@@ -89,16 +89,20 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
         } else {
             treeItem.iconPath = new vscode.ThemeIcon("bug");
         }
-        const mainLocation = entry.locations[0];
-        treeItem.command = {
-            command: "weAudit.openFileLines",
-            title: "Open File",
-            arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
-        };
-
         const badge = getResolutionBadge(entry);
-        treeItem.description = `${path.basename(mainLocation.path)} [${badge}]`;
-        treeItem.tooltip = `${entry.author}'s ${entry.entryType === EntryType.Note ? "note" : "finding"} (${badge})`;
+        const mainLocation = entry.locations[0];
+        if (mainLocation !== undefined) {
+            treeItem.command = {
+                command: "weAudit.openFileLines",
+                title: "Open File",
+                arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
+            };
+            treeItem.description = `${path.basename(mainLocation.path)} [${badge}]`;
+            treeItem.tooltip = `${entry.author}'s ${entry.entryType === EntryType.Note ? "note" : "finding"} (${badge})`;
+        } else {
+            treeItem.description = `No location [${badge}]`;
+            treeItem.tooltip = `${entry.author}'s ${entry.entryType === EntryType.Note ? "note" : "finding"} (${badge}, no location)`;
+        }
         treeItem.contextValue = entry.entryType === EntryType.Note ? "resolvedNote" : "resolvedFinding";
 
         return treeItem;

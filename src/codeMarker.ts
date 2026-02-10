@@ -52,6 +52,8 @@ import { normalizePathForOS } from "./utilities/normalizePath";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
+// Special path label used to group entries that have no locations.
+const NO_LOCATION_PATH_LABEL = "(no location)";
 
 /**
  * Class representing a WeAudit workspace root. Each root maintains its own set of
@@ -1611,6 +1613,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     private pathToEntryMap: Map<string, FullLocationEntry[]>;
     private pathToEntryMapDirty = true;
     private locationEntryCache = new WeakMap<FullLocation, FullLocationEntry>();
+    // Preserve which workspace root produced locationless entries so they can be filtered and saved correctly.
+    private entryOriginRoots = new WeakMap<FullEntry, RootPathAndLabel>();
 
     private treeViewMode: TreeViewMode;
 
@@ -2158,6 +2162,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     async getCodeToCopyFromLocation(entry: FullEntry | FullLocationEntry): Promise<FromLocationResponse | void> {
         const location = isLocationEntry(entry) ? entry.location : entry.locations[0];
+        if (location === undefined) {
+            // Locationless entries have no source code region.
+            vscode.window.showErrorMessage("weAudit: Cannot copy code for an entry without locations.");
+            return;
+        }
         const permalink = await this.getClientPermalink(location);
         if (permalink === undefined) {
             return;
@@ -2684,6 +2693,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      */
     async copyEntryPermalink(entry: FullEntry | FullLocationEntry): Promise<void> {
         const location = isLocationEntry(entry) ? entry.location : entry.locations[0];
+        if (location === undefined) {
+            // Locationless entries have no permalink target.
+            vscode.window.showErrorMessage("weAudit: Cannot copy a permalink for an entry without locations.");
+            return;
+        }
         const remoteAndPermalink = await this.getEntryRemoteAndPermalink(location);
         if (remoteAndPermalink === undefined) {
             return;
@@ -2696,6 +2710,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param entry The entry to copy the permalinks of
      */
     async copyEntryPermalinks(entry: FullEntry): Promise<void> {
+        if (entry.locations.length === 0) {
+            // Locationless entries have no permalinks to gather.
+            vscode.window.showErrorMessage("weAudit: Cannot copy permalinks for an entry without locations.");
+            return;
+        }
         const permalinkList = [];
         for (const location of entry.locations) {
             const remoteAndPermalink = await this.getEntryRemoteAndPermalink(location);
@@ -2750,6 +2769,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param entry The entry to open an issue for
      */
     async openGithubIssue(entry: FullEntry): Promise<void> {
+        if (entry.locations.length === 0) {
+            // Locationless entries cannot resolve a repository or file target.
+            vscode.window.showErrorMessage("weAudit: Cannot open a GitHub issue for an entry without locations.");
+            return;
+        }
         // open github issue with the issue body with the finding text and permalink
         const title = encodeURIComponent(entry.label);
 
@@ -3338,26 +3362,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @returns
      */
     getFilteredEntriesForSaving(username: string, root: WARoot): [FullEntry[], FullEntry[]] {
-        const filteredEntries = this.treeEntries.filter((entry) => {
-            let inWs = false;
-            for (const location of entry.locations) {
-                if (location.rootPath === root.rootPath) {
-                    inWs = true;
-                    break;
-                }
-            }
-            return entry.author === username && inWs;
-        });
-        const filteredResolvedEntries = this.resolvedEntries.filter((entry) => {
-            let inWs = false;
-            for (const location of entry.locations) {
-                if (location.rootPath === root.rootPath) {
-                    inWs = true;
-                    break;
-                }
-            }
-            return entry.author === username && inWs;
-        });
+        // Include locationless entries that originated from this root when saving.
+        const filteredEntries = this.treeEntries.filter((entry) => entry.author === username && this.entryMatchesRoot(entry, root));
+        const filteredResolvedEntries = this.resolvedEntries.filter((entry) => entry.author === username && this.entryMatchesRoot(entry, root));
         return [filteredEntries, filteredResolvedEntries];
     }
 
@@ -3379,10 +3386,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // create a quick pick to select the entry to add the region to
         const items = this.treeEntries
             .filter((entry) => {
-                if (entry.locations.length === 0 || entry.locations[0].rootPath !== locations[0].rootPath) {
-                    return false;
+                if (entry.locations.length === 0) {
+                    // Allow attaching the first location to entries imported without locations.
+                    return true;
                 }
-                return true;
+                return entry.locations[0].rootPath === locations[0].rootPath;
             })
             .map((entry) => {
                 return {
@@ -3528,6 +3536,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             ),
         } as FullSerializedData;
 
+        // Keep track of which workspace root produced entries with no locations.
+        for (const entry of fullParsedEntries.treeEntries.concat(fullParsedEntries.resolvedEntries)) {
+            if (entry.locations.length === 0) {
+                this.entryOriginRoots.set(entry, { rootPath: rootPath, rootLabel: wsRoot.getRootLabel() });
+            }
+        }
+
         // Normalize all the paths from loaded files. These can come from different OSes with different path
         // conventions. We do a best effort to match them to the current OS format.
         fullParsedEntries.treeEntries.forEach((entry) => {
@@ -3568,18 +3583,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                         .map((selectedConfig) => selectedConfig.username)
                         .includes(config.username)
                 ) {
-                    this.treeEntries = this.treeEntries.filter(
-                        (entry) =>
-                            entry.author !== config.username ||
-                            entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
-                    );
+                    this.treeEntries = this.treeEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
                     wsRoot.filterAudited(config.username);
                     wsRoot.filterPartiallyAudited(config.username);
-                    this.resolvedEntries = this.resolvedEntries.filter(
-                        (entry) =>
-                            entry.author !== config.username ||
-                            entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
-                    );
+                    this.resolvedEntries = this.resolvedEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
                 }
 
                 const newTreeEntries = fullParsedEntries.treeEntries;
@@ -3596,18 +3603,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     this.resolvedEntries = this.resolvedEntries.concat(fullParsedEntries.resolvedEntries);
                 }
             } else {
-                this.treeEntries = this.treeEntries.filter(
-                    (entry) =>
-                        entry.author !== config.username ||
-                        entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
-                );
+                this.treeEntries = this.treeEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
                 wsRoot.filterAudited(config.username);
                 wsRoot.filterPartiallyAudited(config.username);
-                this.resolvedEntries = this.resolvedEntries.filter(
-                    (entry) =>
-                        entry.author !== config.username ||
-                        entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
-                );
+                this.resolvedEntries = this.resolvedEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
             }
         }
 
@@ -3721,18 +3720,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (wsRoot === undefined) {
             return;
         }
-        this.treeEntries = this.treeEntries.filter(
-            (entry) =>
-                entry.author !== config.username ||
-                entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
-        );
+        this.treeEntries = this.treeEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
         wsRoot.filterAudited(config.username);
         wsRoot.filterPartiallyAudited(config.username);
-        this.resolvedEntries = this.resolvedEntries.filter(
-            (entry) =>
-                entry.author !== config.username ||
-                entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
-        );
+        this.resolvedEntries = this.resolvedEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
         this.markPathMapDirty();
     }
 
@@ -3928,10 +3919,27 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         if (element === undefined) {
             const pathLabels = Array.from(this.pathToEntryMap.keys()).sort();
+            const unlocatedEntries = this.treeEntries.filter((entry) => entry.locations.length === 0 && this.isEntryVisible(entry));
+            if (unlocatedEntries.length > 0) {
+                // Keep locationless entries visible in group-by-file mode under a dedicated bucket.
+                pathLabels.push(NO_LOCATION_PATH_LABEL);
+            }
             return pathLabels.map((label) => createPathOrganizer(label));
         } else {
             // get entries with same path as element
             if (isPathOrganizerEntry(element)) {
+                if (element.pathLabel === NO_LOCATION_PATH_LABEL) {
+                    const unlocatedEntries = this.treeEntries.filter((entry) => entry.locations.length === 0 && this.isEntryVisible(entry));
+                    if (this.sortEntriesAlphabetically) {
+                        return [...unlocatedEntries].sort((a, b) => {
+                            if (a.entryType !== b.entryType) {
+                                return a.entryType === EntryType.Finding ? -1 : 1;
+                            }
+                            return a.label.localeCompare(b.label);
+                        });
+                    }
+                    return unlocatedEntries;
+                }
                 const entries = this.pathToEntryMap.get(element.pathLabel) ?? [];
                 if (this.sortEntriesAlphabetically) {
                     return [...entries].sort((a, b) => {
@@ -3993,7 +4001,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             notes.sort((a, b) => a.label.localeCompare(b.label));
         }
 
-        return entries.concat(notes).filter((entry) => this.hasVisibleLocation(entry));
+        return entries.concat(notes).filter((entry) => this.isEntryVisible(entry));
     }
 
     /**
@@ -4107,6 +4115,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         const mainLocation = entry.locations[0];
+        if (mainLocation === undefined) {
+            // Entries imported without locations still appear, but cannot be navigated.
+            treeItem.description = `No location (${entry.author})`;
+            treeItem.tooltip = `${entry.author}'s ${entry.entryType === EntryType.Note ? "note" : "finding"} (no location)`;
+            treeItem.contextValue = entry.entryType === EntryType.Note ? "note" : "finding";
+            return treeItem;
+        }
 
         const basePath = path.basename(mainLocation.path);
         treeItem.description = basePath + ":" + (mainLocation.startLine + 1).toString();
@@ -4244,6 +4259,51 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return false;
     }
 
+    /**
+     * Returns whether an entry should be shown in the tree view.
+     * Locationless entries are scoped to the config root they were loaded from.
+     */
+    private isEntryVisible(entry: FullEntry): boolean {
+        if (entry.locations.length > 0) {
+            return this.hasVisibleLocation(entry);
+        }
+        const origin = this.entryOriginRoots.get(entry);
+        if (origin === undefined) {
+            return !this.workspaces.moreThanOneRoot() && this.workspaces.getSelectedConfigurations().some((config) => config.username === entry.author);
+        }
+        return this.workspaces.getSelectedConfigurations().some((config) => config.username === entry.author && config.root.label === origin.rootLabel);
+    }
+
+    /**
+     * Returns true when an entry belongs to the config's workspace root.
+     * Locationless entries use their recorded origin root.
+     */
+    private entryMatchesConfig(entry: FullEntry, config: ConfigurationEntry): boolean {
+        if (entry.locations.length > 0) {
+            return entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) === -1;
+        }
+        const origin = this.entryOriginRoots.get(entry);
+        if (origin !== undefined) {
+            return origin.rootLabel === config.root.label;
+        }
+        return !this.workspaces.moreThanOneRoot();
+    }
+
+    /**
+     * Returns true when an entry should be saved under the provided workspace root.
+     * Locationless entries use their recorded origin root.
+     */
+    private entryMatchesRoot(entry: FullEntry, root: WARoot): boolean {
+        if (entry.locations.length > 0) {
+            return entry.locations.some((location) => location.rootPath === root.rootPath);
+        }
+        const origin = this.entryOriginRoots.get(entry);
+        if (origin !== undefined) {
+            return origin.rootPath === root.rootPath;
+        }
+        return !this.workspaces.moreThanOneRoot();
+    }
+
     private markPathMapDirty(): void {
         this.pathToEntryMapDirty = true;
     }
@@ -4288,6 +4348,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param entry the entry to refresh and decorate
      */
     refreshAndDecorateEntry(entry: FullEntry): void {
+        if (entry.locations.length === 0) {
+            // Ensure locationless entries still trigger a tree refresh.
+            this.refreshTree();
+            return;
+        }
         for (const loc of entry.locations) {
             const uri = vscode.Uri.file(path.join(loc.rootPath, loc.path));
             this.decorateWithUri(uri);
@@ -4382,6 +4447,12 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
             // Target is an Entry (a finding with only one location, or the root element of a multi-location finding)
             if (isEntry(target)) {
                 if (target === locationEntry.parentEntry) {
+                    return;
+                }
+
+                // Locationless entries cannot accept dropped locations.
+                if (target.locations.length === 0) {
+                    vscode.window.showErrorMessage("weAudit: Error moving a location to a finding without locations.");
                     return;
                 }
 
@@ -4497,6 +4568,12 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
             // get its parent entry and continue to the next if statement
             if (isLocationEntry(target)) {
                 target = target.parentEntry;
+            }
+
+            // Entries without locations cannot be merged because we cannot verify roots.
+            if (entry.locations.length === 0 || target.locations.length === 0) {
+                vscode.window.showErrorMessage("weAudit: Error merging findings that do not have locations.");
+                return;
             }
 
             // Prevent mixing findings that belong to different workspace roots, because it is a headache to synchronize this.
