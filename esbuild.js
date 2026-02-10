@@ -1,7 +1,6 @@
 const { build, context } = require("esbuild");
 
-const isProduction =
-    process.argv.includes("--production") || process.env.NODE_ENV === "production";
+const isProduction = process.argv.includes("--production") || process.env.NODE_ENV === "production";
 
 const baseConfig = {
     bundle: true,
