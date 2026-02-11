@@ -235,6 +235,9 @@ describe("weAudit Command UI Tests", () => {
         // In CI the explorer may not be ready immediately after waitForWorkbench.
         await VSBrowser.instance.driver.sleep(2000);
 
+        // Dismiss any notification toasts that may overlap the editor area.
+        await workbench.executeCommand("Notifications: Clear All Notifications");
+
         // Open the sample file once and keep a reference for the entire suite
         editor = await openSampleFile();
     });
