@@ -22,7 +22,7 @@
     },
     "icon": "media/icon.png",
     "engines": {
-        "vscode": "^1.107.0"
+        "vscode": "^1.108.0"
     },
     "activationEvents": [
         "onStartupFinished",
@@ -536,34 +536,49 @@
     "scripts": {
         "vscode:prepublish": "npm run package",
         "compile": "node ./esbuild.js",
-        "package": "NODE_ENV=production node ./esbuild.js",
+        "package": "node ./esbuild.js --production",
         "watch": "node ./esbuild.js --watch",
         "lint": "eslint --ext ts --color -c .eslintrc.cjs src",
+        "test": "npm run test:unit && npm run test:ext",
+        "test:all": "npm run test:unit && npm run test:ext && npm run test:ui",
+        "test:unit": "mocha -r ts-node/register/transpile-only \"test/unit/**/*.test.ts\" \"test/webview/**/*.test.ts\"",
+        "pretest:ext": "npm run compile && tsc -p test/extension/tsconfig.json",
+        "test:ext": "vscode-test --config .vscode-test.mjs",
+        "pretest:ui": "npm run compile && tsc -p test/ui/tsconfig.json",
+        "test:ui": "extest setup-and-run './out/test/ui/**/*.test.js' --code_version max --storage .test-extensions --extensions_dir .test-extensions/extensions --mocha_config test/ui/.mocharc.json -- --disable-extensions",
+        "test:ui-setup": "extest setup-tests --code_version max --storage .test-extensions --extensions_dir .test-extensions/extensions",
+        "coverage": "nyc npm run test:unit",
         "lint:fix": "eslint --ext ts -c .eslintrc.cjs src --fix",
         "format": "biome format --write .",
         "format:check": "biome check --formatter-enabled=true --linter-enabled=false .",
-        "typecheck": "tsc --noEmit",
-        "test": "mocha --require ts-node/register 'src/test/**/*.test.ts'"
+        "typecheck": "tsc --noEmit"
     },
     "devDependencies": {
         "@biomejs/biome": "^2.3.11",
         "@microsoft/eslint-formatter-sarif": "^3.1.0",
         "@stylistic/eslint-plugin": "^5.7.0",
         "@types/asciichart": "^1.5.6",
+        "@types/chai": "^4.3.20",
         "@types/glob": "^9.0.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "25.x",
+        "@types/sinon": "^21.0.0",
         "@types/vscode": "^1.108.1",
         "@types/vscode-webview": "^1.57.1",
         "@typescript-eslint/eslint-plugin": "^8.53.0",
         "@typescript-eslint/parser": "^8.50.0",
+        "@vscode/test-cli": "^0.0.10",
         "@vscode/test-electron": "^2.5.2",
+        "chai": "^4.4.1",
         "esbuild": "^0.27.2",
         "eslint": "^9.39.2",
         "glob": "^13.0.0",
         "mocha": "^11.3.0",
+        "nyc": "^17.1.0",
+        "sinon": "^21.0.1",
         "ts-node": "^10.9.2",
-        "typescript": "^5.9.3"
+        "typescript": "^5.9.3",
+        "vscode-extension-tester": "^8.21.0"
     },
     "dependencies": {
         "@vscode/webview-ui-toolkit": "^1.4.0",

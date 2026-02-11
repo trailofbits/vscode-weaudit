@@ -17,7 +17,7 @@ module.exports = [
         languageOptions: {
             parser: tsParser,
             parserOptions: {
-                project: ["./tsconfig.json"],
+                project: ["./tsconfig.json", "./test/tsconfig.json"],
             },
         },
         plugins: {

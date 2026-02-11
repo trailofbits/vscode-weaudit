@@ -28,7 +28,7 @@ import {
     mergeTwoPartiallyAuditedFileArrays,
     treeViewModeLabel,
     validateSerializedData,
-} from "../types";
+} from "../../src/types";
 
 describe("types.ts", () => {
     describe("createDefaultSerializedData", () => {
@@ -182,34 +182,22 @@ describe("types.ts", () => {
             assert.strictEqual(validateSerializedData(data), true);
         });
 
-        // BUG TEST: This test exposes a logic error in validatepartiallyAuditedFile
-        // The function uses `||` instead of `&&`, so validation passes if ANY field is defined
-        // instead of requiring ALL required fields (path, author, startLine, endLine)
+        // Regression: validatepartiallyAuditedFile requires all fields (path, author, startLine, endLine)
         it("should reject partially audited file missing startLine", () => {
             const data = createDefaultSerializedData();
-            // Create a partially audited file missing startLine - should be invalid
             data.partiallyAuditedFiles = [{ path: "test.ts", author: "user", endLine: 10 } as unknown as PartiallyAuditedFile];
-
-            // This test FAILS - validateSerializedData returns true due to the || bug
             assert.strictEqual(validateSerializedData(data), false);
         });
 
-        // BUG TEST: Similar test for missing endLine
         it("should reject partially audited file missing endLine", () => {
             const data = createDefaultSerializedData();
             data.partiallyAuditedFiles = [{ path: "test.ts", author: "user", startLine: 1 } as unknown as PartiallyAuditedFile];
-
-            // This test FAILS - validateSerializedData returns true due to the || bug
             assert.strictEqual(validateSerializedData(data), false);
         });
 
-        // BUG TEST: Test with path and author only (no line numbers at all)
         it("should reject partially audited file missing both line numbers", () => {
             const data = createDefaultSerializedData();
             data.partiallyAuditedFiles = [{ path: "test.ts", author: "user" } as unknown as PartiallyAuditedFile];
-
-            // This test FAILS - validateSerializedData returns true due to the || bug
-            // (validateAuditedFile passes because path and author exist)
             assert.strictEqual(validateSerializedData(data), false);
         });
     });
@@ -378,9 +366,7 @@ describe("types.ts", () => {
             assert.strictEqual(result[1].label, "B");
         });
 
-        // BUG TEST: This test exposes the mutation bug in mergeTwoEntryArrays
-        // The function assigns `const result: Entry[] = a` which creates a reference, not a copy
-        // Then `result.push(b[i])` mutates the original array 'a'
+        // Regression: merge should not mutate the first array argument
         it("should not mutate the first array argument", () => {
             const a = [createEntry("A", "src/a.ts")];
             const b = [createEntry("B", "src/b.ts")];
@@ -388,7 +374,6 @@ describe("types.ts", () => {
 
             mergeTwoEntryArrays(a, b);
 
-            // This test FAILS - a.length will be 2 instead of 1
             assert.strictEqual(a.length, originalLength, "First array should not be mutated");
         });
     });
@@ -420,7 +405,7 @@ describe("types.ts", () => {
             assert.strictEqual(result.length, 2);
         });
 
-        // BUG TEST: This test exposes the mutation bug in mergeTwoAuditedFileArrays
+        // Regression: merge should not mutate the first array argument
         it("should not mutate the first array argument", () => {
             const a: AuditedFile[] = [{ path: "src/a.ts", author: "user1" }];
             const b: AuditedFile[] = [{ path: "src/b.ts", author: "user2" }];
@@ -428,7 +413,6 @@ describe("types.ts", () => {
 
             mergeTwoAuditedFileArrays(a, b);
 
-            // This test FAILS - a.length will be 2 instead of 1
             assert.strictEqual(a.length, originalLength, "First array should not be mutated");
         });
     });
@@ -460,7 +444,7 @@ describe("types.ts", () => {
             assert.strictEqual(result.length, 2);
         });
 
-        // BUG TEST: This test exposes the mutation bug in mergeTwoPartiallyAuditedFileArrays
+        // Regression: merge should not mutate the first array argument
         it("should not mutate the first array argument", () => {
             const a: PartiallyAuditedFile[] = [{ path: "src/a.ts", author: "user1", startLine: 1, endLine: 10 }];
             const b: PartiallyAuditedFile[] = [{ path: "src/b.ts", author: "user2", startLine: 1, endLine: 10 }];
@@ -468,7 +452,6 @@ describe("types.ts", () => {
 
             mergeTwoPartiallyAuditedFileArrays(a, b);
 
-            // This test FAILS - a.length will be 2 instead of 1
             assert.strictEqual(a.length, originalLength, "First array should not be mutated");
         });
     });
@@ -575,14 +558,12 @@ describe("types.ts", () => {
                 assert.strictEqual(isWorkspaceRootEntry(entry), true);
             });
 
-            it("should return true for ConfigurationEntry (has label via root)", () => {
+            it("should return false for ConfigurationEntry (no direct label property)", () => {
                 const entry: ConfigurationEntry = {
                     path: "/path/to/file",
                     username: "testuser",
                     root: { label: "root" },
                 };
-                // Note: isWorkspaceRootEntry checks for 'label' which ConfigurationEntry doesn't have directly
-                // This actually returns false because ConfigurationEntry doesn't have a 'label' property directly
                 assert.strictEqual(isWorkspaceRootEntry(entry), false);
             });
         });

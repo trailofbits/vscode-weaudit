@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "module": "CommonJS",
+        "target": "ES2022",
+        "lib": ["ES2022", "DOM"],
+        "rootDir": "..",
+        "sourceMap": true,
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "resolveJsonModule": true,
+        "types": ["node", "mocha"]
+    },
+    "include": ["unit/**/*.ts", "webview/**/*.ts", "mocks/**/*.ts", "../src/**/*.ts"],
+    "exclude": ["../src/webview/**/*.ts"]
+}
