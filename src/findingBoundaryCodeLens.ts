@@ -95,6 +95,17 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
     }
 
     /**
+     * Disposes all decoration types and the event emitter.
+     */
+    dispose(): void {
+        this.decorationStyles.single.dispose();
+        this.decorationStyles.top.dispose();
+        this.decorationStyles.middle.dispose();
+        this.decorationStyles.bottom.dispose();
+        this._onDidChangeCodeLenses.dispose();
+    }
+
+    /**
      * Checks if boundary editing mode is currently active.
      * @returns true if a boundary editing session is in progress
      */
@@ -128,7 +139,7 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
             uri: vscode.Uri.file(filePath),
         };
 
-        vscode.commands.executeCommand("setContext", "weAudit.boundaryEditing", true);
+        void vscode.commands.executeCommand("setContext", "weAudit.boundaryEditing", true);
 
         // Force refresh of CodeLenses in all visible editors
         this._onDidChangeCodeLenses.fire();
@@ -247,6 +258,7 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
             return [];
         }
         const lenses: vscode.CodeLens[] = [];
+        const canMoveDownOrExpandDown = location.endLine < document.lineCount - 1;
 
         // Create a unique identifier for the location
         const locationId = `${this.activeSession.entry.label}:${this.activeSession.locationIndex}`;
@@ -277,8 +289,8 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
 
             const bottomControls: Array<{ condition: boolean; commandId: BoundaryCommandId }> = [
                 { condition: location.endLine > location.startLine, commandId: "weAudit.boundaryShrinkBottom" },
-                { condition: true, commandId: "weAudit.boundaryExpandDown" },
-                { condition: true, commandId: "weAudit.boundaryMoveDown" },
+                { condition: canMoveDownOrExpandDown, commandId: "weAudit.boundaryExpandDown" },
+                { condition: canMoveDownOrExpandDown, commandId: "weAudit.boundaryMoveDown" },
             ];
 
             for (const control of bottomControls) {
@@ -288,11 +300,13 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
             }
         } else {
             // Single-line finding: show expand down on the same line
-            lenses.push(
-                this.createBoundaryCommandLens(topRange, "weAudit.boundaryExpandDown", locationArgs, {
-                    title: "$(arrow-down) Expand",
-                }),
-            );
+            if (canMoveDownOrExpandDown) {
+                lenses.push(
+                    this.createBoundaryCommandLens(topRange, "weAudit.boundaryExpandDown", locationArgs, {
+                        title: "$(arrow-down) Expand",
+                    }),
+                );
+            }
         }
 
         return lenses;
@@ -404,6 +418,7 @@ export function activateFindingBoundaryCodeLens(
     // Use a glob pattern so the provider also works in remote scenarios (where the scheme isn't "file")
     const selector: vscode.DocumentSelector = [{ pattern: "**/*" }, { scheme: "untitled" }];
     context.subscriptions.push(vscode.languages.registerCodeLensProvider(selector, provider));
+    context.subscriptions.push(provider);
 
     // Command: Start editing finding boundary
     context.subscriptions.push(
@@ -461,7 +476,7 @@ export function activateFindingBoundaryCodeLens(
                 return;
             }
             const session = provider.getActiveSession();
-            if (session && editor && editor.document.uri.fsPath !== session.uri.fsPath) {
+            if (session && (!editor || editor.document.uri.fsPath !== session.uri.fsPath)) {
                 provider.stopEditing();
             }
         }),

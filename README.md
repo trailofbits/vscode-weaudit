@@ -213,7 +213,8 @@ You can configure the keybindings to any of the extension's commands in the VSCo
 -   `weAudit.boundaryExpandDown`: Expand Finding Down: `cmd + shift + numpad1`
 -   `weAudit.boundaryMoveDown`: Move Finding Down: `cmd + shift + numpad2`
 -   `weAudit.boundaryShrinkBottom`: Shrink Finding from Bottom: `cmd + shift + numpad3`
--   `weAudit.stopEditingBoundary`: Finish Boundary Editing: `cmd + shift + numpad5`
+-   `weAudit.editFindingBoundary`: Start Boundary Editing (when not editing): `cmd + shift + numpad5`
+-   `weAudit.stopEditingBoundary`: Finish Boundary Editing (when editing): `cmd + shift + numpad5`
 
 ## WeAudit Concepts
 
