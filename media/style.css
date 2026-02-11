@@ -43,6 +43,18 @@
     padding-bottom: 1em;
 }
 
+.detailsWarning {
+    display: none;
+    padding: 0.5em 0.75em;
+    margin-bottom: 1em;
+    border-left: 3px solid var(--vscode-inputValidation-warningBorder, #d7ba7d);
+    background: var(--vscode-inputValidation-warningBackground, rgba(255, 197, 61, 0.12));
+    color: var(--vscode-inputValidation-warningForeground, inherit);
+    border-radius: 2px;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
 vscode-dropdown,
 vscode-text-area,
 vscode-text-field {

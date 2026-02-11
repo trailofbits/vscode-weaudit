@@ -1635,6 +1635,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     // Cached configuration for sorting entries alphabetically
     private sortEntriesAlphabetically: boolean;
 
+    // Whether entries should be filtered by the current workspace commit hash.
+    private filterByCurrentCommit = false;
+
     // State for navigating through partially audited regions
     private currentPartiallyAuditedIndex = -1;
 
@@ -1656,6 +1659,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.username = this.setUsernameConfigOrDefault();
         this.findAndLoadConfigurationUsernames();
         this.resolvedEntriesTree = new ResolvedEntries(context, this.resolvedEntries);
+        // Initialize context key so the toolbar toggle renders correctly.
+        void vscode.commands.executeCommand("setContext", "weAudit.filterCurrentCommit", this.filterByCurrentCommit);
 
         vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
 
@@ -1740,6 +1745,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         vscode.commands.registerCommand("weAudit.toggleTreeViewMode", () => {
             this.toggleTreeViewMode();
+        });
+
+        // Commit filter controls for the List of Findings toolbar.
+        vscode.commands.registerCommand("weAudit.enableCurrentCommitFilter", () => {
+            this.setCommitFilterEnabled(true);
+        });
+
+        vscode.commands.registerCommand("weAudit.disableCurrentCommitFilter", () => {
+            this.setCommitFilterEnabled(false);
         });
 
         vscode.commands.registerCommand("weAudit.addFinding", () => {
@@ -2359,6 +2373,28 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     /**
+     * Returns whether commit filtering is enabled.
+     */
+    public isCommitFilterEnabled(): boolean {
+        return this.filterByCurrentCommit;
+    }
+
+    /**
+     * Enable or disable commit-based filtering of entries.
+     */
+    public setCommitFilterEnabled(enabled: boolean): void {
+        if (this.filterByCurrentCommit === enabled) {
+            return;
+        }
+        this.filterByCurrentCommit = enabled;
+        void vscode.commands.executeCommand("setContext", "weAudit.filterCurrentCommit", enabled);
+        this.markPathMapDirty();
+        this.refreshTree();
+        this.decorate();
+        this.refreshAllFileDecorations();
+    }
+
+    /**
      * Toggles the tree view mode between linear and organized per file,
      * updates the configuration and
      * refreshes the tree.
@@ -2372,6 +2408,24 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const label = treeViewModeLabel(this.treeViewMode);
         vscode.workspace.getConfiguration("weAudit").update("general.treeViewMode", label, true);
         this.refreshTree();
+    }
+
+    /**
+     * Refresh file decorations for every location in the current tree entries.
+     */
+    private refreshAllFileDecorations(): void {
+        const seen = new Set<string>();
+        for (const entry of this.treeEntries) {
+            for (const location of entry.locations) {
+                const uri = vscode.Uri.file(path.join(location.rootPath, location.path));
+                const key = uri.fsPath;
+                if (seen.has(key)) {
+                    continue;
+                }
+                seen.add(key);
+                this._onDidChangeFileDecorationsEmitter.fire(uri);
+            }
+        }
     }
 
     /**
@@ -3755,6 +3809,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         outer: for (const entry of this.treeEntries) {
             // if any of the locations is on this file, badge it
             if (entry.entryType === EntryType.Finding && entry.locations) {
+                // Commit filtering should also constrain file badges.
+                if (!this.entryMatchesCommitFilter(entry)) {
+                    continue;
+                }
                 for (const location of entry.locations) {
                     for (const [wsRoot, relativePath] of allRootsAndPaths) {
                         if (location.path === relativePath && location.rootPath === wsRoot.rootPath) {
@@ -3852,6 +3910,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const labelDecorations: vscode.DecorationOptions[] = [];
 
         for (const treeItem of this.treeEntries) {
+            // Keep editor highlights in sync with commit filtering.
+            if (!this.entryMatchesCommitFilter(treeItem)) {
+                continue;
+            }
             const isOwnEntry = this.username === treeItem.author;
             const findingDecoration = isOwnEntry ? ownDecorations : otherDecorations;
             const noteDecoration = isOwnEntry ? ownNoteDecorations : otherNoteDecorations;
@@ -4231,6 +4293,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     private isLocationVisible(entry: FullEntry, location: FullLocation): boolean {
+        // Respect commit filtering when deciding whether a location is visible.
+        if (!this.entryMatchesCommitFilter(entry)) {
+            return false;
+        }
         const absolutePath = path.join(location.rootPath, location.path);
         const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(absolutePath);
         if (wsRoot === undefined) {
@@ -4264,6 +4330,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Locationless entries are scoped to the config root they were loaded from.
      */
     private isEntryVisible(entry: FullEntry): boolean {
+        // Commit filtering applies before any workspace/user visibility checks.
+        if (!this.entryMatchesCommitFilter(entry)) {
+            return false;
+        }
         if (entry.locations.length > 0) {
             return this.hasVisibleLocation(entry);
         }
@@ -4272,6 +4342,55 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return !this.workspaces.moreThanOneRoot() && this.workspaces.getSelectedConfigurations().some((config) => config.username === entry.author);
         }
         return this.workspaces.getSelectedConfigurations().some((config) => config.username === entry.author && config.root.label === origin.rootLabel);
+    }
+
+    /**
+     * Return the commit hash stored on an entry's provenance, or an empty string.
+     */
+    public getEntryCommitHash(entry: FullEntry): string {
+        const provenance = entry.details?.provenance;
+        if (provenance && typeof provenance === "object") {
+            return provenance.commitHash ?? "";
+        }
+        return "";
+    }
+
+    /**
+     * Resolve the workspace root for an entry, including locationless entries.
+     */
+    public getEntryWorkspaceRoot(entry: FullEntry): WARoot | undefined {
+        if (entry.locations.length > 0) {
+            const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(entry.locations[0].rootPath);
+            return wsRoot;
+        }
+        const origin = this.entryOriginRoots.get(entry);
+        if (origin) {
+            const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(origin.rootPath);
+            return wsRoot;
+        }
+        return undefined;
+    }
+
+    /**
+     * Get the current commit hash for the entry's workspace root.
+     */
+    public getEntryCurrentCommitHash(entry: FullEntry): string {
+        return this.getEntryWorkspaceRoot(entry)?.findGitSha() ?? "";
+    }
+
+    /**
+     * Return whether an entry should be included when commit filtering is enabled.
+     */
+    private entryMatchesCommitFilter(entry: FullEntry): boolean {
+        if (!this.filterByCurrentCommit) {
+            return true;
+        }
+        const entryCommitHash = this.getEntryCommitHash(entry);
+        const currentCommitHash = this.getEntryCurrentCommitHash(entry);
+        if (!entryCommitHash || !currentCommitHash) {
+            return false;
+        }
+        return entryCommitHash === currentCommitHash;
     }
 
     /**
@@ -4790,8 +4909,19 @@ export class AuditMarker {
         // Active entries should always present an open resolution in the details view.
         entry.details.resolution = EntryResolution.Open;
 
-        // Fills the Finding details webview with the currently selected entry details
-        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details, entry.label, entry.entryType, entry.author);
+        // Fills the Finding details webview with the currently selected entry details.
+        // Include commit hashes so the details view can warn about mismatches.
+        const entryCommitHash = treeDataProvider.getEntryCommitHash(entry);
+        const currentCommitHash = treeDataProvider.getEntryCurrentCommitHash(entry);
+        vscode.commands.executeCommand(
+            "weAudit.setWebviewFindingDetails",
+            entry.details,
+            entry.label,
+            entry.entryType,
+            entry.author,
+            entryCommitHash,
+            currentCommitHash,
+        );
     }
 
     /**

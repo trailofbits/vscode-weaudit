@@ -93,6 +93,7 @@ The panel also shows a read-only provenance field (defaulting to "human"), with 
 The Description, Exploit Scenario, and Recommendations fields auto-expand as you type, starting at roughly two lines tall, up to half the panel height, then scroll.
 The action buttons at the top let you triage findings (True/False Positive), resolve notes, or open a GitHub issue.
 Resolution changes are applied through those action buttons.
+If the finding's commit hash does not match the current workspace commit hash, a warning banner appears in the details view.
 
 ![Finding Details](media/readme/finding_details.png)
 
@@ -187,6 +188,7 @@ Hide every findings/notes highlight in the editor by running the `weAudit: Toggl
 
 ### Search & Filter Findings
 You can search for and filter the findings in the `List of Findings` panel by calling the `weAudit: Search and Filter Findings` command.
+You can also toggle the `Current Commit` filter in the `List of Findings` panel toolbar to only show entries that match the workspace commit hash.
 
 ![Filter Findings](media/readme/gifs/filter_findings.gif)
 

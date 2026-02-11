@@ -14,9 +14,12 @@ export function activateFindingDetailsWebview(context: vscode.ExtensionContext):
 
     // Register commands
     context.subscriptions.push(
-        vscode.commands.registerCommand("weAudit.setWebviewFindingDetails", (entry: EntryDetails, title: string, entryType: EntryType, author: string) => {
-            provider.setFindingDetails(entry, title, entryType, author);
-        }),
+        vscode.commands.registerCommand(
+            "weAudit.setWebviewFindingDetails",
+            (entry: EntryDetails, title: string, entryType: EntryType, author: string, entryCommitHash?: string, currentCommitHash?: string) => {
+                provider.setFindingDetails(entry, title, entryType, author, entryCommitHash, currentCommitHash);
+            },
+        ),
     );
 
     context.subscriptions.push(
@@ -58,7 +61,14 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
     /**
      * Set finding details in the webview
      */
-    public setFindingDetails(entry: EntryDetails, title: string, entryType: EntryType, author: string): void {
+    public setFindingDetails(
+        entry: EntryDetails,
+        title: string,
+        entryType: EntryType,
+        author: string,
+        entryCommitHash?: string,
+        currentCommitHash?: string,
+    ): void {
         if (this._view) {
             const resolution = entry.resolution ?? EntryResolution.Open;
             this._view.webview.postMessage({
@@ -74,6 +84,8 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                 entryType: entryType === EntryType.Finding ? "finding" : "note",
                 resolution: resolution,
                 title: title,
+                entryCommitHash: entryCommitHash ?? "",
+                currentCommitHash: currentCommitHash ?? "",
             });
 
             // Set context to show the "Open Remote Issue" button in the view title

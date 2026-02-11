@@ -205,6 +205,16 @@
                 "icon": "$(sort-precedence)"
             },
             {
+                "command": "weAudit.enableCurrentCommitFilter",
+                "title": "Show Current Commit Findings",
+                "icon": "$(git-commit)"
+            },
+            {
+                "command": "weAudit.disableCurrentCommitFilter",
+                "title": "Show All Findings",
+                "icon": "$(list-unordered)"
+            },
+            {
                 "command": "weAudit.toggleAudited",
                 "title": "weAudit: Mark File as Reviewed"
             },
@@ -395,6 +405,16 @@
                     "command": "weAudit.toggleTreeViewMode",
                     "when": "view == codeMarker",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "weAudit.enableCurrentCommitFilter",
+                    "when": "view == codeMarker && !weAudit.filterCurrentCommit",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "weAudit.disableCurrentCommitFilter",
+                    "when": "view == codeMarker && weAudit.filterCurrentCommit",
+                    "group": "navigation@3"
                 },
                 {
                     "command": "weAudit.setupRepositoriesCurrent",

@@ -25,6 +25,7 @@ function main(): void {
     titleField?.addEventListener("change", handlePersistentFieldChange);
 
     const provenanceValue = document.getElementById("provenance-value") as HTMLSpanElement;
+    const commitWarning = document.getElementById("commit-warning") as HTMLDivElement;
 
     const findingActionsRow = document.getElementById("finding-actions") as HTMLDivElement;
     const noteActionsRow = document.getElementById("note-actions") as HTMLDivElement;
@@ -81,6 +82,17 @@ function main(): void {
                 const provenance = (message.provenance ?? "human") as string;
                 const authorSuffix = message.author ? ` (${message.author})` : "";
                 provenanceValue.textContent = `${provenance}${authorSuffix}`;
+                const entryCommitHash = String(message.entryCommitHash ?? "");
+                const currentCommitHash = String(message.currentCommitHash ?? "");
+                if (isCommitMismatch(entryCommitHash, currentCommitHash)) {
+                    const entryShort = formatCommitHash(entryCommitHash);
+                    const currentShort = formatCommitHash(currentCommitHash);
+                    commitWarning.textContent = `Commit hash mismatch: entry ${entryShort} vs current ${currentShort}.`;
+                    commitWarning.style.display = "block";
+                } else {
+                    commitWarning.textContent = "";
+                    commitWarning.style.display = "none";
+                }
                 const isFinding = message.entryType === "finding";
                 const isNote = message.entryType === "note";
                 findingActionsRow.style.display = isFinding ? "flex" : "none";
@@ -101,6 +113,8 @@ function main(): void {
             case "hide-finding-details":
                 containerDiv.style.display = "none";
                 provenanceValue.textContent = "";
+                commitWarning.textContent = "";
+                commitWarning.style.display = "none";
                 findingActionsRow.style.display = "none";
                 noteActionsRow.style.display = "none";
                 break;
@@ -186,6 +200,24 @@ function registerAutoResizingTextArea(textArea: TextArea | null, onInput: (event
         onInput(event);
     });
     window.addEventListener("resize", () => resizeTextAreaToContent(textArea));
+}
+
+/**
+ * Returns true when both commit hashes exist and do not match.
+ */
+function isCommitMismatch(entryCommitHash: string, currentCommitHash: string): boolean {
+    return entryCommitHash !== "" && currentCommitHash !== "" && entryCommitHash !== currentCommitHash;
+}
+
+/**
+ * Format a commit hash for display, shortening long values.
+ */
+function formatCommitHash(hash: string): string {
+    const trimmed = hash.trim();
+    if (trimmed.length <= 12) {
+        return trimmed;
+    }
+    return trimmed.slice(0, 12);
 }
 /**
  * Registers a button click listener that posts a details action message.
