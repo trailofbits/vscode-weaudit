@@ -98,18 +98,15 @@ async function openSampleFile(): Promise<TextEditor> {
             500,
         );
 
-        // If the tab still isn't open, fall back to Quick Open (Ctrl+P / Cmd+P).
+        // If the tab still isn't open, open the file via the Explorer sidebar.
         try {
             return (await editorView.openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
         } catch {
-            const driver = VSBrowser.instance.driver;
-            const modifier = process.platform === "darwin" ? Key.META : Key.CONTROL;
-            await driver.actions({ bridge: true }).keyDown(modifier).sendKeys("p").keyUp(modifier).perform();
-            await driver.sleep(2_000);
-            const input = await InputBox.create();
-            await input.setText(SAMPLE_FILE_BASENAME);
-            await driver.sleep(2_000);
-            await input.confirm();
+            const explorerView = await new ActivityBar().getViewControl("Explorer");
+            await explorerView?.openView();
+            const content = new Workbench().getSideBar().getContent();
+            const section = await content.getSection("sample-workspace");
+            await section.openItem("src", SAMPLE_FILE_BASENAME);
             await waitForCondition(
                 async () => {
                     try {
