@@ -53,6 +53,11 @@ type BoundaryCommandMetadata = (typeof BOUNDARY_COMMANDS)[BoundaryCommandId];
 /** The four decoration style keys used for boundary highlighting. */
 type DecorationStyleKey = "single" | "top" | "middle" | "bottom";
 
+/** Creates a zero-width range at the start of the given line. */
+function lineRange(line: number): vscode.Range {
+    return new vscode.Range(line, 0, line, 0);
+}
+
 /**
  * CodeLens provider that displays boundary adjustment controls for findings.
  * This provider is only active when a user explicitly enters boundary editing mode
@@ -93,9 +98,6 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
         }),
     };
 
-    /** Ordered keys for iterating over decoration styles consistently. */
-    private readonly decorationStyleKeys: DecorationStyleKey[] = ["single", "top", "middle", "bottom"];
-
     constructor() {
         void vscode.commands.executeCommand("setContext", "weAudit.boundaryEditing", false);
     }
@@ -104,8 +106,8 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
      * Disposes all decoration types and the event emitter.
      */
     dispose(): void {
-        for (const key of this.decorationStyleKeys) {
-            this.decorationStyles[key].dispose();
+        for (const style of Object.values(this.decorationStyles)) {
+            style.dispose();
         }
         this._onDidChangeCodeLenses.dispose();
     }
@@ -201,50 +203,40 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
         const canMoveDownOrExpandDown = location.endLine < document.lineCount - 1;
 
         const locationId = `${this.activeSession.entry.label}:${this.activeSession.locationIndex}`;
-        const locationArgs: readonly [string] = [locationId];
+        const locationArgs = [locationId];
 
         // === TOP BOUNDARY CONTROLS (at startLine) ===
-        const topRange = new vscode.Range(location.startLine, 0, location.startLine, 0);
+        const topRange = lineRange(location.startLine);
+        const canShrink = location.startLine < location.endLine;
 
-        const topControls: Array<{ condition: boolean; commandId: BoundaryCommandId }> = [
-            { condition: location.startLine > 0, commandId: "weAudit.boundaryExpandUp" },
-            { condition: location.startLine < location.endLine, commandId: "weAudit.boundaryShrinkTop" },
-            { condition: location.startLine > 0, commandId: "weAudit.boundaryMoveUp" },
-        ];
-
-        for (const control of topControls) {
-            if (control.condition) {
-                lenses.push(this.createBoundaryCommandLens(topRange, control.commandId, locationArgs));
-            }
+        if (location.startLine > 0) {
+            lenses.push(this.createBoundaryCommandLens(topRange, "weAudit.boundaryExpandUp", locationArgs));
         }
-
+        if (canShrink) {
+            lenses.push(this.createBoundaryCommandLens(topRange, "weAudit.boundaryShrinkTop", locationArgs));
+        }
+        if (location.startLine > 0) {
+            lenses.push(this.createBoundaryCommandLens(topRange, "weAudit.boundaryMoveUp", locationArgs));
+        }
         lenses.push(this.createBoundaryCommandLens(topRange, "weAudit.stopEditingBoundary"));
 
         // === BOTTOM BOUNDARY CONTROLS (at endLine) ===
-        if (location.endLine !== location.startLine) {
+        if (canShrink) {
             const bottomLine = Math.min(location.endLine + 1, document.lineCount - 1);
-            const bottomRange = new vscode.Range(bottomLine, 0, bottomLine, 0);
+            const bottomRange = lineRange(bottomLine);
 
-            const bottomControls: Array<{ condition: boolean; commandId: BoundaryCommandId }> = [
-                { condition: location.endLine > location.startLine, commandId: "weAudit.boundaryShrinkBottom" },
-                { condition: canMoveDownOrExpandDown, commandId: "weAudit.boundaryExpandDown" },
-                { condition: canMoveDownOrExpandDown, commandId: "weAudit.boundaryMoveDown" },
-            ];
-
-            for (const control of bottomControls) {
-                if (control.condition) {
-                    lenses.push(this.createBoundaryCommandLens(bottomRange, control.commandId, locationArgs));
-                }
-            }
-        } else {
-            // Single-line finding: show expand down on the same line
+            lenses.push(this.createBoundaryCommandLens(bottomRange, "weAudit.boundaryShrinkBottom", locationArgs));
             if (canMoveDownOrExpandDown) {
-                lenses.push(
-                    this.createBoundaryCommandLens(topRange, "weAudit.boundaryExpandDown", locationArgs, {
-                        title: "$(arrow-down) Expand",
-                    }),
-                );
+                lenses.push(this.createBoundaryCommandLens(bottomRange, "weAudit.boundaryExpandDown", locationArgs));
+                lenses.push(this.createBoundaryCommandLens(bottomRange, "weAudit.boundaryMoveDown", locationArgs));
             }
+        } else if (canMoveDownOrExpandDown) {
+            // Single-line finding: show expand down on the same line
+            lenses.push(
+                this.createBoundaryCommandLens(topRange, "weAudit.boundaryExpandDown", locationArgs, {
+                    title: "$(arrow-down) Expand",
+                }),
+            );
         }
 
         return lenses;
@@ -297,9 +289,9 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
                 continue;
             }
 
-            const decorations = this.buildDecorationRanges(location);
-            for (const key of this.decorationStyleKeys) {
-                editor.setDecorations(this.decorationStyles[key], decorations[key]);
+            const decorationRanges = this.buildDecorationRanges(location);
+            for (const [key, style] of Object.entries(this.decorationStyles)) {
+                editor.setDecorations(style, decorationRanges[key as DecorationStyleKey]);
             }
         }
     }
@@ -317,15 +309,15 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
         };
 
         if (location.startLine === location.endLine) {
-            ranges.single.push(new vscode.Range(location.startLine, 0, location.startLine, 0));
+            ranges.single.push(lineRange(location.startLine));
             return ranges;
         }
 
-        ranges.top.push(new vscode.Range(location.startLine, 0, location.startLine, 0));
+        ranges.top.push(lineRange(location.startLine));
         for (let line = location.startLine + 1; line < location.endLine; line++) {
-            ranges.middle.push(new vscode.Range(line, 0, line, 0));
+            ranges.middle.push(lineRange(line));
         }
-        ranges.bottom.push(new vscode.Range(location.endLine, 0, location.endLine, 0));
+        ranges.bottom.push(lineRange(location.endLine));
 
         return ranges;
     }
@@ -334,8 +326,8 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
      * Removes all boundary decorations from the given editor.
      */
     private clearDecorations(editor: vscode.TextEditor): void {
-        for (const key of this.decorationStyleKeys) {
-            editor.setDecorations(this.decorationStyles[key], []);
+        for (const style of Object.values(this.decorationStyles)) {
+            editor.setDecorations(style, []);
         }
     }
 
