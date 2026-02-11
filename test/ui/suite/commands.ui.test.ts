@@ -228,7 +228,7 @@ describe("weAudit Command UI Tests", () => {
     before(async function () {
         this.timeout(120_000);
         workbench = new Workbench();
-        await VSBrowser.instance.openResources(SAMPLE_WORKSPACE);
+        await VSBrowser.instance.openResources(SAMPLE_WORKSPACE, SAMPLE_FILE);
         await VSBrowser.instance.waitForWorkbench(60_000);
 
         // Wait for the workspace to fully load before running tests.
