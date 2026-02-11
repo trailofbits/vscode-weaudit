@@ -2,7 +2,7 @@ name: Tests
 
 on:
     push:
-        branches: [main, testing]
+        branches: [main]
     pull_request:
         branches: [main]
 
@@ -111,6 +111,11 @@ jobs:
 
             - name: Compile extension
               run: npm run compile
+
+            # https://github.com/redhat-developer/vscode-extension-tester/issues/2050
+            - name: Allow unprivileged user namespace (Ubuntu AppArmor)
+              if: runner.os == 'Linux'
+              run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
             # Linux requires a virtual display for VS Code / ChromeDriver
             - name: Run UI tests (Linux)
