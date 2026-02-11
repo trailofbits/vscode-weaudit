@@ -75,26 +75,61 @@ async function readSerializedData(): Promise<SerializedData | undefined> {
  * Opens the sample file, using the file picker when needed.
  */
 async function openSampleFile(): Promise<TextEditor> {
-    // Try the fast path first: the tab is already open.
+    // Fast path: the tab is already open.
     try {
         return (await new EditorView().openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
     } catch {
-        // Tab not open yet — ask VS Code to open the file and poll until the
-        // tab appears.  On CI (xvfb) the workspace may still be initialising,
-        // so we re-issue openResources on every retry to be safe.
-        await waitForCondition(
+        // Tab not open yet. Try the code CLI first; if that doesn't work
+        // (common on Linux CI where the CLI can't reach the chromedriver-
+        // managed VS Code instance), fall back to Quick Open via the
+        // command palette.
+        try {
+            await VSBrowser.instance.openResources(SAMPLE_FILE);
+        } catch {
+            /* ignore – we'll fall through to Quick Open */
+        }
+
+        let found = await waitForCondition(
             async () => {
                 try {
-                    await VSBrowser.instance.openResources(SAMPLE_FILE);
                     await new EditorView().openEditor(SAMPLE_FILE_BASENAME);
                     return true;
                 } catch {
                     return false;
                 }
             },
-            30_000,
-            1_000,
+            10_000,
+            500,
         );
+
+        if (!found) {
+            // Quick Open fallback: open the command palette, clear the ">"
+            // prefix so it becomes a file search, type the filename, and
+            // confirm.
+            await waitForCondition(
+                async () => {
+                    try {
+                        const prompt = await new Workbench().openCommandPrompt();
+                        await prompt.setText(SAMPLE_FILE_BASENAME);
+                        await VSBrowser.instance.driver.sleep(1_000);
+                        await prompt.confirm();
+                        await VSBrowser.instance.driver.sleep(500);
+                        await new EditorView().openEditor(SAMPLE_FILE_BASENAME);
+                        return true;
+                    } catch {
+                        try {
+                            await VSBrowser.instance.driver.actions({ bridge: true }).sendKeys(Key.ESCAPE).perform();
+                        } catch {
+                            /* ignore */
+                        }
+                        return false;
+                    }
+                },
+                20_000,
+                2_000,
+            );
+        }
+
         return (await new EditorView().openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
     }
 }
