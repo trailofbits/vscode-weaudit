@@ -4496,8 +4496,8 @@ export class AuditMarker {
             try {
                 await treeView.reveal(entry);
             } catch (error) {
-                const typedError = error as Error;
-                if (typedError.message.startsWith("TreeError")) {
+                const message = (error as Error).message ?? "";
+                if (message.startsWith("TreeError") || message.includes("Cannot resolve tree item")) {
                     return;
                 }
                 throw error;

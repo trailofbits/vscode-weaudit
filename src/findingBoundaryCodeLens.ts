@@ -50,6 +50,9 @@ const BOUNDARY_COMMANDS = {
 type BoundaryCommandId = keyof typeof BOUNDARY_COMMANDS;
 type BoundaryCommandMetadata = (typeof BOUNDARY_COMMANDS)[BoundaryCommandId];
 
+/** The four decoration style keys used for boundary highlighting. */
+type DecorationStyleKey = "single" | "top" | "middle" | "bottom";
+
 /**
  * CodeLens provider that displays boundary adjustment controls for findings.
  * This provider is only active when a user explicitly enters boundary editing mode
@@ -71,7 +74,7 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
         dark: { borderColor: "#ffcf70" },
     };
 
-    private readonly decorationStyles = {
+    private readonly decorationStyles: Record<DecorationStyleKey, vscode.TextEditorDecorationType> = {
         single: vscode.window.createTextEditorDecorationType({
             ...this.commonDecorationProps,
             borderWidth: "2px",
@@ -90,6 +93,9 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
         }),
     };
 
+    /** Ordered keys for iterating over decoration styles consistently. */
+    private readonly decorationStyleKeys: DecorationStyleKey[] = ["single", "top", "middle", "bottom"];
+
     constructor() {
         void vscode.commands.executeCommand("setContext", "weAudit.boundaryEditing", false);
     }
@@ -98,10 +104,9 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
      * Disposes all decoration types and the event emitter.
      */
     dispose(): void {
-        this.decorationStyles.single.dispose();
-        this.decorationStyles.top.dispose();
-        this.decorationStyles.middle.dispose();
-        this.decorationStyles.bottom.dispose();
+        for (const key of this.decorationStyleKeys) {
+            this.decorationStyles[key].dispose();
+        }
         this._onDidChangeCodeLenses.dispose();
     }
 
@@ -140,12 +145,9 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
         };
 
         void vscode.commands.executeCommand("setContext", "weAudit.boundaryEditing", true);
+        this.refreshSession();
 
-        // Force refresh of CodeLenses in all visible editors
-        this._onDidChangeCodeLenses.fire();
-        this.refreshEditingDecorations();
-
-        // Also focus the editor on the finding location to ensure it's visible
+        // Focus the editor on the finding location to ensure it is visible
         const editor = vscode.window.activeTextEditor;
         if (editor && editor.document.uri.fsPath === filePath) {
             const range = new vscode.Range(location.startLine, 0, location.endLine, 0);
@@ -159,8 +161,7 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
     stopEditing(): void {
         this.activeSession = undefined;
         void vscode.commands.executeCommand("setContext", "weAudit.boundaryEditing", false);
-        this._onDidChangeCodeLenses.fire();
-        this.refreshEditingDecorations();
+        this.refreshSession();
     }
 
     /**
@@ -170,69 +171,16 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
     updateEntry(entry: FullEntry): void {
         if (this.activeSession) {
             this.activeSession.entry = entry;
-            this._onDidChangeCodeLenses.fire();
-            this.refreshEditingDecorations();
+            this.refreshSession();
         }
     }
 
-    public updateDecorationsForVisibleEditors(): void {
+    /**
+     * Re-applies boundary decorations to all visible editors.
+     * Called when the set of visible editors changes while editing.
+     */
+    updateDecorationsForVisibleEditors(): void {
         this.refreshEditingDecorations();
-    }
-    private refreshEditingDecorations(): void {
-        for (const editor of vscode.window.visibleTextEditors) {
-            if (!this.activeSession || !this.isSessionDocument(editor.document.uri)) {
-                this.clearDecorations(editor);
-                continue;
-            }
-
-            const location = this.activeSession.entry.locations[this.activeSession.locationIndex];
-            if (!location) {
-                this.clearDecorations(editor);
-                continue;
-            }
-
-            const decorations = this.buildDecorationRanges(location);
-            editor.setDecorations(this.decorationStyles.single, decorations.single);
-            editor.setDecorations(this.decorationStyles.top, decorations.top);
-            editor.setDecorations(this.decorationStyles.middle, decorations.middle);
-            editor.setDecorations(this.decorationStyles.bottom, decorations.bottom);
-        }
-    }
-
-    private buildDecorationRanges(location: FullLocation): Record<"single" | "top" | "middle" | "bottom", vscode.Range[]> {
-        const ranges = {
-            single: [] as vscode.Range[],
-            top: [] as vscode.Range[],
-            middle: [] as vscode.Range[],
-            bottom: [] as vscode.Range[],
-        };
-
-        if (location.startLine === location.endLine) {
-            ranges.single.push(new vscode.Range(location.startLine, 0, location.startLine, 0));
-            return ranges;
-        }
-
-        ranges.top.push(new vscode.Range(location.startLine, 0, location.startLine, 0));
-        for (let line = location.startLine + 1; line < location.endLine; line++) {
-            ranges.middle.push(new vscode.Range(line, 0, line, 0));
-        }
-        ranges.bottom.push(new vscode.Range(location.endLine, 0, location.endLine, 0));
-
-        return ranges;
-    }
-
-    private clearDecorations(editor: vscode.TextEditor): void {
-        editor.setDecorations(this.decorationStyles.single, []);
-        editor.setDecorations(this.decorationStyles.top, []);
-        editor.setDecorations(this.decorationStyles.middle, []);
-        editor.setDecorations(this.decorationStyles.bottom, []);
-    }
-
-    private isSessionDocument(uri: vscode.Uri): boolean {
-        if (!this.activeSession) {
-            return false;
-        }
-        return path.normalize(uri.fsPath) === path.normalize(this.activeSession.uri.fsPath);
     }
 
     /**
@@ -240,16 +188,7 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
      * Only returns lenses when boundary editing mode is active and the document matches.
      */
     provideCodeLenses(document: vscode.TextDocument, _token: vscode.CancellationToken): vscode.CodeLens[] {
-        if (!this.activeSession) {
-            return [];
-        }
-
-        // Compare paths - normalize both to handle any path format differences
-        const docPath = document.uri.fsPath;
-        const sessionPath = this.activeSession.uri.fsPath;
-
-        // Only show lenses for the file being edited
-        if (path.normalize(docPath) !== path.normalize(sessionPath)) {
+        if (!this.activeSession || !this.isSessionDocument(document.uri)) {
             return [];
         }
 
@@ -257,10 +196,10 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
         if (!location) {
             return [];
         }
+
         const lenses: vscode.CodeLens[] = [];
         const canMoveDownOrExpandDown = location.endLine < document.lineCount - 1;
 
-        // Create a unique identifier for the location
         const locationId = `${this.activeSession.entry.label}:${this.activeSession.locationIndex}`;
         const locationArgs: readonly [string] = [locationId];
 
@@ -282,7 +221,6 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
         lenses.push(this.createBoundaryCommandLens(topRange, "weAudit.stopEditingBoundary"));
 
         // === BOTTOM BOUNDARY CONTROLS (at endLine) ===
-        // Only show bottom controls if endLine is different from startLine
         if (location.endLine !== location.startLine) {
             const bottomLine = Math.min(location.endLine + 1, document.lineCount - 1);
             const bottomRange = new vscode.Range(bottomLine, 0, bottomLine, 0);
@@ -333,6 +271,83 @@ export class FindingBoundaryCodeLensProvider implements vscode.CodeLensProvider 
             arguments: [...args],
         });
     }
+
+    /**
+     * Fires the CodeLens change event and refreshes boundary decorations.
+     * This is the common update path used after any session state change.
+     */
+    private refreshSession(): void {
+        this._onDidChangeCodeLenses.fire();
+        this.refreshEditingDecorations();
+    }
+
+    /**
+     * Applies or clears boundary decorations on all visible editors based on the active session.
+     */
+    private refreshEditingDecorations(): void {
+        for (const editor of vscode.window.visibleTextEditors) {
+            if (!this.activeSession || !this.isSessionDocument(editor.document.uri)) {
+                this.clearDecorations(editor);
+                continue;
+            }
+
+            const location = this.activeSession.entry.locations[this.activeSession.locationIndex];
+            if (!location) {
+                this.clearDecorations(editor);
+                continue;
+            }
+
+            const decorations = this.buildDecorationRanges(location);
+            for (const key of this.decorationStyleKeys) {
+                editor.setDecorations(this.decorationStyles[key], decorations[key]);
+            }
+        }
+    }
+
+    /**
+     * Builds per-style decoration ranges for the given location.
+     * Single-line locations use the "single" style; multi-line locations use top/middle/bottom.
+     */
+    private buildDecorationRanges(location: FullLocation): Record<DecorationStyleKey, vscode.Range[]> {
+        const ranges: Record<DecorationStyleKey, vscode.Range[]> = {
+            single: [],
+            top: [],
+            middle: [],
+            bottom: [],
+        };
+
+        if (location.startLine === location.endLine) {
+            ranges.single.push(new vscode.Range(location.startLine, 0, location.startLine, 0));
+            return ranges;
+        }
+
+        ranges.top.push(new vscode.Range(location.startLine, 0, location.startLine, 0));
+        for (let line = location.startLine + 1; line < location.endLine; line++) {
+            ranges.middle.push(new vscode.Range(line, 0, line, 0));
+        }
+        ranges.bottom.push(new vscode.Range(location.endLine, 0, location.endLine, 0));
+
+        return ranges;
+    }
+
+    /**
+     * Removes all boundary decorations from the given editor.
+     */
+    private clearDecorations(editor: vscode.TextEditor): void {
+        for (const key of this.decorationStyleKeys) {
+            editor.setDecorations(this.decorationStyles[key], []);
+        }
+    }
+
+    /**
+     * Checks whether the given URI matches the file for the active editing session.
+     */
+    private isSessionDocument(uri: vscode.Uri): boolean {
+        if (!this.activeSession) {
+            return false;
+        }
+        return path.normalize(uri.fsPath) === path.normalize(this.activeSession.uri.fsPath);
+    }
 }
 
 /** Singleton instance of the CodeLens provider */
@@ -362,12 +377,13 @@ export function activateFindingBoundaryCodeLens(
     modifyLocationBoundary: (entry: FullEntry, locationIndex: number, startLineDelta: number, endLineDelta: number, document: vscode.TextDocument) => boolean,
 ): void {
     const provider = getCodeLensProvider();
+
     /**
      * Resolves the entry and location index from the provided tree item.
      * @param locationOrEntry the entry or specific location entry under the cursor
      * @returns the concrete entry and the index of the location being edited
      */
-    const resolveEntrySelection = (locationOrEntry: FullEntry | FullLocationEntry | undefined): { entry: FullEntry; locationIndex: number } | undefined => {
+    function resolveEntrySelection(locationOrEntry: FullEntry | FullLocationEntry | undefined): { entry: FullEntry; locationIndex: number } | undefined {
         if (!locationOrEntry) {
             return undefined;
         }
@@ -383,24 +399,23 @@ export function activateFindingBoundaryCodeLens(
         }
 
         if (isEntry(locationOrEntry)) {
-            const entry = locationOrEntry;
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 return undefined;
             }
             const cursorLine = editor.selection.active.line;
-            const locationIndex = entry.locations.findIndex((loc) => cursorLine >= loc.startLine && cursorLine <= loc.endLine);
-            return { entry, locationIndex: locationIndex === -1 ? 0 : locationIndex };
+            const locationIndex = locationOrEntry.locations.findIndex((loc) => cursorLine >= loc.startLine && cursorLine <= loc.endLine);
+            return { entry: locationOrEntry, locationIndex: locationIndex === -1 ? 0 : locationIndex };
         }
 
         return undefined;
-    };
+    }
 
     /**
      * Ensures there is an active boundary editing session, creating one from the cursor location if needed.
      * @returns the active boundary edit session, or undefined if none could be established
      */
-    const ensureActiveBoundarySession = (): BoundaryEditSession | undefined => {
+    function ensureActiveBoundarySession(): BoundaryEditSession | undefined {
         const existingSession = provider.getActiveSession();
         if (existingSession) {
             return existingSession;
@@ -412,10 +427,32 @@ export function activateFindingBoundaryCodeLens(
         }
         provider.startEditing(selection.entry, selection.locationIndex);
         return provider.getActiveSession();
-    };
+    }
 
-    // Register the CodeLens provider for all text documents (file + untitled)
-    // Use a glob pattern so the provider also works in remote scenarios (where the scheme isn't "file")
+    /**
+     * Registers a boundary adjustment command that modifies the start/end lines by the given deltas.
+     */
+    function registerBoundaryCommand(commandId: string, startDelta: number, endDelta: number): void {
+        context.subscriptions.push(
+            vscode.commands.registerCommand(commandId, () => {
+                const document = vscode.window.activeTextEditor?.document;
+                if (!document) {
+                    return;
+                }
+
+                const session = ensureActiveBoundarySession();
+                if (!session) {
+                    return;
+                }
+                if (modifyLocationBoundary(session.entry, session.locationIndex, startDelta, endDelta, document)) {
+                    provider.updateEntry(session.entry);
+                }
+            }),
+        );
+    }
+
+    // Register the CodeLens provider for all text documents (file + untitled).
+    // Use a glob pattern so the provider also works in remote scenarios (where the scheme is not "file").
     const selector: vscode.DocumentSelector = [{ pattern: "**/*" }, { scheme: "untitled" }];
     context.subscriptions.push(vscode.languages.registerCodeLensProvider(selector, provider));
     context.subscriptions.push(provider);
@@ -438,30 +475,7 @@ export function activateFindingBoundaryCodeLens(
         }),
     );
 
-    // Helper to get the active editor's document
-    const getActiveDocument = (): vscode.TextDocument | undefined => {
-        return vscode.window.activeTextEditor?.document;
-    };
-
-    const registerBoundaryCommand = (commandId: string, startDelta: number, endDelta: number): void => {
-        context.subscriptions.push(
-            vscode.commands.registerCommand(commandId, () => {
-                const document = getActiveDocument();
-                if (!document) {
-                    return;
-                }
-
-                const session = ensureActiveBoundarySession();
-                if (!session) {
-                    return;
-                }
-                if (modifyLocationBoundary(session.entry, session.locationIndex, startDelta, endDelta, document)) {
-                    provider.updateEntry(session.entry);
-                }
-            }),
-        );
-    };
-
+    // Boundary adjustment commands
     registerBoundaryCommand("weAudit.boundaryExpandUp", -1, 0);
     registerBoundaryCommand("weAudit.boundaryShrinkTop", 1, 0);
     registerBoundaryCommand("weAudit.boundaryExpandDown", 0, 1);
@@ -472,9 +486,6 @@ export function activateFindingBoundaryCodeLens(
     // Stop editing when switching to a different file
     context.subscriptions.push(
         vscode.window.onDidChangeActiveTextEditor((editor) => {
-            if (!provider.isEditing()) {
-                return;
-            }
             const session = provider.getActiveSession();
             if (session && (!editor || editor.document.uri.fsPath !== session.uri.fsPath)) {
                 provider.stopEditing();
@@ -482,6 +493,7 @@ export function activateFindingBoundaryCodeLens(
         }),
     );
 
+    // Refresh decorations when the set of visible editors changes
     context.subscriptions.push(
         vscode.window.onDidChangeVisibleTextEditors(() => {
             if (provider.isEditing()) {

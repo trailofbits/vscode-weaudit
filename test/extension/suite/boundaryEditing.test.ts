@@ -11,6 +11,13 @@ interface ConfigurationEntry {
 }
 
 /**
+ * Returns a promise that resolves after the given number of milliseconds.
+ */
+function delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Returns the absolute path to the current user's `.weaudit` file for the given workspace folder.
  */
 function getWeauditFilePath(workspaceFolder: vscode.WorkspaceFolder): string {
@@ -82,39 +89,41 @@ suite("Boundary Editing CodeLens", () => {
         }
     });
 
-    suiteTeardown(async () => {
+    /**
+     * Stops boundary editing, unloads the config if loaded, and closes all editors.
+     */
+    async function stopEditingAndUnloadConfig(): Promise<void> {
         await vscode.commands.executeCommand("weAudit.stopEditingBoundary");
         if (isConfigLoaded) {
             await vscode.commands.executeCommand("weAudit.toggleSavedFindings", configEntry);
             isConfigLoaded = false;
         }
         await vscode.commands.executeCommand("workbench.action.closeAllEditors");
+    }
 
-        if (weauditFilePath) {
-            if (originalWeauditContent !== null) {
-                fs.writeFileSync(weauditFilePath, originalWeauditContent);
-            } else if (fs.existsSync(weauditFilePath)) {
-                fs.unlinkSync(weauditFilePath);
-            }
-            await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+    /**
+     * Restores the `.weaudit` file to its original state (or removes it if none existed).
+     */
+    function restoreWeauditFile(): void {
+        if (!weauditFilePath) {
+            return;
         }
+        if (originalWeauditContent !== null) {
+            fs.writeFileSync(weauditFilePath, originalWeauditContent);
+        } else if (fs.existsSync(weauditFilePath)) {
+            fs.unlinkSync(weauditFilePath);
+        }
+    }
+
+    suiteTeardown(async () => {
+        await stopEditingAndUnloadConfig();
+        restoreWeauditFile();
+        await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
     });
 
     setup(async () => {
-        await vscode.commands.executeCommand("weAudit.stopEditingBoundary");
-        if (isConfigLoaded) {
-            await vscode.commands.executeCommand("weAudit.toggleSavedFindings", configEntry);
-            isConfigLoaded = false;
-        }
-        await vscode.commands.executeCommand("workbench.action.closeAllEditors");
-
-        if (weauditFilePath) {
-            if (originalWeauditContent !== null) {
-                fs.writeFileSync(weauditFilePath, originalWeauditContent);
-            } else if (fs.existsSync(weauditFilePath)) {
-                fs.unlinkSync(weauditFilePath);
-            }
-        }
+        await stopEditingAndUnloadConfig();
+        restoreWeauditFile();
     });
 
     /**
@@ -138,8 +147,7 @@ suite("Boundary Editing CodeLens", () => {
      * This is used as a fallback for environments where cursor-only selections don't intersect regions as expected.
      */
     function selectSingleCharacterOnLine(editor: vscode.TextEditor, line: number): void {
-        const text = editor.document.lineAt(line).text;
-        const endChar = text.length === 0 ? 0 : 1;
+        const endChar = Math.min(1, editor.document.lineAt(line).text.length);
         editor.selection = new vscode.Selection(new vscode.Position(line, 0), new vscode.Position(line, endChar));
     }
 
@@ -152,35 +160,45 @@ suite("Boundary Editing CodeLens", () => {
     }
 
     /**
-     * Polls until a given CodeLens command appears for a document, or throws on timeout.
+     * Polls until the given predicate holds for the CodeLens command list, or throws on timeout.
+     * @param uri the document to query CodeLens commands for
+     * @param predicate returns true when the desired condition is met
+     * @param description human-readable description for the timeout error message
+     * @param timeoutMs maximum time to wait before throwing
      */
-    async function waitForWeauditCodeLensCommand(uri: vscode.Uri, command: string, timeoutMs: number = 3000): Promise<string[]> {
+    async function waitForCodeLensCondition(
+        uri: vscode.Uri,
+        predicate: (commands: string[]) => boolean,
+        description: string,
+        timeoutMs: number = 3000,
+    ): Promise<string[]> {
         const startTime = Date.now();
         while (Date.now() - startTime < timeoutMs) {
             const commands = await getWeauditCodeLensCommands(uri);
-            if (commands.includes(command)) {
+            if (predicate(commands)) {
                 return commands;
             }
-            await new Promise((resolve) => setTimeout(resolve, 100));
+            await delay(100);
         }
         const commands = await getWeauditCodeLensCommands(uri);
-        throw new Error(`Timed out waiting for CodeLens command "${command}". Got: ${JSON.stringify(commands)}`);
+        if (predicate(commands)) {
+            return commands;
+        }
+        throw new Error(`Timed out: ${description}. Got: ${JSON.stringify(commands)}`);
+    }
+
+    /**
+     * Polls until a given CodeLens command appears for a document, or throws on timeout.
+     */
+    async function waitForWeauditCodeLensCommand(uri: vscode.Uri, command: string, timeoutMs: number = 3000): Promise<string[]> {
+        return waitForCodeLensCondition(uri, (cmds) => cmds.includes(command), `waiting for CodeLens command "${command}"`, timeoutMs);
     }
 
     /**
      * Polls until a given CodeLens command disappears for a document, or throws on timeout.
      */
     async function waitForWeauditCodeLensCommandAbsent(uri: vscode.Uri, command: string, timeoutMs: number = 3000): Promise<string[]> {
-        const startTime = Date.now();
-        while (Date.now() - startTime < timeoutMs) {
-            const commands = await getWeauditCodeLensCommands(uri);
-            if (!commands.includes(command)) {
-                return commands;
-            }
-            await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        const commands = await getWeauditCodeLensCommands(uri);
-        throw new Error(`Timed out waiting for CodeLens command "${command}" to disappear. Got: ${JSON.stringify(commands)}`);
+        return waitForCodeLensCondition(uri, (cmds) => !cmds.includes(command), `waiting for CodeLens command "${command}" to disappear`, timeoutMs);
     }
 
     /**
@@ -196,7 +214,7 @@ suite("Boundary Editing CodeLens", () => {
         isConfigLoaded = true;
 
         // Allow the extension to process the loaded findings before editing
-        await new Promise((resolve) => setTimeout(resolve, 200));
+        await delay(200);
 
         try {
             await vscode.commands.executeCommand("weAudit.editFindingBoundary");
@@ -208,7 +226,7 @@ suite("Boundary Editing CodeLens", () => {
             await vscode.commands.executeCommand("weAudit.toggleSavedFindings", configEntry);
             isConfigLoaded = true;
 
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await delay(200);
             selectSingleCharacterOnLine(editor, cursorLine);
             await vscode.commands.executeCommand("weAudit.editFindingBoundary");
             return await waitForWeauditCodeLensCommand(editor.document.uri, expectedLensCommand, 3000);
@@ -276,7 +294,7 @@ suite("Boundary Editing CodeLens", () => {
             assert.ok(commands.includes("weAudit.boundaryMoveDown"), "Move Down should be offered when not yet at the document's last line");
 
             await vscode.commands.executeCommand("weAudit.boundaryExpandDown");
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await delay(300);
 
             const commandsAtEof = await getWeauditCodeLensCommands(editor.document.uri);
             assert.ok(!commandsAtEof.includes("weAudit.boundaryExpandDown"), "Expand Down should not be offered once the finding reaches end-of-file");
@@ -292,7 +310,7 @@ suite("Boundary Editing CodeLens", () => {
         await loadSeededFindingAndStartEditing(editor, 5, "weAudit.stopEditingBoundary");
 
         await vscode.commands.executeCommand("workbench.action.closeAllEditors");
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        await delay(500);
 
         const reopened = await openTestFile();
         const commandsAfterClose = await getWeauditCodeLensCommands(reopened.document.uri);
