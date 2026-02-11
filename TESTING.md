@@ -155,6 +155,83 @@ Key patterns that made the UI tests stable:
 - Timeouts: UI tests should use a suite-level Mocha timeout instead of scattered `this.timeout(...)` calls. This repo uses `test/ui/.mocharc.json` and passes it via `--mocha_config` in `package.json`.
 - Extension isolation: UI tests run with `--disable-extensions` and an isolated `--extensions_dir` (`.test-extensions/extensions`) to prevent local VS Code extensions from affecting runs.
 
+### ExTester Lessons Learned (Linux CI)
+
+`vscode-extension-tester` has several sharp edges, especially on Linux CI. This section documents issues we hit and the workarounds that work.
+
+#### `openResources` is unreliable on Linux CI
+
+`VSBrowser.instance.openResources(...)` spawns a **separate VS Code CLI subprocess** (`code -r <paths>`) via `child_process.execSync`. This fails silently in several Linux CI scenarios:
+
+- **Ubuntu 24.04 / AppArmor** ([ExTester #2050](https://github.com/redhat-developer/vscode-extension-tester/issues/2050)): AppArmor restricts unprivileged user namespaces, breaking the CLI subprocess. Fix in CI:
+  ```yaml
+  - name: Allow unprivileged user namespace (ubuntu)
+    if: runner.os == 'Linux'
+    run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+  ```
+- **Docker / xvfb** ([ExTester #506](https://github.com/redhat-developer/vscode-extension-tester/issues/506)): The CLI subprocess launches but can't connect to the running VS Code instance via IPC. No upstream fix exists.
+
+When `openResources` fails, the workspace may not actually open and files won't appear as editor tabs. Always wrap it in try/catch and provide a fallback.
+
+**Always use absolute paths** with `openResources`. Use `path.resolve(__dirname, ...)` — relative paths resolve from `process.cwd()` which is unpredictable in test runners.
+
+#### Opening files: fallback strategy
+
+Our `openSampleFile()` function uses a layered approach:
+
+1. **Fast path**: `EditorView.openEditor(filename)` — succeeds if the tab is already open.
+2. **CLI path**: `openResources(absolutePath)` — works on macOS/Windows, may fail on Linux CI.
+3. **Quick Open fallback**: `workbench.executeCommand("workbench.action.quickOpen")` followed by `InputBox.create()` / `setText(absolutePath)` / `confirm()`. This is the **most reliable cross-platform approach** documented in ExTester issues. It goes through VS Code's command palette UI, which works everywhere.
+
+The Quick Open approach is preferred over:
+- **`Ctrl+P` / `Cmd+P` keyboard shortcuts**: May not reach VS Code under xvfb/ChromeDriver.
+- **`Workbench.openCommandPrompt()`**: Opens the Command Palette with a `>` prefix. Clearing it via `InputBox.setText()` may not work reliably on all platforms because `clear()` on VS Code's custom input widget is inconsistent.
+- **Explorer sidebar navigation**: Requires knowing the exact section name (the workspace folder name), which can vary or not exist if the workspace didn't open.
+
+#### `EditorView.openEditor()` only switches tabs
+
+`openEditor(title)` does **not** open a file — it finds an existing tab by exact title match and activates it. If the file isn't already open as a tab, it throws `EditorTabNotFound`. Always pair it with a mechanism that actually opens the file first.
+
+#### Notifications can block UI interactions
+
+VS Code shows notification toasts (workspace trust, extension recommendations) that can overlay the editor tab bar. Clear them early in the `before` hook:
+```typescript
+await workbench.executeCommand("Notifications: Clear All Notifications");
+```
+
+The [Continue extension](https://github.com/continuedev/continue) does this as the first thing after opening a workspace.
+
+#### Workspace trust is disabled by default
+
+Since ExTester v4.1.0, `security.workspace.trust.enabled` is set to `false` in the test settings. No manual configuration needed unless you specifically want to test the trust dialog.
+
+#### Tree sections and `getSection()`
+
+`ViewContent.getSection(title)` does a case-sensitive lookup. The Explorer file tree section is named after the workspace folder. If the workspace didn't open (e.g., because `openResources` failed), the section won't exist. Use `getSections()` to discover available sections when debugging.
+
+Tree items may not be immediately available after opening a view. Use a wait pattern:
+```typescript
+await driver.wait(async () => {
+    const items = await section.getVisibleItems();
+    return items.length > 0;
+}, 5_000);
+```
+
+#### `StaleElementReferenceError`
+
+VS Code's DOM changes dynamically. ExTester page objects can go stale between interactions. The only solution is to re-find elements when this occurs. Wrap fragile interactions in retry loops.
+
+#### macOS limitations
+
+Native dialogs (file open, context menus, title bar menus) are **not automatable** on macOS. Use VS Code's built-in simple dialogs and the command palette instead.
+
+#### Reference
+
+- [ExTester Wiki](https://github.com/redhat-developer/vscode-extension-tester/wiki)
+- [Known Issues](https://github.com/redhat-developer/vscode-extension-tester/blob/main/KNOWN_ISSUES.md)
+- [ExTester #506 — openResources in Docker](https://github.com/redhat-developer/vscode-extension-tester/issues/506) (Quick Open and TitleBar workarounds)
+- [ExTester #2050 — AppArmor on Ubuntu 24.04](https://github.com/redhat-developer/vscode-extension-tester/issues/2050)
+
 ---
 
 ## Phase 1: Data Integrity (P0)

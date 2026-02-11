@@ -98,15 +98,15 @@ async function openSampleFile(): Promise<TextEditor> {
             500,
         );
 
-        // If the tab still isn't open, open the file via the Explorer sidebar.
+        // If the tab still isn't open, use Quick Open (most reliable cross-platform).
         try {
             return (await editorView.openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
         } catch {
-            const explorerView = await new ActivityBar().getViewControl("Explorer");
-            await explorerView?.openView();
-            const content = new Workbench().getSideBar().getContent();
-            const section = await content.getSection("sample-workspace");
-            await section.openItem("src", SAMPLE_FILE_BASENAME);
+            await new Workbench().executeCommand("workbench.action.quickOpen");
+            const input = await InputBox.create();
+            await input.setText(SAMPLE_FILE);
+            await VSBrowser.instance.driver.sleep(2_000);
+            await input.confirm();
             await waitForCondition(
                 async () => {
                     try {
