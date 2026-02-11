@@ -75,62 +75,55 @@ async function readSerializedData(): Promise<SerializedData | undefined> {
  * Opens the sample file, using the file picker when needed.
  */
 async function openSampleFile(): Promise<TextEditor> {
-    // Fast path: the tab is already open.
+    const editorView = new EditorView();
     try {
-        return (await new EditorView().openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
+        return (await editorView.openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
     } catch {
-        // Tab not open yet. Try the code CLI first; if that doesn't work
-        // (common on Linux CI where the CLI can't reach the chromedriver-
-        // managed VS Code instance), fall back to Quick Open via the
-        // command palette.
+        // Try the code CLI first; it may not be available on all CI environments.
         try {
             await VSBrowser.instance.openResources(SAMPLE_FILE);
         } catch {
-            /* ignore – we'll fall through to Quick Open */
+            /* ignore */
         }
-
-        let found = await waitForCondition(
+        await waitForCondition(
             async () => {
                 try {
-                    await new EditorView().openEditor(SAMPLE_FILE_BASENAME);
+                    await editorView.openEditor(SAMPLE_FILE_BASENAME);
                     return true;
                 } catch {
                     return false;
                 }
             },
-            10_000,
+            20_000,
             500,
         );
 
-        if (!found) {
-            // Quick Open fallback: open the command palette, clear the ">"
-            // prefix so it becomes a file search, type the filename, and
-            // confirm.
+        // If the tab still isn't open, fall back to Quick Open (Ctrl+P / Cmd+P).
+        try {
+            return (await editorView.openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
+        } catch {
+            const driver = VSBrowser.instance.driver;
+            const modifier = process.platform === "darwin" ? Key.META : Key.CONTROL;
+            await driver.actions({ bridge: true }).keyDown(modifier).sendKeys("p").keyUp(modifier).perform();
+            await driver.sleep(2_000);
+            const input = await InputBox.create();
+            await input.setText(SAMPLE_FILE_BASENAME);
+            await driver.sleep(2_000);
+            await input.confirm();
             await waitForCondition(
                 async () => {
                     try {
-                        const prompt = await new Workbench().openCommandPrompt();
-                        await prompt.setText(SAMPLE_FILE_BASENAME);
-                        await VSBrowser.instance.driver.sleep(1_000);
-                        await prompt.confirm();
-                        await VSBrowser.instance.driver.sleep(500);
-                        await new EditorView().openEditor(SAMPLE_FILE_BASENAME);
+                        await editorView.openEditor(SAMPLE_FILE_BASENAME);
                         return true;
                     } catch {
-                        try {
-                            await VSBrowser.instance.driver.actions({ bridge: true }).sendKeys(Key.ESCAPE).perform();
-                        } catch {
-                            /* ignore */
-                        }
                         return false;
                     }
                 },
                 20_000,
-                2_000,
+                500,
             );
+            return (await editorView.openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
         }
-
-        return (await new EditorView().openEditor(SAMPLE_FILE_BASENAME)) as TextEditor;
     }
 }
 
