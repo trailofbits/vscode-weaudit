@@ -558,7 +558,7 @@
         "@microsoft/eslint-formatter-sarif": "^3.1.0",
         "@stylistic/eslint-plugin": "^5.7.0",
         "@types/asciichart": "^1.5.6",
-        "@types/chai": "^4.3.20",
+        "@types/chai": "^5.2.3",
         "@types/glob": "^9.0.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "25.x",
