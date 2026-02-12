@@ -55,6 +55,7 @@
                 {
                     "id": "resolvedFindings",
                     "name": "Resolved Findings",
+                    "visibility": "collapsed",
                     "contextualTitle": "weAudit"
                 },
                 {
@@ -74,6 +75,7 @@
                 {
                     "id": "savedFindings",
                     "name": "weAudit Files",
+                    "visibility": "collapsed",
                     "contextualTitle": "weAudit"
                 }
             ]

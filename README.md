@@ -112,7 +112,7 @@ In the _List of Findings_ view, multi-location entries are collapsed by default;
 
 ### Resolve and Restore
 
-Notes can be resolved from the _List of Findings_ panel. Findings are triaged instead: mark them as `True Positive` or `False Positive` from the same panel. Resolved notes and triaged findings are no longer highlighted in the editor but remain visible in the _Resolved Findings_ panel with a status badge and a ✅/❌ indicator for true/false positives. You can restore any resolved entry by clicking the corresponding `Restore` button in the _Resolved Findings_ panel.
+Notes can be resolved from the _List of Findings_ panel. Findings are triaged instead: mark them as `True Positive` or `False Positive` from the same panel. Resolved notes and triaged findings are no longer highlighted in the editor but remain visible in the _Resolved Findings_ panel with a status badge and a ✅/❌ indicator for true/false positives. The _Resolved Findings_ panel is collapsed by default in the weAudit sidebar; expand it when you need to review or restore entries. You can restore any resolved entry by clicking the corresponding `Restore` button in the _Resolved Findings_ panel.
 When commit filtering is enabled, the _Resolved Findings_ panel follows the same commit hash rules as the main list.
 
 ![Resolve and Restore](media/readme/gifs/resolve_finding.gif)
@@ -147,7 +147,7 @@ You can view findings in a list, or grouped by filename by clicking on the `View
 
 You can share the weAudit file with you co-auditors to share findings. This file is located in the `.vscode` folder in your workspace named `$USERNAME.weaudit`.
 
-In the `weAudit Files` panel, you can toggle to show or hide the findings from each user by clicking on the entries.
+In the `weAudit Files` panel, you can toggle to show or hide the findings from each user by clicking on the entries. The `weAudit Files` panel is collapsed by default in the weAudit sidebar; expand it to manage contributors.
 Newly discovered `.weaudit` files are shown automatically by default; use the panel to hide them if needed.
 There are color settings for other user's findings and notes, and for your own findings and notes.
 Findings and notes show the author's username after the filename/line number in the _List of Findings_ panel.
