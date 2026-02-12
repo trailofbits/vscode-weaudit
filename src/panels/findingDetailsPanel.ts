@@ -71,6 +71,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
     ): void {
         if (this._view) {
             const resolution = entry.resolution ?? EntryResolution.Open;
+            const campaign = typeof entry.provenance === "object" && entry.provenance !== null ? (entry.provenance.campaign ?? "") : "";
             this._view.webview.postMessage({
                 command: "set-finding-details",
                 severity: entry.severity,
@@ -80,6 +81,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
                 exploit: entry.exploit,
                 recommendation: entry.recommendation,
                 provenance: typeof entry.provenance === "object" ? entry.provenance.source : (entry.provenance ?? "human"),
+                campaign: campaign,
                 author: author,
                 entryType: entryType === EntryType.Finding ? "finding" : "note",
                 resolution: resolution,

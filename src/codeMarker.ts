@@ -171,6 +171,48 @@ class WARoot {
     }
 
     /**
+     * Refresh configuration entries from disk and select newly discovered configs by default.
+     * @param selectNew Whether to auto-select configs that were not previously known.
+     */
+    refreshConfigurations(selectNew: boolean): void {
+        const vscodeFolder = path.join(this.rootPath, ".vscode");
+        const nextConfigs: ConfigurationEntry[] = [];
+        if (!fs.existsSync(vscodeFolder)) {
+            this.configs = [];
+            this.currentlySelectedConfigs = [];
+            return;
+        }
+
+        fs.readdirSync(vscodeFolder).forEach((file) => {
+            if (path.extname(file) !== SERIALIZED_FILE_EXTENSION) {
+                return;
+            }
+            const parsedPath = path.parse(file);
+            const configEntry = {
+                path: path.join(vscodeFolder, file),
+                username: parsedPath.name,
+                root: { label: this.rootLabel } as WorkspaceRootEntry,
+            } as ConfigurationEntry;
+            nextConfigs.push(configEntry);
+        });
+
+        const wasKnown = (config: ConfigurationEntry): boolean =>
+            this.configs.some((entry) => entry.path === config.path && entry.username === config.username);
+        const wasSelected = (config: ConfigurationEntry): boolean =>
+            this.currentlySelectedConfigs.some((entry) => entry.path === config.path && entry.username === config.username);
+
+        const nextSelected: ConfigurationEntry[] = [];
+        for (const configEntry of nextConfigs) {
+            if (wasSelected(configEntry) || (selectNew && !wasKnown(configEntry))) {
+                nextSelected.push(configEntry);
+            }
+        }
+
+        this.configs = nextConfigs;
+        this.currentlySelectedConfigs = nextSelected;
+    }
+
+    /**
      * Get the configurations (.weaudit files) of this workspace root.
      * @returns The configuration entries corresponding to the .weaudit
      * files from the .vscode folder in this workspace root.
@@ -487,6 +529,43 @@ class WARoot {
         this.gitSha = shaCommit.trim();
         this.persistGitHash();
         return this.gitSha;
+    }
+
+    /**
+     * Find the current HEAD git sha without using the configured gitSha cache.
+     * @returns The git sha or undefined if it could not be found
+     */
+    findHeadGitSha(): string | undefined {
+        const gitPath = path.join(this.rootPath, ".git", "HEAD");
+        if (!fs.existsSync(gitPath)) {
+            return;
+        }
+
+        let gitHead = fs.readFileSync(gitPath, "utf8");
+        if (!gitHead) {
+            return;
+        }
+
+        const headPath = gitHead.match(/ref: (.*)/);
+        if (!headPath) {
+            // probably a detached head
+            gitHead = gitHead.trim();
+            if (gitHead.length !== 40) {
+                console.error("[weAudit] Could not determine the git sha. Seemed to be a detached head but the hash length was not 40: " + gitHead);
+                return;
+            }
+            return gitHead.trim();
+        }
+
+        const shaPath = path.join(this.rootPath, ".git", headPath[1]);
+        if (!fs.existsSync(shaPath)) {
+            return;
+        }
+        const shaCommit = fs.readFileSync(shaPath, "utf8");
+        if (!shaCommit) {
+            return;
+        }
+        return shaCommit.trim();
     }
 
     /**
@@ -1270,6 +1349,16 @@ class MultiRootManager {
     }
 
     /**
+     * Refresh configuration entries for each workspace root.
+     * @param selectNew Whether to auto-select configs discovered since last refresh.
+     */
+    refreshConfigurations(selectNew: boolean): void {
+        for (const root of this.roots) {
+            root.refreshConfigurations(selectNew);
+        }
+    }
+
+    /**
      * Removes a root based on its root path and removes all the corresponding
      * data from the CodeMarker.
      * @param rootPath The path to the workspace root.
@@ -1636,7 +1725,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     private sortEntriesAlphabetically: boolean;
 
     // Whether entries should be filtered by the current workspace commit hash.
-    private filterByCurrentCommit = false;
+    private filterByCurrentCommit = true;
+    private hasShownCommitMismatchToast = false;
 
     // State for navigating through partially audited regions
     private currentPartiallyAuditedIndex = -1;
@@ -1663,6 +1753,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         void vscode.commands.executeCommand("setContext", "weAudit.filterCurrentCommit", this.filterByCurrentCommit);
 
         vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
+        this.maybeShowCommitMismatchToast();
 
         // Fill the Git configuration webview with the current git configuration
         vscode.commands.registerCommand(
@@ -1723,6 +1814,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // Pushes the roots and currently selected configurations to the MultiConfig
         vscode.commands.registerCommand("weAudit.getMultiConfigRoots", () => {
+            this.workspaces.refreshConfigurations(true);
             const rootPathsAndLabels = this.workspaces
                 .getRoots()
                 .map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel);
@@ -3328,7 +3420,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (wsRoot === undefined) {
             return "";
         }
-        return wsRoot.findGitSha() ?? "";
+        return wsRoot.findHeadGitSha() ?? wsRoot.findGitSha() ?? "";
     }
 
     /**
@@ -3673,6 +3765,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Reload all selected configurations from disk to keep the tree in sync with external changes.
      */
     reloadSavedFindingsFromDisk(): void {
+        this.workspaces.refreshConfigurations(true);
         const selectedConfigs = this.workspaces.getSelectedConfigurations();
         for (const config of selectedConfigs) {
             if (this.isSaving(config.username)) {
@@ -4375,7 +4468,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * Get the current commit hash for the entry's workspace root.
      */
     public getEntryCurrentCommitHash(entry: FullEntry): string {
-        return this.getEntryWorkspaceRoot(entry)?.findGitSha() ?? "";
+        const wsRoot = this.getEntryWorkspaceRoot(entry);
+        if (!wsRoot) {
+            return "";
+        }
+        return wsRoot.findHeadGitSha() ?? wsRoot.findGitSha() ?? "";
     }
 
     /**
@@ -4385,12 +4482,58 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (!this.filterByCurrentCommit) {
             return true;
         }
+        if (entry.entryType !== EntryType.Finding) {
+            return true;
+        }
         const entryCommitHash = this.getEntryCommitHash(entry);
         const currentCommitHash = this.getEntryCurrentCommitHash(entry);
         if (!entryCommitHash || !currentCommitHash) {
             return false;
         }
         return entryCommitHash === currentCommitHash;
+    }
+
+    /**
+     * Count findings whose commit hashes differ from the current workspace commit hash.
+     */
+    private countFindingsWithDifferentCommit(): number {
+        let count = 0;
+        for (const entry of this.treeEntries) {
+            if (entry.entryType !== EntryType.Finding) {
+                continue;
+            }
+            const entryCommitHash = this.getEntryCommitHash(entry);
+            const currentCommitHash = this.getEntryCurrentCommitHash(entry);
+            if (!entryCommitHash || !currentCommitHash) {
+                continue;
+            }
+            if (entryCommitHash !== currentCommitHash) {
+                count += 1;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Show a one-time toast when mismatched findings are hidden by commit filtering.
+     */
+    private maybeShowCommitMismatchToast(): void {
+        if (this.hasShownCommitMismatchToast) {
+            return;
+        }
+        this.hasShownCommitMismatchToast = true;
+        const count = this.countFindingsWithDifferentCommit();
+        if (count === 0) {
+            return;
+        }
+        const actionLabel = "Show All Findings";
+        void vscode.window
+            .showInformationMessage(`weAudit: ${count} finding(s) apply to different commit hashes. Run "${actionLabel}" to view them.`, actionLabel)
+            .then((choice) => {
+                if (choice === actionLabel) {
+                    void vscode.commands.executeCommand("weAudit.disableCurrentCommitFilter");
+                }
+            });
     }
 
     /**

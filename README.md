@@ -89,7 +89,7 @@ You can quickly navigate through all partially audited regions in your workspace
 ### Detailed Findings
 
 You can fill detailed information about a finding by clicking on it in the _List of Findings_ view in the sidebar. The respective _Finding Details_ panel will open, where you can fill the information.
-The panel also shows a read-only provenance field (defaulting to "human"), with the author's username shown next to it.
+The panel also shows a read-only provenance field (defaulting to "human"), with the author's username and any campaign tag shown next to it.
 The Description, Exploit Scenario, and Recommendations fields auto-expand as you type, starting at roughly two lines tall, up to half the panel height, then scroll.
 The action buttons at the top let you triage findings (True/False Positive), resolve notes, or open a GitHub issue.
 Resolution changes are applied through those action buttons.
@@ -147,6 +147,7 @@ You can view findings in a list, or grouped by filename by clicking on the `View
 You can share the weAudit file with you co-auditors to share findings. This file is located in the `.vscode` folder in your workspace named `$USERNAME.weaudit`.
 
 In the `weAudit Files` panel, you can toggle to show or hide the findings from each user by clicking on the entries.
+Newly discovered `.weaudit` files are shown automatically by default; use the panel to hide them if needed.
 There are color settings for other user's findings and notes, and for your own findings and notes.
 Findings and notes show the author's username after the filename/line number in the _List of Findings_ panel.
 
@@ -188,7 +189,7 @@ Hide every findings/notes highlight in the editor by running the `weAudit: Toggl
 
 ### Search & Filter Findings
 You can search for and filter the findings in the `List of Findings` panel by calling the `weAudit: Search and Filter Findings` command.
-You can also toggle the `Current Commit` filter in the `List of Findings` panel toolbar to only show entries that match the workspace commit hash.
+By default, the `List of Findings` panel shows only findings that match the workspace commit hash. Use the `Show All Findings` command in the panel toolbar to reveal findings from other commits (notes remain visible). When the workspace opens, weAudit notifies you if there are hidden findings from other commits.
 
 ![Filter Findings](media/readme/gifs/filter_findings.gif)
 

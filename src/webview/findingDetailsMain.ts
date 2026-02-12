@@ -80,8 +80,9 @@ function main(): void {
                 containerDiv.style.display = "block";
                 titleField.value = message.title;
                 const provenance = (message.provenance ?? "human") as string;
-                const authorSuffix = message.author ? ` (${message.author})` : "";
-                provenanceValue.textContent = `${provenance}${authorSuffix}`;
+                const campaign = String(message.campaign ?? "");
+                const author: string | undefined = typeof message.author === "string" ? message.author : undefined;
+                provenanceValue.textContent = formatProvenanceValue(provenance, author, campaign);
                 const entryCommitHash = String(message.entryCommitHash ?? "");
                 const currentCommitHash = String(message.currentCommitHash ?? "");
                 if (isCommitMismatch(entryCommitHash, currentCommitHash)) {
@@ -200,6 +201,16 @@ function registerAutoResizingTextArea(textArea: TextArea | null, onInput: (event
         onInput(event);
     });
     window.addEventListener("resize", () => resizeTextAreaToContent(textArea));
+}
+
+/**
+ * Formats the provenance display string with optional author and campaign metadata.
+ */
+function formatProvenanceValue(source: string, author: string | undefined, campaign: string): string {
+    const authorSuffix = author ? ` (${author})` : "";
+    const trimmedCampaign = campaign.trim();
+    const campaignSuffix = trimmedCampaign ? ` · campaign: ${trimmedCampaign}` : "";
+    return `${source}${authorSuffix}${campaignSuffix}`;
 }
 
 /**
