@@ -38,16 +38,13 @@ function main(): void {
     registerActionButton(resolveNoteButton, "resolve-note");
 
     const severityDropdown = document.getElementById("severity-dropdown") as Dropdown;
-    severityDropdown?.addEventListener("change", handlePersistentFieldChange);
-    severityDropdown?.addEventListener("input", handleNonPersistentFieldChange);
+    severityDropdown?.addEventListener("input", handlePersistentFieldChange);
 
     const difficultyDropdown = document.getElementById("difficulty-dropdown") as Dropdown;
-    difficultyDropdown?.addEventListener("change", handlePersistentFieldChange);
-    difficultyDropdown?.addEventListener("input", handleNonPersistentFieldChange);
+    difficultyDropdown?.addEventListener("input", handlePersistentFieldChange);
 
     const typeDropdown = document.getElementById("type-dropdown") as Dropdown;
-    typeDropdown?.addEventListener("change", handlePersistentFieldChange);
-    typeDropdown?.addEventListener("input", handleNonPersistentFieldChange);
+    typeDropdown?.addEventListener("input", handlePersistentFieldChange);
 
     // for the text areas, we listen to to both the change and input events
     // on change events we persist the data into disk
