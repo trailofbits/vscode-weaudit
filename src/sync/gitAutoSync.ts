@@ -16,6 +16,9 @@ const SYNC_COMMIT_MESSAGE = "chore(weaudit): sync findings";
 const LAST_SUCCESS_KEY = "weAudit.sync.lastSuccessAt";
 const CENTRAL_REMOTE_NAME = "origin";
 const PREFERRED_ORG = "trailofbits";
+const LOCK_WAIT_MS = 5000;
+const LOCK_RETRY_MS = 250;
+const LOCK_STALE_MS = 2 * 60 * 1000;
 
 type SyncMode = "repo-branch" | "central-repo";
 
@@ -100,6 +103,120 @@ async function filesAreIdentical(sourcePath: string, targetPath: string): Promis
  */
 async function ensureDirectory(dirPath: string): Promise<void> {
     await fs.promises.mkdir(dirPath, { recursive: true });
+}
+
+/**
+ * Pause for the provided number of milliseconds.
+ */
+function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Attempt to acquire a filesystem lock file using an exclusive create.
+ * Returns the opened file handle on success, or undefined if lock exists.
+ */
+async function tryAcquireLock(lockPath: string): Promise<fs.promises.FileHandle | undefined> {
+    try {
+        const handle = await fs.promises.open(lockPath, "wx");
+        const payload = JSON.stringify({ pid: process.pid, createdAt: new Date().toISOString() }) + "\n";
+        await handle.writeFile(payload, { encoding: "utf8" });
+        return handle;
+    } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code === "EEXIST") {
+            return;
+        }
+        throw error;
+    }
+}
+
+/**
+ * Determine whether an existing lock file is stale.
+ */
+async function isLockStale(lockPath: string, staleMs: number): Promise<boolean> {
+    try {
+        const stats = await fs.promises.stat(lockPath);
+        return Date.now() - stats.mtimeMs > staleMs;
+    } catch (_error) {
+        return false;
+    }
+}
+
+/**
+ * Release a previously acquired lock file.
+ */
+async function releaseLock(handle: fs.promises.FileHandle | undefined, lockPath: string): Promise<void> {
+    try {
+        await handle?.close();
+    } catch (_error) {
+        // ignore close errors
+    }
+    try {
+        await fs.promises.unlink(lockPath);
+    } catch (_error) {
+        // ignore unlink errors
+    }
+}
+
+/**
+ * Run a task while holding a filesystem lock.
+ * Returns true if the task executed, or false if the lock was busy.
+ */
+async function withFileLock(options: { lockPath: string; label: string; log: (message: string) => void; task: () => Promise<void> }): Promise<boolean> {
+    const { lockPath, label, log, task } = options;
+    await ensureDirectory(path.dirname(lockPath));
+    const start = Date.now();
+    let handle: fs.promises.FileHandle | undefined;
+
+    while (Date.now() - start < LOCK_WAIT_MS) {
+        handle = await tryAcquireLock(lockPath);
+        if (handle) {
+            break;
+        }
+
+        if (await isLockStale(lockPath, LOCK_STALE_MS)) {
+            log(`weAudit: ${label} sync recovered stale lock.`);
+            await releaseLock(undefined, lockPath);
+            continue;
+        }
+
+        await sleep(LOCK_RETRY_MS);
+    }
+
+    if (!handle) {
+        log(`weAudit: ${label} sync skipped (lock busy).`);
+        return false;
+    }
+
+    try {
+        await task();
+        return true;
+    } finally {
+        await releaseLock(handle, lockPath);
+    }
+}
+
+/**
+ * Determine whether an error message indicates a rebase failure/conflict.
+ */
+function isRebaseFailure(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+    const lower = message.toLowerCase();
+    if (message.includes("Cannot rebase onto multiple branches")) {
+        return true;
+    }
+    if (!lower.includes("rebase")) {
+        return false;
+    }
+    return lower.includes("conflict") || lower.includes("could not apply");
+}
+
+/**
+ * Notify the user that a sync conflict prevented their changes from syncing.
+ */
+function showSyncConflictToast(): void {
+    vscode.window.showWarningMessage("weAudit: Sync conflict detected. Your changes weren't synced due to a conflict.");
 }
 
 /**
@@ -548,6 +665,8 @@ class GitSyncSession implements SyncSession {
     private readonly repoRoot: string;
     private readonly workspaceMappings: WorkspaceRootMapping[];
     private readonly worktreePath: string;
+    private readonly lockPath: string;
+    private readonly lockLabel: string;
     private readonly settings: SyncSettings;
     private readonly outputChannel: vscode.OutputChannel;
     private readonly onSyncSuccess: () => void;
@@ -564,6 +683,8 @@ class GitSyncSession implements SyncSession {
         this.outputChannel = options.outputChannel;
         this.onSyncSuccess = options.onSyncSuccess;
         this.worktreePath = path.join(options.worktreeBaseDir, hashRepoRoot(this.repoRoot));
+        this.lockPath = path.join(options.worktreeBaseDir, `${hashRepoRoot(this.repoRoot)}.lock`);
+        this.lockLabel = this.repoRoot;
         this.workspaceMappings = this.buildWorkspaceMappings(options.workspaceRoots);
     }
 
@@ -571,7 +692,9 @@ class GitSyncSession implements SyncSession {
      * Initialize the worktree, watchers, and polling timer.
      */
     async initialize(): Promise<void> {
-        await this.ensureWorktree();
+        await this.withRepoLock(async () => {
+            await this.ensureWorktree();
+        });
         const seededDirty = this.seedLocalUserFile();
         this.setupWatchers();
         this.startPolling();
@@ -679,6 +802,18 @@ class GitSyncSession implements SyncSession {
     }
 
     /**
+     * Execute a task while holding the per-repo sync lock.
+     */
+    private async withRepoLock(task: () => Promise<void>): Promise<boolean> {
+        return withFileLock({
+            lockPath: this.lockPath,
+            label: this.lockLabel,
+            log: (message) => this.outputChannel.appendLine(message),
+            task,
+        });
+    }
+
+    /**
      * Handle a local .weaudit file change event.
      */
     private async onWorkspaceFileChange(filePath: string): Promise<void> {
@@ -748,41 +883,50 @@ class GitSyncSession implements SyncSession {
      * Perform a local sync: pull remote, apply remote changes, then commit/push local changes.
      */
     private async performLocalSync(): Promise<void> {
-        const dirtySnapshot = new Set(this.dirtyFiles);
-        this.dirtyFiles.clear();
-        let shouldRecordSuccess = false;
+        const executed = await this.withRepoLock(async () => {
+            const dirtySnapshot = new Set(this.dirtyFiles);
+            this.dirtyFiles.clear();
+            let shouldRecordSuccess = false;
 
-        try {
-            await this.ensureWorktree();
-            const hasRemote = await this.pullRemote();
-            if (hasRemote) {
-                const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
-                if (appliedChanges) {
-                    await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
-                    await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+            try {
+                await this.ensureWorktree();
+                const hasRemote = await this.pullRemote();
+                if (hasRemote) {
+                    const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
+                    if (appliedChanges) {
+                        await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+                        await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+                    }
+                    shouldRecordSuccess = true;
                 }
-                shouldRecordSuccess = true;
-            }
 
-            if (dirtySnapshot.size === 0) {
+                if (dirtySnapshot.size === 0) {
+                    if (shouldRecordSuccess) {
+                        this.onSyncSuccess();
+                    }
+                    return;
+                }
+
+                await this.applyWorkspaceToWorktree(dirtySnapshot);
+                const committed = await this.commitChanges(dirtySnapshot);
+                if (committed) {
+                    await this.pushRemote();
+                    shouldRecordSuccess = true;
+                }
                 if (shouldRecordSuccess) {
                     this.onSyncSuccess();
                 }
-                return;
+            } catch (error) {
+                this.mergeDirty(dirtySnapshot);
+                if (isRebaseFailure(error)) {
+                    showSyncConflictToast();
+                }
+                throw error;
             }
+        });
 
-            await this.applyWorkspaceToWorktree(dirtySnapshot);
-            const committed = await this.commitChanges(dirtySnapshot);
-            if (committed) {
-                await this.pushRemote();
-                shouldRecordSuccess = true;
-            }
-            if (shouldRecordSuccess) {
-                this.onSyncSuccess();
-            }
-        } catch (error) {
-            this.mergeDirty(dirtySnapshot);
-            throw error;
+        if (!executed) {
+            return;
         }
     }
 
@@ -790,18 +934,24 @@ class GitSyncSession implements SyncSession {
      * Perform a polling sync: pull remote and apply changes locally.
      */
     private async performPollSync(): Promise<void> {
-        await this.ensureWorktree();
-        const hasRemote = await this.pullRemote();
-        if (!hasRemote) {
+        const executed = await this.withRepoLock(async () => {
+            await this.ensureWorktree();
+            const hasRemote = await this.pullRemote();
+            if (!hasRemote) {
+                return;
+            }
+            const dirtySnapshot = new Set(this.dirtyFiles);
+            const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
+            if (appliedChanges) {
+                await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+                await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+            }
+            this.onSyncSuccess();
+        });
+
+        if (!executed) {
             return;
         }
-        const dirtySnapshot = new Set(this.dirtyFiles);
-        const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
-        if (appliedChanges) {
-            await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
-            await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
-        }
-        this.onSyncSuccess();
     }
 
     /**
@@ -1001,6 +1151,8 @@ class CentralGitSyncSession implements SyncSession {
     private readonly settings: SyncSettings;
     private readonly outputChannel: vscode.OutputChannel;
     private readonly onSyncSuccess: () => void;
+    private readonly lockPath: string;
+    private readonly lockLabel: string;
     private readonly watchers: vscode.FileSystemWatcher[] = [];
     private readonly dirtyFiles = new Set<string>();
     private readonly suppressedFileHashes = new Map<string, string | null>();
@@ -1015,6 +1167,8 @@ class CentralGitSyncSession implements SyncSession {
         this.onSyncSuccess = options.onSyncSuccess;
         const centralRepoUrl = this.settings.centralRepoUrl.trim();
         this.repoPath = path.join(options.worktreeBaseDir, "central", hashValue(centralRepoUrl));
+        this.lockPath = path.join(options.worktreeBaseDir, `central-${hashValue(centralRepoUrl)}.lock`);
+        this.lockLabel = "central";
     }
 
     /**
@@ -1026,7 +1180,9 @@ class CentralGitSyncSession implements SyncSession {
         for (const mapping of this.workspaceMappings) {
             this.log(`weAudit: central sync mapping ${mapping.workspaceRoot} -> repos/${mapping.repoKey}/${mapping.repoRelativeRoot || "."}`);
         }
-        await this.ensureCentralRepo();
+        await this.withRepoLock(async () => {
+            await this.ensureCentralRepo();
+        });
         const seededDirty = this.seedLocalUserFile();
         this.setupWatchers();
         this.startPolling();
@@ -1116,6 +1272,18 @@ class CentralGitSyncSession implements SyncSession {
             this.outputChannel.appendLine(`weAudit: central sync error: ${error instanceof Error ? error.message : String(error)}`);
         });
         return this.syncQueue;
+    }
+
+    /**
+     * Execute a task while holding the central repo sync lock.
+     */
+    private async withRepoLock(task: () => Promise<void>): Promise<boolean> {
+        return withFileLock({
+            lockPath: this.lockPath,
+            label: this.lockLabel,
+            log: (message) => this.outputChannel.appendLine(message),
+            task,
+        });
     }
 
     /**
@@ -1209,46 +1377,55 @@ class CentralGitSyncSession implements SyncSession {
      * Perform a local sync: pull remote, apply remote changes, then commit/push local changes.
      */
     private async performLocalSync(): Promise<void> {
-        const dirtySnapshot = new Set(this.dirtyFiles);
-        this.dirtyFiles.clear();
-        let shouldRecordSuccess = false;
+        const executed = await this.withRepoLock(async () => {
+            const dirtySnapshot = new Set(this.dirtyFiles);
+            this.dirtyFiles.clear();
+            let shouldRecordSuccess = false;
 
-        try {
-            this.log(`weAudit: central sync starting local sync (dirty=${dirtySnapshot.size}).`);
-            await this.ensureCentralRepo();
-            const hasRemote = await this.pullRemote();
-            if (hasRemote) {
-                const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
-                if (appliedChanges) {
-                    await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
-                    await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+            try {
+                this.log(`weAudit: central sync starting local sync (dirty=${dirtySnapshot.size}).`);
+                await this.ensureCentralRepo();
+                const hasRemote = await this.pullRemote();
+                if (hasRemote) {
+                    const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
+                    if (appliedChanges) {
+                        await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+                        await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+                    }
+                    shouldRecordSuccess = true;
                 }
-                shouldRecordSuccess = true;
-            }
 
-            if (dirtySnapshot.size === 0) {
-                this.log("weAudit: central sync no local changes to push.");
+                if (dirtySnapshot.size === 0) {
+                    this.log("weAudit: central sync no local changes to push.");
+                    if (shouldRecordSuccess) {
+                        this.onSyncSuccess();
+                    }
+                    return;
+                }
+
+                await this.applyWorkspaceToCentral(dirtySnapshot);
+                const committed = await this.commitChanges(dirtySnapshot);
+                if (committed) {
+                    await this.pushRemote();
+                    this.log("weAudit: central sync pushed local changes.");
+                    shouldRecordSuccess = true;
+                } else {
+                    this.log("weAudit: central sync no changes to commit after staging.");
+                }
                 if (shouldRecordSuccess) {
                     this.onSyncSuccess();
                 }
-                return;
+            } catch (error) {
+                this.mergeDirty(dirtySnapshot);
+                if (isRebaseFailure(error)) {
+                    showSyncConflictToast();
+                }
+                throw error;
             }
+        });
 
-            await this.applyWorkspaceToCentral(dirtySnapshot);
-            const committed = await this.commitChanges(dirtySnapshot);
-            if (committed) {
-                await this.pushRemote();
-                this.log("weAudit: central sync pushed local changes.");
-                shouldRecordSuccess = true;
-            } else {
-                this.log("weAudit: central sync no changes to commit after staging.");
-            }
-            if (shouldRecordSuccess) {
-                this.onSyncSuccess();
-            }
-        } catch (error) {
-            this.mergeDirty(dirtySnapshot);
-            throw error;
+        if (!executed) {
+            return;
         }
     }
 
@@ -1256,20 +1433,26 @@ class CentralGitSyncSession implements SyncSession {
      * Perform a polling sync: pull remote and apply changes locally.
      */
     private async performPollSync(): Promise<void> {
-        this.log("weAudit: central sync starting poll.");
-        await this.ensureCentralRepo();
-        const hasRemote = await this.pullRemote();
-        if (!hasRemote) {
-            this.log("weAudit: central sync poll skipped (remote branch not found).");
+        const executed = await this.withRepoLock(async () => {
+            this.log("weAudit: central sync starting poll.");
+            await this.ensureCentralRepo();
+            const hasRemote = await this.pullRemote();
+            if (!hasRemote) {
+                this.log("weAudit: central sync poll skipped (remote branch not found).");
+                return;
+            }
+            const dirtySnapshot = new Set(this.dirtyFiles);
+            const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
+            if (appliedChanges) {
+                await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+                await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+            }
+            this.onSyncSuccess();
+        });
+
+        if (!executed) {
             return;
         }
-        const dirtySnapshot = new Set(this.dirtyFiles);
-        const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
-        if (appliedChanges) {
-            await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
-            await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
-        }
-        this.onSyncSuccess();
     }
 
     /**
