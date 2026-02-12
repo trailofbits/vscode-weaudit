@@ -1089,6 +1089,33 @@ class WARoot {
             existsFile = false;
         }
 
+        // Only persist git config for the current user; keep existing values for other users to avoid overwrites.
+        let clientRemoteToSave = this.clientRemote;
+        let gitRemoteToSave = this.gitRemote;
+        let gitShaToSave = this.gitSha;
+        if (username !== this.username) {
+            clientRemoteToSave = "";
+            gitRemoteToSave = "";
+            gitShaToSave = "";
+            if (existsFile) {
+                try {
+                    const existingRaw = fs.readFileSync(fileName, "utf8");
+                    const existingData = JSON.parse(existingRaw) as Partial<SerializedData>;
+                    if (typeof existingData.clientRemote === "string") {
+                        clientRemoteToSave = existingData.clientRemote;
+                    }
+                    if (typeof existingData.gitRemote === "string") {
+                        gitRemoteToSave = existingData.gitRemote;
+                    }
+                    if (typeof existingData.gitSha === "string") {
+                        gitShaToSave = existingData.gitSha;
+                    }
+                } catch {
+                    // If we cannot read existing git config, fall back to empty fields for non-current users.
+                }
+            }
+        }
+
         // filter local entries of the affected user
         let filteredAuditedFiles = this.auditedFiles.filter((file) => file.author === username);
         let filteredPartiallyAuditedEntries = this.partiallyAuditedFiles.filter((entry) => entry.author === username);
@@ -1158,9 +1185,9 @@ class WARoot {
         }
 
         if (
-            !!this.clientRemote ||
-            !!this.gitRemote ||
-            !!this.gitSha ||
+            !!clientRemoteToSave ||
+            !!gitRemoteToSave ||
+            !!gitShaToSave ||
             reducedEntries.length !== 0 ||
             filteredAuditedFiles.length !== 0 ||
             filteredPartiallyAuditedEntries.length !== 0 ||
@@ -1188,9 +1215,9 @@ class WARoot {
             // save findings to file
             const data = JSON.stringify(
                 {
-                    clientRemote: this.clientRemote,
-                    gitRemote: this.gitRemote,
-                    gitSha: this.gitSha,
+                    clientRemote: clientRemoteToSave,
+                    gitRemote: gitRemoteToSave,
+                    gitSha: gitShaToSave,
                     treeEntries: reducedEntries,
                     auditedFiles: filteredAuditedFiles,
                     partiallyAuditedFiles: filteredPartiallyAuditedEntries,

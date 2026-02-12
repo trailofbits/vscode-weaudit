@@ -112,7 +112,7 @@ In the _List of Findings_ view, multi-location entries are collapsed by default;
 
 ### Resolve and Restore
 
-Notes can be resolved from the _List of Findings_ panel. Findings are triaged instead: mark them as `True Positive` or `False Positive` from the same panel. Resolved notes and triaged findings are no longer highlighted in the editor but remain visible in the _Resolved Findings_ panel with a status badge and a ✅/❌ indicator for true/false positives. The _Resolved Findings_ panel is collapsed by default in the weAudit sidebar; expand it when you need to review or restore entries. You can restore any resolved entry by clicking the corresponding `Restore` button in the _Resolved Findings_ panel.
+Notes can be resolved from the _List of Findings_ panel. Findings are triaged instead: mark them as `True Positive` or `False Positive` from the same panel. Resolved notes and triaged findings are no longer highlighted in the editor but remain visible in the _Resolved Findings_ panel with a status badge and a ✅/❌ indicator for true/false positives. Resolved findings keep their severity-tinted bug icon in the _Resolved Findings_ panel to make triaged items easier to scan. The _Resolved Findings_ panel is collapsed by default in the weAudit sidebar; expand it when you need to review or restore entries. You can restore any resolved entry by clicking the corresponding `Restore` button in the _Resolved Findings_ panel.
 When commit filtering is enabled, the _Resolved Findings_ panel follows the same commit hash rules as the main list.
 
 ![Resolve and Restore](media/readme/gifs/resolve_finding.gif)

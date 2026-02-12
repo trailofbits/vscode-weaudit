@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 
-import { FullEntry, EntryType, EntryResolution } from "./types";
+import { FullEntry, EntryType, EntryResolution, FindingSeverity } from "./types";
 
 /**
  * Returns a short status badge for a resolved entry.
@@ -49,6 +49,28 @@ function getResolutionEmoji(entry: FullEntry): string {
     return "";
 }
 
+/**
+ * Returns a theme color used to tint finding icons by severity.
+ * @param severity The severity value to map to a theme color.
+ * @returns A theme color for the icon, or undefined to use the default color.
+ */
+function getSeverityColor(severity: FindingSeverity | undefined): vscode.ThemeColor | undefined {
+    switch (severity) {
+        case FindingSeverity.High:
+            return new vscode.ThemeColor("problemsErrorIcon.foreground");
+        case FindingSeverity.Medium:
+            return new vscode.ThemeColor("problemsWarningIcon.foreground");
+        case FindingSeverity.Low:
+            return new vscode.ThemeColor("problemsInfoIcon.foreground");
+        case FindingSeverity.Informational:
+            return new vscode.ThemeColor("descriptionForeground");
+        case FindingSeverity.Undetermined:
+        case FindingSeverity.Undefined:
+        default:
+            return undefined;
+    }
+}
+
 export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
     private resolvedEntries: FullEntry[];
 
@@ -87,7 +109,7 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
         if (entry.entryType === EntryType.Note) {
             treeItem.iconPath = new vscode.ThemeIcon("bookmark");
         } else {
-            treeItem.iconPath = new vscode.ThemeIcon("bug");
+            treeItem.iconPath = new vscode.ThemeIcon("bug", getSeverityColor(entry.details?.severity));
         }
         const badge = getResolutionBadge(entry);
         const mainLocation = entry.locations[0];
