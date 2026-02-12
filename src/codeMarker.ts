@@ -494,41 +494,144 @@ class WARoot {
             return this.gitSha;
         }
 
-        const gitPath = path.join(this.rootPath, ".git", "HEAD");
+        // Resolve gitdir/commondir so worktrees don't fall back to the wrong HEAD.
+        const gitDirs = this.resolveGitDirectories();
+        if (gitDirs === undefined) {
+            return;
+        }
+        const sha = this.readGitHeadSha(gitDirs.gitDir, gitDirs.commonDir);
+        if (!sha) {
+            return;
+        }
+        this.gitSha = sha;
+        this.persistGitHash();
+        return this.gitSha;
+    }
+
+    /**
+     * Resolve the git directory and common directory for this workspace root.
+     * Worktrees store HEAD in a per-worktree gitdir with refs in a commondir,
+     * so we resolve both to return the checked-out commit hash.
+     */
+    private resolveGitDirectories(): { gitDir: string; commonDir: string } | undefined {
+        const gitPath = path.join(this.rootPath, ".git");
         if (!fs.existsSync(gitPath)) {
             return;
         }
 
-        let gitHead = fs.readFileSync(gitPath, "utf8");
+        let gitDir = gitPath;
+        const gitStat = fs.statSync(gitPath);
+        if (gitStat.isFile()) {
+            const gitDirPointer = fs.readFileSync(gitPath, "utf8").trim();
+            const gitDirMatch = gitDirPointer.match(/^gitdir:\s*(.+)\s*$/i);
+            if (!gitDirMatch) {
+                console.error(`[weAudit] Could not parse gitdir pointer at ${gitPath}`);
+                return;
+            }
+            gitDir = gitDirMatch[1].trim();
+            if (!path.isAbsolute(gitDir)) {
+                gitDir = path.resolve(this.rootPath, gitDir);
+            }
+        } else if (!gitStat.isDirectory()) {
+            return;
+        }
+
+        if (!fs.existsSync(gitDir)) {
+            return;
+        }
+
+        let commonDir = gitDir;
+        const commonDirPath = path.join(gitDir, "commondir");
+        if (fs.existsSync(commonDirPath)) {
+            const commonDirPointer = fs.readFileSync(commonDirPath, "utf8").trim();
+            if (commonDirPointer) {
+                commonDir = path.isAbsolute(commonDirPointer) ? commonDirPointer : path.resolve(gitDir, commonDirPointer);
+            }
+        }
+
+        return { gitDir, commonDir };
+    }
+
+    /**
+     * Read the current commit hash from the git HEAD file, resolving refs and packed refs as needed.
+     */
+    private readGitHeadSha(gitDir: string, commonDir: string): string | undefined {
+        const gitHeadPath = path.join(gitDir, "HEAD");
+        if (!fs.existsSync(gitHeadPath)) {
+            return;
+        }
+
+        const gitHead = fs.readFileSync(gitHeadPath, "utf8").trim();
         if (!gitHead) {
             return;
         }
 
         const headPath = gitHead.match(/ref: (.*)/);
         if (!headPath) {
-            // probably a detached head
-            // check if gitHead has the correct hash length
-            gitHead = gitHead.trim();
+            // Probably a detached head; validate expected length.
             if (gitHead.length !== 40) {
                 console.error("[weAudit] Could not determine the git sha. Seemed to be a detached head but the hash length was not 40: " + gitHead);
                 return;
             }
-            this.gitSha = gitHead.trim();
-            this.persistGitHash();
-            return this.gitSha;
+            return gitHead;
         }
 
-        const shaPath = path.join(this.rootPath, ".git", headPath[1]);
-        if (!fs.existsSync(shaPath)) {
+        const refPath = headPath[1].trim();
+        return this.readRefSha(refPath, gitDir, commonDir);
+    }
+
+    /**
+     * Read a ref SHA from loose refs, falling back to packed refs if needed.
+     */
+    private readRefSha(refPath: string, gitDir: string, commonDir: string): string | undefined {
+        const refPaths = [path.join(gitDir, refPath)];
+        if (commonDir !== gitDir) {
+            refPaths.push(path.join(commonDir, refPath));
+        }
+
+        for (const candidate of refPaths) {
+            if (!fs.existsSync(candidate)) {
+                continue;
+            }
+            const shaCommit = fs.readFileSync(candidate, "utf8").trim();
+            if (shaCommit) {
+                return shaCommit;
+            }
+        }
+
+        const packedSha = this.readPackedRefSha(commonDir, refPath);
+        if (packedSha) {
+            return packedSha;
+        }
+        if (commonDir !== gitDir) {
+            return this.readPackedRefSha(gitDir, refPath);
+        }
+        return;
+    }
+
+    /**
+     * Look up a ref's SHA in the packed-refs file.
+     */
+    private readPackedRefSha(gitDir: string, refPath: string): string | undefined {
+        const packedRefsPath = path.join(gitDir, "packed-refs");
+        if (!fs.existsSync(packedRefsPath)) {
             return;
         }
-        const shaCommit = fs.readFileSync(shaPath, "utf8");
-        if (!shaCommit) {
+        const packedRefs = fs.readFileSync(packedRefsPath, "utf8");
+        if (!packedRefs) {
             return;
         }
-        this.gitSha = shaCommit.trim();
-        this.persistGitHash();
-        return this.gitSha;
+        for (const line of packedRefs.split(/\r?\n/)) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("^")) {
+                continue;
+            }
+            const [sha, ref] = trimmed.split(/\s+/);
+            if (ref === refPath) {
+                return sha;
+            }
+        }
+        return;
     }
 
     /**
@@ -536,36 +639,12 @@ class WARoot {
      * @returns The git sha or undefined if it could not be found
      */
     findHeadGitSha(): string | undefined {
-        const gitPath = path.join(this.rootPath, ".git", "HEAD");
-        if (!fs.existsSync(gitPath)) {
+        // Resolve gitdir/commondir so worktrees read the checked-out commit hash.
+        const gitDirs = this.resolveGitDirectories();
+        if (gitDirs === undefined) {
             return;
         }
-
-        let gitHead = fs.readFileSync(gitPath, "utf8");
-        if (!gitHead) {
-            return;
-        }
-
-        const headPath = gitHead.match(/ref: (.*)/);
-        if (!headPath) {
-            // probably a detached head
-            gitHead = gitHead.trim();
-            if (gitHead.length !== 40) {
-                console.error("[weAudit] Could not determine the git sha. Seemed to be a detached head but the hash length was not 40: " + gitHead);
-                return;
-            }
-            return gitHead.trim();
-        }
-
-        const shaPath = path.join(this.rootPath, ".git", headPath[1]);
-        if (!fs.existsSync(shaPath)) {
-            return;
-        }
-        const shaCommit = fs.readFileSync(shaPath, "utf8");
-        if (!shaCommit) {
-            return;
-        }
-        return shaCommit.trim();
+        return this.readGitHeadSha(gitDirs.gitDir, gitDirs.commonDir);
     }
 
     /**
