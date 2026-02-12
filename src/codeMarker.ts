@@ -2038,7 +2038,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
             // refresh the currently selected files, findings tree and file decorations
             vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
-            this.resolvedEntriesTree.setResolvedEntries(this.resolvedEntries);
+            this.refreshResolvedEntriesTree();
             this.refreshTree();
             this.decorate();
             if (!savedData) {
@@ -2482,6 +2482,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         void vscode.commands.executeCommand("setContext", "weAudit.filterCurrentCommit", enabled);
         this.markPathMapDirty();
         this.refreshTree();
+        this.refreshResolvedEntriesTree();
         this.decorate();
         this.refreshAllFileDecorations();
     }
@@ -3105,7 +3106,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 entry.details = createDefaultEntryDetails();
             }
             this.resolvedEntries.push(removed);
-            this.resolvedEntriesTree.refresh();
+            this.refreshResolvedEntriesTree();
         }
 
         void this.updateSavedData(removed.author);
@@ -3218,7 +3219,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
         }
 
-        this.resolvedEntriesTree.refresh();
+        this.refreshResolvedEntriesTree();
         this.refreshAndDecorateEntry(entry);
 
         if (persist) {
@@ -3269,7 +3270,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
         this.resolvedEntries.splice(idx, 1);
-        this.resolvedEntriesTree.refresh();
+        this.refreshResolvedEntriesTree();
         void this.updateSavedData(entry.author);
     }
 
@@ -3288,7 +3289,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         for (const author of authors) {
             void this.updateSavedData(author);
         }
-        this.resolvedEntriesTree.refresh();
+        this.refreshResolvedEntriesTree();
     }
 
     /**
@@ -3317,7 +3318,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.treeEntries.push(entry);
             this.refreshEntry(entry);
         }
-        this.resolvedEntriesTree.refresh();
+        this.refreshResolvedEntriesTree();
         this.decorate();
     }
 
@@ -3781,7 +3782,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         vscode.commands.executeCommand("weAudit.refreshSavedFindings", selectedConfigs);
-        this.resolvedEntriesTree.setResolvedEntries(this.resolvedEntries);
+        this.refreshResolvedEntriesTree();
         this.refreshTree();
         this.decorate();
     }
@@ -4512,6 +4513,20 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
         }
         return count;
+    }
+
+    /**
+     * Returns resolved entries filtered by the current commit filter.
+     */
+    private getFilteredResolvedEntries(): FullEntry[] {
+        return this.resolvedEntries.filter((entry) => this.entryMatchesCommitFilter(entry));
+    }
+
+    /**
+     * Refresh the resolved findings view with the commit-filtered entries.
+     */
+    private refreshResolvedEntriesTree(): void {
+        this.resolvedEntriesTree.setResolvedEntries(this.getFilteredResolvedEntries());
     }
 
     /**
