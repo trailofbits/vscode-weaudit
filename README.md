@@ -105,6 +105,12 @@ You can add multiple regions to a single finding or note. Once you select the co
 
 ![Add Region to a Finding](media/readme/gifs/multi_region_finding.gif)
 
+### Boundary Editing
+
+Need to tweak the highlighted range for an existing finding? Run the `weAudit: Edit Finding Boundary` command to enter boundary editing mode. weAudit shows a set of inline CodeLens controls at the top and bottom of the region so you can expand, shrink, or move the selection and click `Done` when you are satisfied.
+
+You can also use the dedicated keyboard shortcuts to make quick adjustments without touching the mouse. These shortcuts automatically focus the relevant finding, so you can adjust boundaries from the keyboard only.
+
 ### Resolve and Restore
 
 You can resolve a finding by clicking on the corresponding `Resolve` button in the _List of Findings_ panel. The finding will no longer be highlighted in the editor, but will still be visible in the _Resolved Findings_ panel. You can restore a resolved finding by clicking on the corresponding `Restore` button in the _Resolved Findings_ panel.
@@ -201,6 +207,14 @@ You can configure the keybindings to any of the extension's commands in the VSCo
 -   `weAudit.copySelectedCodePermalink`: Copy Permalink (for the Selected Code Region): `cmd + 8`
 -   `weAudit.copySelectedCodeClientPermalink`: Copy Client Permalink (for the Selected Code Region): `cmd + 9`
 -   `weAudit.navigateToNextPartiallyAuditedRegion`: Navigate to Next Partially Audited Region: `cmd + 0`
+-   `weAudit.boundaryExpandUp`: Expand Finding Up: `cmd + shift + numpad7`
+-   `weAudit.boundaryMoveUp`: Move Finding Up: `cmd + shift + numpad8`
+-   `weAudit.boundaryShrinkTop`: Shrink Finding from Top: `cmd + shift + numpad9`
+-   `weAudit.boundaryExpandDown`: Expand Finding Down: `cmd + shift + numpad1`
+-   `weAudit.boundaryMoveDown`: Move Finding Down: `cmd + shift + numpad2`
+-   `weAudit.boundaryShrinkBottom`: Shrink Finding from Bottom: `cmd + shift + numpad3`
+-   `weAudit.editFindingBoundary`: Start Boundary Editing (when not editing): `cmd + shift + numpad5`
+-   `weAudit.stopEditingBoundary`: Finish Boundary Editing (when editing): `cmd + shift + numpad5`
 
 ## WeAudit Concepts
 

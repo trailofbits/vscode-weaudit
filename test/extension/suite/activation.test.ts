@@ -54,6 +54,15 @@ suite("Extension Activation", () => {
             "weAudit.exportFindingsInMarkdown",
             "weAudit.showMarkedFilesDayLog",
             "weAudit.navigateToNextPartiallyAuditedRegion",
+            // Boundary editing commands
+            "weAudit.editFindingBoundary",
+            "weAudit.stopEditingBoundary",
+            "weAudit.boundaryExpandUp",
+            "weAudit.boundaryShrinkTop",
+            "weAudit.boundaryMoveUp",
+            "weAudit.boundaryExpandDown",
+            "weAudit.boundaryShrinkBottom",
+            "weAudit.boundaryMoveDown",
             // Git config commands
             "weAudit.editClientRemote",
             "weAudit.editAuditRemote",

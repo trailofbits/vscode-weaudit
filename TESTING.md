@@ -51,6 +51,10 @@ npm run test:ui
 npm run test:ui-setup
 ```
 
+### Shared Test VS Code Profile
+
+Both `npm run test:ext` and `npm run test:ui` run VS Code with isolated user data and extensions directories under `.test-extensions/` so local/user-installed extensions do not affect test results.
+
 ### Example UI Test
 
 ```typescript
