@@ -1,11 +1,11 @@
-const js = require("@eslint/js");
-const tseslint = require("@typescript-eslint/eslint-plugin");
-const tsParser = require("@typescript-eslint/parser");
-const stylistic = require("@stylistic/eslint-plugin");
+import js from "@eslint/js";
+import tseslint from "@typescript-eslint/eslint-plugin";
+import tsParser from "@typescript-eslint/parser";
+import stylistic from "@stylistic/eslint-plugin";
 
 const tsFiles = ["**/*.ts", "**/*.tsx", "**/*.mts", "**/*.cts"];
 
-module.exports = [
+export default [
     {
         ignores: ["out", "dist", "**/*.d.ts", "esbuild.js"],
     },
