@@ -2,7 +2,9 @@ out
 dist
 node_modules
 .vscode-test/
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
 *.mov
 *.vsix
 *.sarif*

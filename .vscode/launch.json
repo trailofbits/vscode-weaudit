@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+            "name": "Launch Extension",
+            "outFiles": ["${workspaceFolder}/out/**/*.js", "--extensionDevelopmentPath=${workspaceFolder}"],
+            "preLaunchTask": "${defaultBuildTask}",
+            "request": "launch",
+            "type": "extensionHost",
+            "sourceMaps": true
+        }
+    ]
+}
