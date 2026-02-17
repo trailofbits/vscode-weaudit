@@ -1,7 +1,7 @@
 import * as assert from "node:assert";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { type SerializedData, validateSerializedData } from "../types";
+import { type SerializedData, validateSerializedData } from "../../src/types";
 
 /**
  * Loads a serialized weAudit fixture from disk for compatibility tests.

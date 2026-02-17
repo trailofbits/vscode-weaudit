@@ -8,6 +8,7 @@ import { plot } from "asciichart";
 
 import { ResolvedEntries } from "./resolvedFindings";
 import { labelAfterFirstLineTextDecoration, hoverOnLabel, DecorationManager } from "./decorationManager";
+import { activateFindingBoundaryCodeLens } from "./findingBoundaryCodeLens";
 import {
     Entry,
     FullEntry,
@@ -30,6 +31,7 @@ import {
     FindingDifficulty,
     FindingSeverity,
     FindingType,
+    isEnumValue,
     EntryType,
     EntryResolution,
     RemoteAndPermalink,
@@ -1960,7 +1962,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.treeViewMode = TreeViewMode.List;
         this.loadTreeViewModeConfiguration();
 
-        this.sortEntriesAlphabetically = vscode.workspace.getConfiguration("weAudit").get<boolean>("general.sortEntriesAlphabetically", false);
+        this.sortEntriesAlphabetically = this.loadSortEntriesConfiguration();
 
         this.username = this.setUsernameConfigOrDefault();
         this.findAndLoadConfigurationUsernames();
@@ -2216,7 +2218,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                     endLine: loc.endLine,
                                     label: loc.label,
                                     description: loc.description,
-                                    rootPath: wsRoot!.rootPath, // We checked this in the earlier for loop
+                                    rootPath: wsRoot!.rootPath,
                                 } as FullLocation;
                             }),
                         }) as FullEntry,
@@ -2325,7 +2327,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                 endLine: loc.endLine,
                                 label: loc.label,
                                 description: loc.description,
-                                rootPath: wsRoot!.rootPath, // We checked this in the earlier for loop
+                                rootPath: wsRoot!.rootPath,
                             } as FullLocation;
                         }),
                     }) as FullEntry,
@@ -2622,14 +2624,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 return;
             }
             case "severity":
-                entry.details.severity = value as FindingSeverity;
-                this.refreshTree();
+                entry.details.severity = isEnumValue(FindingSeverity, value) ? value : FindingSeverity.Undefined;
                 break;
             case "difficulty":
-                entry.details.difficulty = value as FindingDifficulty;
+                entry.details.difficulty = isEnumValue(FindingDifficulty, value) ? value : FindingDifficulty.Undefined;
                 break;
             case "type":
-                entry.details.type = value as FindingType;
+                entry.details.type = isEnumValue(FindingType, value) ? value : FindingType.Undefined;
                 break;
             case "description":
                 entry.details.description = value;
@@ -2670,10 +2671,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     /**
      * Loads the sort entries alphabetically setting from the configuration,
      * refreshing the tree.
+     *
+     * Returns the current value of the setting after loading it from the configuration.
      */
-    loadSortEntriesConfiguration(): void {
+    loadSortEntriesConfiguration(): boolean {
         this.sortEntriesAlphabetically = vscode.workspace.getConfiguration("weAudit").get<boolean>("general.sortEntriesAlphabetically", false);
         this.refreshTree();
+        return this.sortEntriesAlphabetically;
     }
 
     getTreeViewMode(): TreeViewMode {
@@ -2715,7 +2719,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.treeViewMode = TreeViewMode.List;
         }
         const label = treeViewModeLabel(this.treeViewMode);
-        vscode.workspace.getConfiguration("weAudit").update("general.treeViewMode", label, true);
+        void vscode.workspace.getConfiguration("weAudit").update("general.treeViewMode", label, true);
         this.refreshTree();
     }
 
@@ -3117,7 +3121,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             location.startLine,
             location.endLine,
         );
-        const document = vscode.window.activeTextEditor!.document;
+        const editor = vscode.window.activeTextEditor;
+        if (editor === undefined) {
+            return "";
+        }
+        const document = editor.document;
         const startLine = location.startLine;
         const endLine = location.endLine;
         let code = "";
@@ -3234,7 +3242,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             // Include location section if there's a label or description
             if (location.label !== "" || location.description !== "") {
                 locationDescriptions += `\n\n---\n`;
-                locationDescriptions += `#### Location ${i + 1}${location.label ? ` ${location.label}` : ""}\n`;
+                locationDescriptions += `#### Location ${i + 1} ${location.label ?? ""}\n`;
                 if (location.description !== "") {
                     locationDescriptions += `${location.description}\n\n`;
                 }
@@ -3613,7 +3621,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     getActiveSelectionLocation(): FullLocation[] | undefined {
         // the null assertion is never undefined because we check if the editor is undefined
-        const editor = vscode.window.activeTextEditor!;
+        const editor = vscode.window.activeTextEditor;
+        if (editor === undefined) {
+            return undefined;
+        }
         const uri = editor.document.uri;
         const locations = this.workspaces.getActiveSelectionLocation(uri);
 
@@ -4506,8 +4517,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
         };
 
-        treeItem.contextValue = entry.entryType === EntryType.Note ? "note" : "finding";
-
         return treeItem;
     }
 
@@ -4857,6 +4866,47 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const uri = vscode.Uri.file(path.join(location.rootPath, location.path));
         this.decorateWithUri(uri);
         this.refresh(uri);
+    }
+
+    /**
+     * Modifies the boundary (startLine and/or endLine) of a specific location within an entry.
+     * Used by the boundary editing CodeLens feature.
+     * @param entry the entry containing the location to modify
+     * @param locationIndex the index of the location within entry.locations
+     * @param startLineDelta the change to apply to startLine (negative = expand up, positive = shrink from top)
+     * @param endLineDelta the change to apply to endLine (negative = shrink from bottom, positive = expand down)
+     * @param document the document to validate line bounds against
+     * @returns true if the modification was successful, false otherwise
+     */
+    modifyLocationBoundary(entry: FullEntry, locationIndex: number, startLineDelta: number, endLineDelta: number, document: vscode.TextDocument): boolean {
+        if (locationIndex < 0 || locationIndex >= entry.locations.length) {
+            return false;
+        }
+
+        const location = entry.locations[locationIndex];
+        const newStartLine = location.startLine + startLineDelta;
+        const newEndLine = location.endLine + endLineDelta;
+
+        // Validate bounds
+        if (newStartLine < 0) {
+            return false;
+        }
+        if (newEndLine >= document.lineCount) {
+            return false;
+        }
+        if (newStartLine > newEndLine) {
+            return false;
+        }
+
+        // Apply the changes
+        location.startLine = newStartLine;
+        location.endLine = newEndLine;
+
+        // Update decorations and save
+        this.refreshAndDecorateFromPath(location);
+        this.updateSavedData(entry.author);
+
+        return true;
     }
 }
 
@@ -5263,6 +5313,14 @@ export class AuditMarker {
             }
             void treeDataProvider.openGithubIssue(entry);
         });
+
+        // Activate the finding boundary CodeLens feature
+        activateFindingBoundaryCodeLens(
+            context,
+            () => treeDataProvider.getLocationUnderCursor(),
+            (entry, locationIndex, startLineDelta, endLineDelta, document) =>
+                treeDataProvider.modifyLocationBoundary(entry, locationIndex, startLineDelta, endLineDelta, document),
+        );
     }
 
     private showEntryInFindingDetails(entry: TreeEntry): void {
@@ -5348,8 +5406,8 @@ export class AuditMarker {
             try {
                 await treeView.reveal(entry);
             } catch (error) {
-                const typedError = error as Error;
-                if (typedError.message.startsWith("TreeError")) {
+                const message = (error as Error).message ?? "";
+                if (message.startsWith("TreeError") || message.includes("Cannot resolve tree item")) {
                     return;
                 }
                 throw error;

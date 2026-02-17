@@ -21,4 +21,22 @@ Guidelines for autonomous contributors working on this repository.
 6. **Commit messaging**
    - When suggesting or creating commit titles, always follow the [Conventional Commits](https://www.conventionalcommits.org/) format (e.g., `feat: add highlight toggle command`). Include scope when it adds clarity.
 
+7. **Preserve default behavior**
+   - Never change the extension's current default behavior without a clear, justified reason. Existing users rely on established workflows; breaking them requires explicit approval.
+
+8. **Do not remove or alter unrelated features**
+   - When implementing a new feature, do not remove existing features or change other parts of the UI that are not directly related to the task at hand. Keep changes isolated to the feature being worked on.
+
+9. **Consider cross-tool compatibility**
+   - Any change involving external commands (callable by other extensions), the GitHub export, finding severity, or finding difficulty must account for the broader tooling ecosystem. These interfaces are consumed by other tools (e.g., audit reporting pipelines), so changes must maintain compatibility and be coordinated with those dependencies.
+
+10. **Backward compatibility of persisted data**
+    - The extension saves audit state (findings, annotations, etc.) to files. Any change to serialization formats or data structures must be able to load data saved by previous versions without loss. Never silently drop fields or change schemas without a migration path.
+
+11. **Stability of contributed extension points**
+    - Command IDs, view IDs, and configuration keys in `package.json` are public API. Renaming or removing them breaks user keybindings, settings, and other extensions that depend on them.
+
+12. **Minimize new dependencies**
+    - Keep the extension lightweight. Don't add new `node_modules` dependencies without justification; prefer using VS Code's built-in APIs or small self-contained implementations.
+
 Following these rules keeps the repository friendly to both human maintainers and future AI agents. Thanks for contributing!

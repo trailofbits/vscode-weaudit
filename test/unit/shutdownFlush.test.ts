@@ -1,5 +1,5 @@
 import * as assert from "node:assert";
-import { flushSessionsWithTimeout, ShutdownFlushSession } from "../sync/shutdownFlush";
+import { flushSessionsWithTimeout, ShutdownFlushSession } from "../../src/sync/shutdownFlush";
 
 describe("Shutdown flush coordination", () => {
     it("returns completed when all sessions flush before timeout", async () => {

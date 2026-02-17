@@ -1,5 +1,5 @@
 import * as assert from "node:assert";
-import { normalizePathForOS } from "../utilities/normalizePath";
+import { normalizePathForOS } from "../../src/utilities/normalizePath";
 
 describe("normalizePath.ts", () => {
     describe("normalizePathForOS", () => {
