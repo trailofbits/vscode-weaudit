@@ -509,44 +509,150 @@ class WARoot {
     }
 
     /**
+     * Return true when a filesystem error indicates the path could not be resolved.
+     */
+    private isMissingPathError(error: unknown): boolean {
+        if (!(error instanceof Error)) {
+            return false;
+        }
+        const errorCode = (error as NodeJS.ErrnoException).code;
+        return errorCode === "ENOENT" || errorCode === "ENOTDIR";
+    }
+
+    /**
+     * Return stat information for a path, or undefined when the path does not exist.
+     */
+    private statPath(filePath: string): fs.Stats | undefined {
+        try {
+            return fs.statSync(filePath);
+        } catch (error: unknown) {
+            if (this.isMissingPathError(error)) {
+                return;
+            }
+            throw error;
+        }
+    }
+
+    /**
+     * Read a UTF-8 file by descriptor to avoid path check-then-read races.
+     */
+    private readUtf8FileByDescriptor(filePath: string): string | undefined {
+        let fileDescriptor: number | undefined;
+        try {
+            fileDescriptor = fs.openSync(filePath, fs.constants.O_RDONLY);
+            const fileStat = fs.fstatSync(fileDescriptor);
+            if (!fileStat.isFile()) {
+                return;
+            }
+            return fs.readFileSync(fileDescriptor, "utf8");
+        } catch (error: unknown) {
+            if (this.isMissingPathError(error)) {
+                return;
+            }
+            throw error;
+        } finally {
+            if (fileDescriptor !== undefined) {
+                fs.closeSync(fileDescriptor);
+            }
+        }
+    }
+
+    /**
+     * Return true when a directory path appears to reference git metadata storage.
+     */
+    private isLikelyGitMetadataDirectory(dirPath: string): boolean {
+        const normalizedPath = path.normalize(path.resolve(dirPath));
+        if (path.basename(normalizedPath) === ".git") {
+            return true;
+        }
+        return normalizedPath.includes(`${path.sep}.git${path.sep}`);
+    }
+
+    /**
+     * Validate a git ref path to reject traversal and malformed ref names.
+     */
+    private isValidGitRefPath(refPath: string): boolean {
+        if (!refPath.startsWith("refs/")) {
+            return false;
+        }
+        if (refPath.includes("\\") || refPath.includes("\0")) {
+            return false;
+        }
+        if (refPath.includes("..") || refPath.includes("//") || refPath.includes("@{")) {
+            return false;
+        }
+        if (refPath.endsWith("/") || refPath.endsWith(".lock")) {
+            return false;
+        }
+        return /^[A-Za-z0-9._/-]+$/.test(refPath);
+    }
+
+    /**
+     * Resolve a relative path under a git metadata directory and reject traversal outside the base.
+     */
+    private resolvePathWithinGitDirectory(gitDir: string, relativePath: string): string | undefined {
+        if (path.isAbsolute(relativePath) || relativePath.includes("\0")) {
+            return;
+        }
+        const normalizedBaseDir = path.resolve(gitDir);
+        const resolvedPath = path.resolve(normalizedBaseDir, relativePath);
+        const relativeToBase = path.relative(normalizedBaseDir, resolvedPath);
+        if (relativeToBase.startsWith("..") || path.isAbsolute(relativeToBase)) {
+            return;
+        }
+        return resolvedPath;
+    }
+
+    /**
      * Resolve the git directory and common directory for this workspace root.
      * Worktrees store HEAD in a per-worktree gitdir with refs in a commondir,
      * so we resolve both to return the checked-out commit hash.
      */
     private resolveGitDirectories(): { gitDir: string; commonDir: string } | undefined {
         const gitPath = path.join(this.rootPath, ".git");
-        if (!fs.existsSync(gitPath)) {
-            return;
-        }
-
         let gitDir = gitPath;
-        const gitStat = fs.statSync(gitPath);
-        if (gitStat.isFile()) {
-            const gitDirPointer = fs.readFileSync(gitPath, "utf8").trim();
-            const gitDirMatch = gitDirPointer.match(/^gitdir:\s*(.+)\s*$/i);
-            if (!gitDirMatch) {
-                console.error(`[weAudit] Could not parse gitdir pointer at ${gitPath}`);
+        let gitPathDescriptor: number | undefined;
+        try {
+            gitPathDescriptor = fs.openSync(gitPath, fs.constants.O_RDONLY);
+            const gitStat = fs.fstatSync(gitPathDescriptor);
+            if (gitStat.isFile()) {
+                const gitDirPointer = fs.readFileSync(gitPathDescriptor, "utf8").trim();
+                const gitDirMatch = gitDirPointer.match(/^gitdir:\s*(.+)\s*$/i);
+                if (!gitDirMatch) {
+                    console.error(`[weAudit] Could not parse gitdir pointer at ${gitPath}`);
+                    return;
+                }
+                gitDir = gitDirMatch[1].trim();
+                if (!path.isAbsolute(gitDir)) {
+                    gitDir = path.resolve(this.rootPath, gitDir);
+                }
+            } else if (!gitStat.isDirectory()) {
                 return;
             }
-            gitDir = gitDirMatch[1].trim();
-            if (!path.isAbsolute(gitDir)) {
-                gitDir = path.resolve(this.rootPath, gitDir);
+        } catch (error: unknown) {
+            if (this.isMissingPathError(error)) {
+                return;
             }
-        } else if (!gitStat.isDirectory()) {
-            return;
+            throw error;
+        } finally {
+            if (gitPathDescriptor !== undefined) {
+                fs.closeSync(gitPathDescriptor);
+            }
         }
 
-        if (!fs.existsSync(gitDir)) {
+        const gitDirStat = this.statPath(gitDir);
+        if (!gitDirStat?.isDirectory() || !this.isLikelyGitMetadataDirectory(gitDir)) {
             return;
         }
 
         let commonDir = gitDir;
-        const commonDirPath = path.join(gitDir, "commondir");
-        if (fs.existsSync(commonDirPath)) {
-            const commonDirPointer = fs.readFileSync(commonDirPath, "utf8").trim();
-            if (commonDirPointer) {
-                commonDir = path.isAbsolute(commonDirPointer) ? commonDirPointer : path.resolve(gitDir, commonDirPointer);
-            }
+        const commonDirPointer = this.readUtf8FileByDescriptor(path.join(gitDir, "commondir"))?.trim();
+        if (commonDirPointer) {
+            commonDir = path.isAbsolute(commonDirPointer) ? commonDirPointer : path.resolve(gitDir, commonDirPointer);
+        }
+        const commonDirStat = this.statPath(commonDir);
+        if (!commonDirStat?.isDirectory() || !this.isLikelyGitMetadataDirectory(commonDir)) {
+            return;
         }
 
         return { gitDir, commonDir };
@@ -557,11 +663,7 @@ class WARoot {
      */
     private readGitHeadSha(gitDir: string, commonDir: string): string | undefined {
         const gitHeadPath = path.join(gitDir, "HEAD");
-        if (!fs.existsSync(gitHeadPath)) {
-            return;
-        }
-
-        const gitHead = fs.readFileSync(gitHeadPath, "utf8").trim();
+        const gitHead = this.readUtf8FileByDescriptor(gitHeadPath)?.trim();
         if (!gitHead) {
             return;
         }
@@ -577,6 +679,10 @@ class WARoot {
         }
 
         const refPath = headPath[1].trim();
+        if (!this.isValidGitRefPath(refPath)) {
+            console.error(`[weAudit] Could not determine the git sha due to invalid ref path: ${refPath}`);
+            return;
+        }
         return this.readRefSha(refPath, gitDir, commonDir);
     }
 
@@ -584,16 +690,20 @@ class WARoot {
      * Read a ref SHA from loose refs, falling back to packed refs if needed.
      */
     private readRefSha(refPath: string, gitDir: string, commonDir: string): string | undefined {
-        const refPaths = [path.join(gitDir, refPath)];
+        const refPaths: string[] = [];
+        const gitDirRefPath = this.resolvePathWithinGitDirectory(gitDir, refPath);
+        if (gitDirRefPath) {
+            refPaths.push(gitDirRefPath);
+        }
         if (commonDir !== gitDir) {
-            refPaths.push(path.join(commonDir, refPath));
+            const commonDirRefPath = this.resolvePathWithinGitDirectory(commonDir, refPath);
+            if (commonDirRefPath) {
+                refPaths.push(commonDirRefPath);
+            }
         }
 
         for (const candidate of refPaths) {
-            if (!fs.existsSync(candidate)) {
-                continue;
-            }
-            const shaCommit = fs.readFileSync(candidate, "utf8").trim();
+            const shaCommit = this.readUtf8FileByDescriptor(candidate)?.trim();
             if (shaCommit) {
                 return shaCommit;
             }
@@ -613,11 +723,11 @@ class WARoot {
      * Look up a ref's SHA in the packed-refs file.
      */
     private readPackedRefSha(gitDir: string, refPath: string): string | undefined {
-        const packedRefsPath = path.join(gitDir, "packed-refs");
-        if (!fs.existsSync(packedRefsPath)) {
+        const packedRefsPath = this.resolvePathWithinGitDirectory(gitDir, "packed-refs");
+        if (!packedRefsPath) {
             return;
         }
-        const packedRefs = fs.readFileSync(packedRefsPath, "utf8");
+        const packedRefs = this.readUtf8FileByDescriptor(packedRefsPath);
         if (!packedRefs) {
             return;
         }
