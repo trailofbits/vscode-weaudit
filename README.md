@@ -180,6 +180,7 @@ To enable, set `weAudit.sync.enabled` to `true` in your settings. By default, we
 
 Repo-branch sync runs from a dedicated git worktree stored in VS Code's global storage, so your current branch and working tree stay untouched. Central repo sync uses a dedicated clone in the same global storage location.
 Sync operations are serialized per repo across VS Code windows on the same machine. When another window is already syncing, weAudit waits briefly for the lock; if it remains busy, the sync is skipped and will retry on the next poll or change. If a pull/rebase conflict occurs, weAudit shows a warning toast and leaves local changes queued for the next sync attempt.
+On extension shutdown, weAudit performs a best-effort sync flush (up to about 3 seconds). VS Code extensions cannot hard-block app/window close, so shutdown can still interrupt in-flight sync operations.
 
 You can configure these settings in the **Sync Configuration** panel in the weAudit sidebar.
 The panel shows the timestamp of the last successful sync.

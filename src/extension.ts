@@ -9,6 +9,9 @@ import { activateGitConfigWebview } from "./panels/gitConfigPanel";
 import { activateSyncConfigWebview } from "./panels/syncConfigPanel";
 import { GitAutoSyncManager } from "./sync/gitAutoSync";
 
+const SHUTDOWN_FLUSH_TIMEOUT_MS = 3000;
+let gitAutoSyncManager: GitAutoSyncManager | undefined;
+
 export function activate(context: vscode.ExtensionContext): void {
     // if there are no open folders, return
     // the extension will be reactivated when a folder is opened
@@ -26,8 +29,21 @@ export function activate(context: vscode.ExtensionContext): void {
     activateFindingDetailsWebview(context);
     activateGitConfigWebview(context);
     activateSyncConfigWebview(context);
-    const gitAutoSyncManager = new GitAutoSyncManager(context);
+    gitAutoSyncManager = new GitAutoSyncManager(context);
     context.subscriptions.push(gitAutoSyncManager);
+}
+
+/**
+ * Best-effort deactivation hook that flushes pending sync work before teardown.
+ */
+export async function deactivate(): Promise<void> {
+    if (!gitAutoSyncManager) {
+        return;
+    }
+
+    await gitAutoSyncManager.flushOnShutdown(SHUTDOWN_FLUSH_TIMEOUT_MS);
+    gitAutoSyncManager.dispose();
+    gitAutoSyncManager = undefined;
 }
 
 async function openResource(resource: vscode.Uri, startLine: number, endLine: number): Promise<void> {

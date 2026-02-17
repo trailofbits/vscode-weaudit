@@ -5,6 +5,7 @@ import { execFile } from "child_process";
 import { createHash } from "crypto";
 import { userInfo } from "os";
 import { SERIALIZED_FILE_EXTENSION } from "../codeMarker";
+import { flushSessionsWithTimeout, ShutdownFlushSession } from "./shutdownFlush";
 
 const DEFAULT_BRANCH_NAME = "weaudit-sync";
 const DEFAULT_CENTRAL_BRANCH = "weaudit-sync";
@@ -39,7 +40,7 @@ type WorkspaceRootMapping = {
     repoRelativeRoot: string;
 };
 
-interface SyncSession extends vscode.Disposable {
+interface SyncSession extends ShutdownFlushSession, vscode.Disposable {
     syncNow(): Promise<void>;
 }
 
@@ -425,6 +426,7 @@ export class GitAutoSyncManager implements vscode.Disposable {
     private sessions = new Map<string, SyncSession>();
     private readonly outputChannel: vscode.OutputChannel;
     private readonly disposables: vscode.Disposable[] = [];
+    private disposed = false;
 
     constructor(private readonly context: vscode.ExtensionContext) {
         this.outputChannel = vscode.window.createOutputChannel("weAudit Sync");
@@ -457,6 +459,9 @@ export class GitAutoSyncManager implements vscode.Disposable {
      * Trigger a manual sync across all active sessions.
      */
     async syncNow(): Promise<void> {
+        if (this.disposed) {
+            return;
+        }
         const settings = readSyncSettings();
         if (!settings.enabled) {
             vscode.window.showInformationMessage("weAudit: Auto sync is disabled. Enable it in settings to use Sync Now.");
@@ -477,9 +482,42 @@ export class GitAutoSyncManager implements vscode.Disposable {
     }
 
     /**
+     * Attempt a best-effort flush of pending sync tasks before shutdown.
+     */
+    async flushOnShutdown(timeoutMs: number): Promise<void> {
+        if (this.disposed) {
+            return;
+        }
+
+        const sessions = Array.from(this.sessions.values());
+        if (sessions.length === 0) {
+            this.outputChannel.appendLine("weAudit: shutdown flush skipped (no active sync sessions).");
+            return;
+        }
+
+        const activeAtStart = sessions.filter((session) => session.isSyncActive()).length;
+        this.outputChannel.appendLine(`weAudit: shutdown flush started for ${sessions.length} session(s) (${activeAtStart} active).`);
+
+        const result = await flushSessionsWithTimeout(sessions, timeoutMs);
+        if (result.status === "completed") {
+            this.outputChannel.appendLine("weAudit: shutdown flush completed.");
+            return;
+        }
+        if (result.status === "timed_out") {
+            this.outputChannel.appendLine(`weAudit: shutdown flush timed out after ${timeoutMs}ms.`);
+            return;
+        }
+        this.outputChannel.appendLine(`weAudit: shutdown flush failed: ${result.errorMessage}`);
+    }
+
+    /**
      * Dispose all sessions and event subscriptions.
      */
     dispose(): void {
+        if (this.disposed) {
+            return;
+        }
+        this.disposed = true;
         for (const session of this.sessions.values()) {
             session.dispose();
         }
@@ -493,6 +531,9 @@ export class GitAutoSyncManager implements vscode.Disposable {
      * Refresh sessions based on the current workspace roots and settings.
      */
     private async refreshSessions(): Promise<void> {
+        if (this.disposed) {
+            return;
+        }
         const settings = readSyncSettings();
         for (const session of this.sessions.values()) {
             session.dispose();
@@ -676,6 +717,9 @@ class GitSyncSession implements SyncSession {
     private syncQueue: Promise<void> = Promise.resolve();
     private debounceTimer: NodeJS.Timeout | undefined;
     private pollTimer: NodeJS.Timeout | undefined;
+    private queuedSyncTasks = 0;
+    private syncInProgress = 0;
+    private acceptWorkspaceChanges = true;
 
     constructor(options: GitSyncSessionOptions) {
         this.repoRoot = options.repoRoot;
@@ -709,6 +753,31 @@ class GitSyncSession implements SyncSession {
      * Dispose watchers and timers for this session.
      */
     dispose(): void {
+        this.stopBackgroundActivity();
+    }
+
+    /**
+     * Report whether this session currently has in-flight or queued sync work.
+     */
+    isSyncActive(): boolean {
+        return this.syncInProgress > 0 || this.queuedSyncTasks > 0;
+    }
+
+    /**
+     * Flush queued sync work and run one final local sync attempt.
+     */
+    async flushPending(): Promise<void> {
+        this.stopBackgroundActivity();
+        await this.syncQueue;
+        await this.enqueue(() => this.performLocalSync());
+        await this.syncQueue;
+    }
+
+    /**
+     * Stop watcher and timer-driven scheduling for this session.
+     */
+    private stopBackgroundActivity(): void {
+        this.acceptWorkspaceChanges = false;
         for (const watcher of this.watchers) {
             watcher.dispose();
         }
@@ -795,10 +864,31 @@ class GitSyncSession implements SyncSession {
      * Enqueue a sync task to run sequentially.
      */
     private enqueue(task: () => Promise<void>): Promise<void> {
-        this.syncQueue = this.syncQueue.then(task).catch((error) => {
-            this.outputChannel.appendLine(`weAudit: sync error in ${this.repoRoot}: ${error instanceof Error ? error.message : String(error)}`);
-        });
+        this.queuedSyncTasks += 1;
+        this.syncQueue = this.syncQueue
+            .then(async () => {
+                try {
+                    await task();
+                } finally {
+                    this.queuedSyncTasks = Math.max(0, this.queuedSyncTasks - 1);
+                }
+            })
+            .catch((error) => {
+                this.outputChannel.appendLine(`weAudit: sync error in ${this.repoRoot}: ${error instanceof Error ? error.message : String(error)}`);
+            });
         return this.syncQueue;
+    }
+
+    /**
+     * Run a sync operation while tracking whether sync execution is active.
+     */
+    private async runTrackedSync(task: () => Promise<void>): Promise<void> {
+        this.syncInProgress += 1;
+        try {
+            await task();
+        } finally {
+            this.syncInProgress = Math.max(0, this.syncInProgress - 1);
+        }
     }
 
     /**
@@ -817,6 +907,9 @@ class GitSyncSession implements SyncSession {
      * Handle a local .weaudit file change event.
      */
     private async onWorkspaceFileChange(filePath: string): Promise<void> {
+        if (!this.acceptWorkspaceChanges) {
+            return;
+        }
         if (await this.shouldIgnoreChange(filePath)) {
             return;
         }
@@ -883,75 +976,79 @@ class GitSyncSession implements SyncSession {
      * Perform a local sync: pull remote, apply remote changes, then commit/push local changes.
      */
     private async performLocalSync(): Promise<void> {
-        const executed = await this.withRepoLock(async () => {
-            const dirtySnapshot = new Set(this.dirtyFiles);
-            this.dirtyFiles.clear();
-            let shouldRecordSuccess = false;
+        await this.runTrackedSync(async () => {
+            const executed = await this.withRepoLock(async () => {
+                const dirtySnapshot = new Set(this.dirtyFiles);
+                this.dirtyFiles.clear();
+                let shouldRecordSuccess = false;
 
-            try {
-                await this.ensureWorktree();
-                const hasRemote = await this.pullRemote();
-                if (hasRemote) {
-                    const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
-                    if (appliedChanges) {
-                        await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
-                        await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+                try {
+                    await this.ensureWorktree();
+                    const hasRemote = await this.pullRemote();
+                    if (hasRemote) {
+                        const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
+                        if (appliedChanges) {
+                            await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+                            await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+                        }
+                        shouldRecordSuccess = true;
                     }
-                    shouldRecordSuccess = true;
-                }
 
-                if (dirtySnapshot.size === 0) {
+                    if (dirtySnapshot.size === 0) {
+                        if (shouldRecordSuccess) {
+                            this.onSyncSuccess();
+                        }
+                        return;
+                    }
+
+                    await this.applyWorkspaceToWorktree(dirtySnapshot);
+                    const committed = await this.commitChanges(dirtySnapshot);
+                    if (committed) {
+                        await this.pushRemote();
+                        shouldRecordSuccess = true;
+                    }
                     if (shouldRecordSuccess) {
                         this.onSyncSuccess();
                     }
-                    return;
+                } catch (error) {
+                    this.mergeDirty(dirtySnapshot);
+                    if (isRebaseFailure(error)) {
+                        showSyncConflictToast();
+                    }
+                    throw error;
                 }
+            });
 
-                await this.applyWorkspaceToWorktree(dirtySnapshot);
-                const committed = await this.commitChanges(dirtySnapshot);
-                if (committed) {
-                    await this.pushRemote();
-                    shouldRecordSuccess = true;
-                }
-                if (shouldRecordSuccess) {
-                    this.onSyncSuccess();
-                }
-            } catch (error) {
-                this.mergeDirty(dirtySnapshot);
-                if (isRebaseFailure(error)) {
-                    showSyncConflictToast();
-                }
-                throw error;
+            if (!executed) {
+                return;
             }
         });
-
-        if (!executed) {
-            return;
-        }
     }
 
     /**
      * Perform a polling sync: pull remote and apply changes locally.
      */
     private async performPollSync(): Promise<void> {
-        const executed = await this.withRepoLock(async () => {
-            await this.ensureWorktree();
-            const hasRemote = await this.pullRemote();
-            if (!hasRemote) {
+        await this.runTrackedSync(async () => {
+            const executed = await this.withRepoLock(async () => {
+                await this.ensureWorktree();
+                const hasRemote = await this.pullRemote();
+                if (!hasRemote) {
+                    return;
+                }
+                const dirtySnapshot = new Set(this.dirtyFiles);
+                const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
+                if (appliedChanges) {
+                    await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+                    await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+                }
+                this.onSyncSuccess();
+            });
+
+            if (!executed) {
                 return;
             }
-            const dirtySnapshot = new Set(this.dirtyFiles);
-            const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
-            if (appliedChanges) {
-                await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
-                await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
-            }
-            this.onSyncSuccess();
         });
-
-        if (!executed) {
-            return;
-        }
     }
 
     /**
@@ -1159,6 +1256,9 @@ class CentralGitSyncSession implements SyncSession {
     private syncQueue: Promise<void> = Promise.resolve();
     private debounceTimer: NodeJS.Timeout | undefined;
     private pollTimer: NodeJS.Timeout | undefined;
+    private queuedSyncTasks = 0;
+    private syncInProgress = 0;
+    private acceptWorkspaceChanges = true;
 
     constructor(options: CentralGitSyncSessionOptions) {
         this.workspaceMappings = options.workspaceMappings;
@@ -1197,6 +1297,31 @@ class CentralGitSyncSession implements SyncSession {
      * Dispose watchers and timers for this session.
      */
     dispose(): void {
+        this.stopBackgroundActivity();
+    }
+
+    /**
+     * Report whether this session currently has in-flight or queued sync work.
+     */
+    isSyncActive(): boolean {
+        return this.syncInProgress > 0 || this.queuedSyncTasks > 0;
+    }
+
+    /**
+     * Flush queued sync work and run one final local sync attempt.
+     */
+    async flushPending(): Promise<void> {
+        this.stopBackgroundActivity();
+        await this.syncQueue;
+        await this.enqueue(() => this.performLocalSync());
+        await this.syncQueue;
+    }
+
+    /**
+     * Stop watcher and timer-driven scheduling for this session.
+     */
+    private stopBackgroundActivity(): void {
+        this.acceptWorkspaceChanges = false;
         for (const watcher of this.watchers) {
             watcher.dispose();
         }
@@ -1268,10 +1393,31 @@ class CentralGitSyncSession implements SyncSession {
      * Enqueue a sync task to run sequentially.
      */
     private enqueue(task: () => Promise<void>): Promise<void> {
-        this.syncQueue = this.syncQueue.then(task).catch((error) => {
-            this.outputChannel.appendLine(`weAudit: central sync error: ${error instanceof Error ? error.message : String(error)}`);
-        });
+        this.queuedSyncTasks += 1;
+        this.syncQueue = this.syncQueue
+            .then(async () => {
+                try {
+                    await task();
+                } finally {
+                    this.queuedSyncTasks = Math.max(0, this.queuedSyncTasks - 1);
+                }
+            })
+            .catch((error) => {
+                this.outputChannel.appendLine(`weAudit: central sync error: ${error instanceof Error ? error.message : String(error)}`);
+            });
         return this.syncQueue;
+    }
+
+    /**
+     * Run a sync operation while tracking whether sync execution is active.
+     */
+    private async runTrackedSync(task: () => Promise<void>): Promise<void> {
+        this.syncInProgress += 1;
+        try {
+            await task();
+        } finally {
+            this.syncInProgress = Math.max(0, this.syncInProgress - 1);
+        }
     }
 
     /**
@@ -1290,6 +1436,9 @@ class CentralGitSyncSession implements SyncSession {
      * Handle a local .weaudit file change event.
      */
     private async onWorkspaceFileChange(filePath: string): Promise<void> {
+        if (!this.acceptWorkspaceChanges) {
+            return;
+        }
         if (await this.shouldIgnoreChange(filePath)) {
             this.log(`weAudit: central sync ignoring echoed change for ${filePath}.`);
             return;
@@ -1377,82 +1526,86 @@ class CentralGitSyncSession implements SyncSession {
      * Perform a local sync: pull remote, apply remote changes, then commit/push local changes.
      */
     private async performLocalSync(): Promise<void> {
-        const executed = await this.withRepoLock(async () => {
-            const dirtySnapshot = new Set(this.dirtyFiles);
-            this.dirtyFiles.clear();
-            let shouldRecordSuccess = false;
+        await this.runTrackedSync(async () => {
+            const executed = await this.withRepoLock(async () => {
+                const dirtySnapshot = new Set(this.dirtyFiles);
+                this.dirtyFiles.clear();
+                let shouldRecordSuccess = false;
 
-            try {
-                this.log(`weAudit: central sync starting local sync (dirty=${dirtySnapshot.size}).`);
-                await this.ensureCentralRepo();
-                const hasRemote = await this.pullRemote();
-                if (hasRemote) {
-                    const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
-                    if (appliedChanges) {
-                        await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
-                        await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+                try {
+                    this.log(`weAudit: central sync starting local sync (dirty=${dirtySnapshot.size}).`);
+                    await this.ensureCentralRepo();
+                    const hasRemote = await this.pullRemote();
+                    if (hasRemote) {
+                        const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
+                        if (appliedChanges) {
+                            await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+                            await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+                        }
+                        shouldRecordSuccess = true;
                     }
-                    shouldRecordSuccess = true;
-                }
 
-                if (dirtySnapshot.size === 0) {
-                    this.log("weAudit: central sync no local changes to push.");
+                    if (dirtySnapshot.size === 0) {
+                        this.log("weAudit: central sync no local changes to push.");
+                        if (shouldRecordSuccess) {
+                            this.onSyncSuccess();
+                        }
+                        return;
+                    }
+
+                    await this.applyWorkspaceToCentral(dirtySnapshot);
+                    const committed = await this.commitChanges(dirtySnapshot);
+                    if (committed) {
+                        await this.pushRemote();
+                        this.log("weAudit: central sync pushed local changes.");
+                        shouldRecordSuccess = true;
+                    } else {
+                        this.log("weAudit: central sync no changes to commit after staging.");
+                    }
                     if (shouldRecordSuccess) {
                         this.onSyncSuccess();
                     }
-                    return;
+                } catch (error) {
+                    this.mergeDirty(dirtySnapshot);
+                    if (isRebaseFailure(error)) {
+                        showSyncConflictToast();
+                    }
+                    throw error;
                 }
+            });
 
-                await this.applyWorkspaceToCentral(dirtySnapshot);
-                const committed = await this.commitChanges(dirtySnapshot);
-                if (committed) {
-                    await this.pushRemote();
-                    this.log("weAudit: central sync pushed local changes.");
-                    shouldRecordSuccess = true;
-                } else {
-                    this.log("weAudit: central sync no changes to commit after staging.");
-                }
-                if (shouldRecordSuccess) {
-                    this.onSyncSuccess();
-                }
-            } catch (error) {
-                this.mergeDirty(dirtySnapshot);
-                if (isRebaseFailure(error)) {
-                    showSyncConflictToast();
-                }
-                throw error;
+            if (!executed) {
+                return;
             }
         });
-
-        if (!executed) {
-            return;
-        }
     }
 
     /**
      * Perform a polling sync: pull remote and apply changes locally.
      */
     private async performPollSync(): Promise<void> {
-        const executed = await this.withRepoLock(async () => {
-            this.log("weAudit: central sync starting poll.");
-            await this.ensureCentralRepo();
-            const hasRemote = await this.pullRemote();
-            if (!hasRemote) {
-                this.log("weAudit: central sync poll skipped (remote branch not found).");
+        await this.runTrackedSync(async () => {
+            const executed = await this.withRepoLock(async () => {
+                this.log("weAudit: central sync starting poll.");
+                await this.ensureCentralRepo();
+                const hasRemote = await this.pullRemote();
+                if (!hasRemote) {
+                    this.log("weAudit: central sync poll skipped (remote branch not found).");
+                    return;
+                }
+                const dirtySnapshot = new Set(this.dirtyFiles);
+                const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
+                if (appliedChanges) {
+                    await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
+                    await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
+                }
+                this.onSyncSuccess();
+            });
+
+            if (!executed) {
                 return;
             }
-            const dirtySnapshot = new Set(this.dirtyFiles);
-            const appliedChanges = await this.applyRemoteToWorkspace(dirtySnapshot);
-            if (appliedChanges) {
-                await vscode.commands.executeCommand("weAudit.findAndLoadConfigurationFiles");
-                await vscode.commands.executeCommand("weAudit.reloadSavedFindingsFromDisk");
-            }
-            this.onSyncSuccess();
         });
-
-        if (!executed) {
-            return;
-        }
     }
 
     /**
