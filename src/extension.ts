@@ -12,6 +12,10 @@ import { GitAutoSyncManager } from "./sync/gitAutoSync";
 const SHUTDOWN_FLUSH_TIMEOUT_MS = 3000;
 let gitAutoSyncManager: GitAutoSyncManager | undefined;
 
+/**
+ * Activates the weAudit extension, registering all commands, tree views, and webview panels.
+ * @param context The extension context provided by VS Code.
+ */
 export function activate(context: vscode.ExtensionContext): void {
     // if there are no open folders, return
     // the extension will be reactivated when a folder is opened
