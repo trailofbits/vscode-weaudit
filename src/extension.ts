@@ -12,6 +12,10 @@ import { GitAutoSyncManager } from "./sync/gitAutoSync";
 const SHUTDOWN_FLUSH_TIMEOUT_MS = 3000;
 let gitAutoSyncManager: GitAutoSyncManager | undefined;
 
+/**
+ * Activates the weAudit extension, registering all commands, views, and webview providers.
+ * @param context The extension context provided by VS Code.
+ */
 export function activate(context: vscode.ExtensionContext): void {
     // if there are no open folders, return
     // the extension will be reactivated when a folder is opened
@@ -46,6 +50,13 @@ export async function deactivate(): Promise<void> {
     gitAutoSyncManager = undefined;
 }
 
+/**
+ * Opens a file in the editor and selects the specified line range.
+ * Reuses an already-visible editor for the file when possible.
+ * @param resource The URI of the file to open.
+ * @param startLine The first line of the range to select.
+ * @param endLine The last line of the range to select.
+ */
 async function openResource(resource: vscode.Uri, startLine: number, endLine: number): Promise<void> {
     const range = new vscode.Range(startLine, 0, endLine, Number.MAX_SAFE_INTEGER);
 
