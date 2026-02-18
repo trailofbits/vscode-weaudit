@@ -930,6 +930,7 @@ class WARoot {
         return urisToDecorate;
     }
 
+    /** Removes all partially-audited entries whose path matches the given URI. */
     private cleanPartialAudits(uriToRemove: vscode.Uri): void {
         const relative = path.relative(this.rootPath, uriToRemove.fsPath);
         this.partiallyAuditedFiles = this.partiallyAuditedFiles.filter((file) => file.path !== relative);
@@ -1890,6 +1891,11 @@ class MultiRootManager {
     }
 }
 
+/**
+ * Core tree data provider and controller for the weAudit extension.
+ * Manages findings, notes, audited files, resolved entries, decorations,
+ * and the tree view that displays all audit data across workspace roots.
+ */
 export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     // treeEntries contains the currently active entries: findings and notes
     private treeEntries: FullEntry[];
@@ -2384,6 +2390,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         });
     }
 
+    /** Reads the username from extension settings, falling back to the OS user. */
     public setUsernameConfigOrDefault(): string {
         this.username = vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username;
         return this.username;
@@ -2437,6 +2444,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             });
     }
 
+    /** Focuses the findings tree view and opens its built-in search bar. */
     private async showFindingsSearchBar(): Promise<void> {
         await vscode.commands.executeCommand("codeMarker.focus");
         // list.find opens the current view's search bar
@@ -2444,6 +2452,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         await vscode.commands.executeCommand("list.find");
     }
 
+    /** Returns the code snippet and client permalink for the current editor selection. */
     async getSelectedClientCodeAndPermalink(): Promise<FromLocationResponse | void> {
         const locations = this.getActiveSelectionLocation();
         if (locations === undefined || locations.length === 0) {
@@ -2468,6 +2477,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return { codeToCopy: codeToCopy, permalink: remoteAndPermalink.permalink };
     }
 
+    /** Returns the code snippet and client permalink for a given entry or location entry. */
     async getCodeToCopyFromLocation(entry: FullEntry | FullLocationEntry): Promise<FromLocationResponse | void> {
         const location = isLocationEntry(entry) ? entry.location : entry.locations[0];
         if (location === undefined) {
@@ -2523,6 +2533,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return splitEntries;
     }
 
+    /** Imports findings from an external source, merging them with existing entries. */
     externallyLoadFindings(entries: FullEntry[]): void {
         const authors = new Set<string>();
 
@@ -2576,6 +2587,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
     }
 
+    /** Updates a field on the currently selected tree view entry, optionally persisting to disk. */
     updateCurrentlySelectedEntry(field: string, value: string, isPersistent: boolean): void {
         if (treeView.selection.length === 0) {
             return;
@@ -2664,6 +2676,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return this.sortEntriesAlphabetically;
     }
 
+    /** Returns the current tree view display mode (list or per-file). */
     getTreeViewMode(): TreeViewMode {
         return this.treeViewMode;
     }
@@ -2762,6 +2775,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refresh(uri);
     }
 
+    /** Marks the current editor selection as a partially-audited region. */
     addPartiallyAudited(): void {
         const editor = vscode.window.activeTextEditor;
         if (editor === undefined) {
@@ -2776,6 +2790,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         void this.updateSavedData(this.username);
     }
 
+    /** Cycles to the next partially-audited region across all workspace roots and opens it in the editor. */
     private navigateToNextPartiallyAuditedRegion(): void {
         // Collect all partially audited regions from all workspace roots
         const allPartiallyAuditedRegions: { file: PartiallyAuditedFile; rootPath: string }[] = [];
@@ -2908,6 +2923,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         void this.updateSavedData(entry.author);
     }
 
+    /** Prompts the user to edit the label and description of a location entry. */
     async editLocationEntryDescription(locationEntry: FullLocationEntry): Promise<void> {
         const label = await vscode.window.showInputBox({
             title: `Edit location label`,
@@ -3198,6 +3214,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             });
     }
 
+    /** Generates a Markdown string for a finding entry, including permalinks and code snippets. */
     private async getEntryMarkdown(entry: FullEntry): Promise<string | void> {
         const clientPermalinks = [];
         const auditPermalinks = [];
@@ -3587,6 +3604,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refresh(uri);
     }
 
+    /** Creates a new standalone entry from a location entry, inheriting its label, type, and location. */
     addNewEntryFromLocationEntry(locationEntry: FullLocationEntry): void {
         const entry: FullEntry = {
             label: locationEntry.location.label !== "" ? locationEntry.location.label : locationEntry.parentEntry.label,
@@ -3603,6 +3621,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refresh(uri);
     }
 
+    /** Returns the full location(s) corresponding to the active editor selection. */
     getActiveSelectionLocation(): FullLocation[] | undefined {
         // the null assertion is never undefined because we check if the editor is undefined
         const editor = vscode.window.activeTextEditor;
@@ -4547,6 +4566,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
     }
 
+    /** Lazily rebuilds the path-to-entry map if it has been marked dirty. */
     private ensurePathToEntryMap(): void {
         if (!this.pathToEntryMapDirty) {
             return;
@@ -4554,6 +4574,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.rebuildPathToEntryMap();
     }
 
+    /** Rebuilds the internal map from file path labels to their sorted location entries. */
     private rebuildPathToEntryMap(): void {
         this.pathToEntryMap.clear();
 
@@ -4585,6 +4606,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.pathToEntryMapDirty = false;
     }
 
+    /** Returns a cached FullLocationEntry for the given entry/location pair, creating one if needed. */
     private getOrCreateLocationEntry(entry: FullEntry, location: FullLocation): FullLocationEntry {
         const cached = this.locationEntryCache.get(location);
         if (cached !== undefined && cached.parentEntry === entry) {
@@ -4595,6 +4617,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return locationEntry;
     }
 
+    /** Checks whether a location belongs to a visible config and matches the commit filter. */
     private isLocationVisible(entry: FullEntry, location: FullLocation): boolean {
         // Respect commit filtering when deciding whether a location is visible.
         if (!this.entryMatchesCommitFilter(entry)) {
@@ -4612,6 +4635,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         );
     }
 
+    /** Returns the unique path label used to group a location in the per-file tree view. */
     private getPathLabelForLocation(location: FullLocation): string | undefined {
         if (this.workspaces.moreThanOneRoot()) {
             return this.workspaces.createUniquePath(location.rootPath, location.path) ?? undefined;
@@ -4619,6 +4643,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return location.path;
     }
 
+    /** Returns true if at least one of the entry's locations passes visibility checks. */
     private hasVisibleLocation(entry: FullEntry): boolean {
         for (const location of entry.locations) {
             if (this.isLocationVisible(entry, location)) {
@@ -4791,6 +4816,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return !this.workspaces.moreThanOneRoot();
     }
 
+    /** Marks the path-to-entry map as dirty so it will be rebuilt on next access. */
     private markPathMapDirty(): void {
         this.pathToEntryMapDirty = true;
     }
@@ -4847,6 +4873,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
     }
 
+    /** Refreshes the tree and reapplies decorations for the file at the given location. */
     refreshAndDecorateFromPath(location: FullLocation): void {
         const uri = vscode.Uri.file(path.join(location.rootPath, location.path));
         this.decorateWithUri(uri);
@@ -4898,6 +4925,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 let treeView: vscode.TreeView<TreeEntry>;
 let treeDataProvider: CodeMarker;
 
+/**
+ * Handles drag-and-drop operations in the findings tree view,
+ * supporting reordering of entries and merging locations between entries.
+ */
 class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntry> {
     /* eslint-disable @typescript-eslint/naming-convention */
     private MIME_TYPE = "application/vnd.code.tree.codemarker";
@@ -4908,6 +4939,7 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
     dragMimeTypes = [this.LOCATION_MIME_TYPE, this.ENTRY_MIME_TYPE];
     dropMimeTypes = [this.MIME_TYPE, this.LOCATION_MIME_TYPE, this.ENTRY_MIME_TYPE];
 
+    /** Packages the dragged tree entry into the data transfer with the appropriate MIME type. */
     handleDrag(source: readonly TreeEntry[], dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): void | Thenable<void> {
         // drag and drop in the TreeViewMode.GroupByFile does not make sense unless we wanted to reorder the file list
         if (treeDataProvider.getTreeViewMode() === TreeViewMode.GroupByFile) {
@@ -4929,6 +4961,7 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
         }
     }
 
+    /** Handles a drop by reordering entries, moving locations between entries, or merging entries. */
     async handleDrop(target: TreeEntry | undefined, dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): Promise<void> {
         // drag and drop in the TreeViewMode.GroupByFile does not make sense unless we wanted to reorder the file list
         if (treeDataProvider.getTreeViewMode() === TreeViewMode.GroupByFile) {
@@ -5195,6 +5228,10 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
     }
 }
 
+/**
+ * Top-level entry point that wires together the CodeMarker tree, decorations,
+ * tree view, drag-and-drop, and editor event listeners.
+ */
 export class AuditMarker {
     private previousVisibleTextEditors: string[] = [];
     private decorationManager: DecorationManager;
@@ -5308,6 +5345,7 @@ export class AuditMarker {
         );
     }
 
+    /** Sends the selected entry's details to the Finding Details webview panel. */
     private showEntryInFindingDetails(entry: TreeEntry): void {
         if (isPathOrganizerEntry(entry)) {
             vscode.commands.executeCommand("weAudit.hideFindingDetails");

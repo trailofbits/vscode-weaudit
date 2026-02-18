@@ -6,6 +6,10 @@ import { EntryDetails, EntryResolution, EntryType } from "../types";
 import { WebviewMessage } from "../webview/webviewMessageTypes";
 import htmlBody from "./findingDetails.html";
 
+/**
+ * Registers the Finding Details webview view provider and its associated commands.
+ * @param context The extension context for managing subscriptions.
+ */
 export function activateFindingDetailsWebview(context: vscode.ExtensionContext): void {
     const provider = new FindingDetailsProvider(context.extensionUri);
 
@@ -29,6 +33,10 @@ export function activateFindingDetailsWebview(context: vscode.ExtensionContext):
     );
 }
 
+/**
+ * Webview provider for the Finding Details sidebar panel, which displays
+ * editable metadata (severity, description, etc.) for the selected finding or note.
+ */
 class FindingDetailsProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = "findingDetails";
     private _disposables: vscode.Disposable[] = [];
@@ -37,6 +45,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
 
     constructor(private readonly _extensionUri: vscode.Uri) {}
 
+    /** Initializes the webview with HTML, scripts, and message listeners when the view becomes visible. */
     public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken): void {
         this._view = webviewView;
 
@@ -111,6 +120,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         }
     }
 
+    /** Generates the HTML content for the Finding Details webview, including CSP and script references. */
     private _getHtmlForWebview(webview: vscode.Webview): string {
         // Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
         const styleUri = getUri(webview, this._extensionUri, ["media", "style.css"]);
@@ -139,6 +149,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
         `;
     }
 
+    /** Listens for messages from the webview and dispatches them to the appropriate extension commands. */
     private _setWebviewMessageListener(webview: vscode.Webview): void {
         webview.onDidReceiveMessage(
             (message: WebviewMessage) => {
@@ -177,6 +188,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
     }
 }
 
+/** Generates a cryptographic nonce for the webview Content Security Policy. */
 function getNonce(): string {
     return crypto.randomBytes(16).toString("base64");
 }

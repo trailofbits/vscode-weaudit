@@ -15,6 +15,10 @@ const vscode = acquireVsCodeApi();
 // or toolkit components
 window.addEventListener("load", main);
 
+/**
+ * Wires up the Git Config webview: registers event listeners on input fields,
+ * handles incoming messages to populate field values, and posts updates back to the extension.
+ */
 function main(): void {
     const rootDropdown = document.getElementById("workspace-root-list-dropdown") as Dropdown;
     rootDropdown?.addEventListener("change", handleDropdownChange);
@@ -63,6 +67,7 @@ function main(): void {
     vscode.postMessage(webviewIsReadyMessage);
 }
 
+/** Reads all Git Config form fields and posts an update-repository-config message. */
 function handleFieldChange(_e: Event): void {
     const clientURL = document.getElementById("client-url") as TextField;
     const auditURL = document.getElementById("audit-url") as TextField;
@@ -79,6 +84,7 @@ function handleFieldChange(_e: Event): void {
     vscode.postMessage(message);
 }
 
+/** Posts a choose-workspace-root message when the user selects a different workspace root. */
 function handleDropdownChange(_e: Event): void {
     const rootDropdown = document.getElementById("workspace-root-list-dropdown") as Dropdown;
 

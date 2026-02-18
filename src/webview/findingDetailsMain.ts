@@ -20,6 +20,10 @@ window.addEventListener("load", () => {
     vscode.postMessage({ command: "webview-ready" });
 });
 
+/**
+ * Wires up the Finding Details webview form: registers event listeners on input fields,
+ * handles incoming messages from the extension host, and manages auto-resizing text areas.
+ */
 function main(): void {
     const titleField = document.getElementById("label-area") as TextField;
     titleField?.addEventListener("change", handlePersistentFieldChange);
@@ -120,14 +124,21 @@ function main(): void {
     });
 }
 
+/** Handles an input event by sending a non-persistent (in-memory only) update to the extension. */
 function handleNonPersistentFieldChange(e: Event): void {
     handleFieldChange(e, false);
 }
 
+/** Handles a change event by sending a persistent (saved to disk) update to the extension. */
 function handlePersistentFieldChange(e: Event): void {
     handleFieldChange(e, true);
 }
 
+/**
+ * Extracts the field name and value from a form element event and posts an update message.
+ * @param e The DOM event from the input or change handler.
+ * @param isPersistent Whether the update should be persisted to disk immediately.
+ */
 function handleFieldChange(e: Event, isPersistent: boolean): void {
     const element = e.target as HTMLInputElement;
     const value = element.value;
