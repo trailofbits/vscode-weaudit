@@ -16,6 +16,10 @@ export class DecorationManager {
     public otherNoteDecorationType;
     public auditedFileDecorationType;
 
+    /**
+     * Loads all decoration type configurations using the current theme and settings.
+     * @param context The extension context used to resolve the gutter icon path.
+     */
     constructor(context: vscode.ExtensionContext) {
         this.gutterIconPath = vscode.Uri.file(context.asAbsolutePath(GUTTER_ICON_PATH));
 

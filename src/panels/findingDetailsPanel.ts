@@ -6,6 +6,10 @@ import { EntryDetails, EntryResolution, EntryType } from "../types";
 import { WebviewMessage } from "../webview/webviewMessageTypes";
 import htmlBody from "./findingDetails.html";
 
+/**
+ * Registers the finding details webview view provider and its associated commands.
+ * @param context The extension context for provider registration and subscriptions.
+ */
 export function activateFindingDetailsWebview(context: vscode.ExtensionContext): void {
     const provider = new FindingDetailsProvider(context.extensionUri);
 
@@ -37,6 +41,7 @@ class FindingDetailsProvider implements vscode.WebviewViewProvider {
 
     constructor(private readonly _extensionUri: vscode.Uri) {}
 
+    /** Initializes the webview with HTML content and registers the message listener. */
     public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken): void {
         this._view = webviewView;
 

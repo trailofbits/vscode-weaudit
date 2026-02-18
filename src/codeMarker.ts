@@ -1890,6 +1890,12 @@ class MultiRootManager {
     }
 }
 
+/**
+ * Core tree data provider that manages audit findings and notes.
+ *
+ * Maintains the active and resolved entry lists, handles serialization/deserialization
+ * of saved findings files, and drives the findings tree view and editor decorations.
+ */
 export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     // treeEntries contains the currently active entries: findings and notes
     private treeEntries: FullEntry[];
@@ -1933,6 +1939,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     // State for navigating through partially audited regions
     private currentPartiallyAuditedIndex = -1;
 
+    /**
+     * Initializes the code marker tree provider, registers all commands, and loads saved data.
+     * @param context The extension context used for subscriptions and storage.
+     * @param decorationManager The decoration manager for editor highlights.
+     */
     constructor(context: vscode.ExtensionContext, decorationManager: DecorationManager) {
         this.treeEntries = [];
         this.resolvedEntries = [];
@@ -2384,6 +2395,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         });
     }
 
+    /**
+     * Reads the username from the weAudit configuration, falling back to the OS username.
+     * @returns The resolved username.
+     */
     public setUsernameConfigOrDefault(): string {
         this.username = vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username;
         return this.username;
@@ -2444,6 +2459,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         await vscode.commands.executeCommand("list.find");
     }
 
+    /**
+     * Returns the source code and client permalink for the currently selected editor region.
+     * @returns The code text and permalink, or void if no valid selection exists.
+     */
     async getSelectedClientCodeAndPermalink(): Promise<FromLocationResponse | void> {
         const locations = this.getActiveSelectionLocation();
         if (locations === undefined || locations.length === 0) {
@@ -2468,6 +2487,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return { codeToCopy: codeToCopy, permalink: remoteAndPermalink.permalink };
     }
 
+    /**
+     * Returns the source code and client permalink for a specific entry or location entry.
+     * @param entry The entry or location entry whose code region to read.
+     * @returns The code text and permalink, or void if unavailable.
+     */
     async getCodeToCopyFromLocation(entry: FullEntry | FullLocationEntry): Promise<FromLocationResponse | void> {
         const location = isLocationEntry(entry) ? entry.location : entry.locations[0];
         if (location === undefined) {
@@ -2523,6 +2547,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return splitEntries;
     }
 
+    /**
+     * Imports findings from an external source (e.g., Sarif Explorer), skipping duplicates
+     * that already exist in the active or resolved lists, and persists the result.
+     * @param entries The entries to import.
+     */
     externallyLoadFindings(entries: FullEntry[]): void {
         const authors = new Set<string>();
 
@@ -2576,6 +2605,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
     }
 
+    /**
+     * Updates a field on the currently selected tree entry from a webview message.
+     * @param field The entry detail field name to update (e.g., "severity", "description").
+     * @param value The new value for the field.
+     * @param isPersistent Whether the change should be saved to disk immediately.
+     */
     updateCurrentlySelectedEntry(field: string, value: string, isPersistent: boolean): void {
         if (treeView.selection.length === 0) {
             return;
@@ -2664,6 +2699,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         return this.sortEntriesAlphabetically;
     }
 
+    /** Returns the current tree view display mode (list or group-by-file). */
     getTreeViewMode(): TreeViewMode {
         return this.treeViewMode;
     }
@@ -2762,6 +2798,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refresh(uri);
     }
 
+    /** Marks the current editor selection as a partially audited region and persists the change. */
     addPartiallyAudited(): void {
         const editor = vscode.window.activeTextEditor;
         if (editor === undefined) {
@@ -2908,6 +2945,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         void this.updateSavedData(entry.author);
     }
 
+    /**
+     * Prompts the user to edit the label of an additional location entry.
+     * @param locationEntry The location entry whose label to edit.
+     */
     async editLocationEntryDescription(locationEntry: FullLocationEntry): Promise<void> {
         const label = await vscode.window.showInputBox({
             title: `Edit location label`,
@@ -3587,6 +3628,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refresh(uri);
     }
 
+    /**
+     * Creates a new standalone entry from an existing location entry and adds it to the tree.
+     * @param locationEntry The location entry to promote to a new top-level entry.
+     */
     addNewEntryFromLocationEntry(locationEntry: FullLocationEntry): void {
         const entry: FullEntry = {
             label: locationEntry.location.label !== "" ? locationEntry.location.label : locationEntry.parentEntry.label,
@@ -3603,6 +3648,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.refresh(uri);
     }
 
+    /**
+     * Returns the full locations corresponding to the active editor's selected lines.
+     * @returns An array of full locations, or undefined if the editor or workspace root is unavailable.
+     */
     getActiveSelectionLocation(): FullLocation[] | undefined {
         // the null assertion is never undefined because we check if the editor is undefined
         const editor = vscode.window.activeTextEditor;
@@ -4847,6 +4896,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
     }
 
+    /**
+     * Refreshes decorations and tree data for the file at the given location.
+     * @param location The location whose file should be refreshed.
+     */
     refreshAndDecorateFromPath(location: FullLocation): void {
         const uri = vscode.Uri.file(path.join(location.rootPath, location.path));
         this.decorateWithUri(uri);
@@ -4908,6 +4961,7 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
     dragMimeTypes = [this.LOCATION_MIME_TYPE, this.ENTRY_MIME_TYPE];
     dropMimeTypes = [this.MIME_TYPE, this.LOCATION_MIME_TYPE, this.ENTRY_MIME_TYPE];
 
+    /** Serializes the dragged tree entry into the data transfer for reordering. */
     handleDrag(source: readonly TreeEntry[], dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): void | Thenable<void> {
         // drag and drop in the TreeViewMode.GroupByFile does not make sense unless we wanted to reorder the file list
         if (treeDataProvider.getTreeViewMode() === TreeViewMode.GroupByFile) {
@@ -4929,6 +4983,7 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
         }
     }
 
+    /** Processes a drop event to reorder entries or move locations between entries. */
     async handleDrop(target: TreeEntry | undefined, dataTransfer: vscode.DataTransfer, _token: vscode.CancellationToken): Promise<void> {
         // drag and drop in the TreeViewMode.GroupByFile does not make sense unless we wanted to reorder the file list
         if (treeDataProvider.getTreeViewMode() === TreeViewMode.GroupByFile) {
@@ -5195,10 +5250,19 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
     }
 }
 
+/**
+ * Top-level controller that wires up the {@link CodeMarker} tree provider, the tree view,
+ * editor event listeners, and decoration management into a single cohesive unit.
+ */
 export class AuditMarker {
     private previousVisibleTextEditors: string[] = [];
     private decorationManager: DecorationManager;
 
+    /**
+     * Creates the decoration manager, code marker tree provider, and tree view,
+     * then registers all editor and selection event listeners.
+     * @param context The extension context used for subscriptions and storage.
+     */
     constructor(context: vscode.ExtensionContext) {
         this.decorationManager = new DecorationManager(context);
 
