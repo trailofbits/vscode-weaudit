@@ -201,7 +201,7 @@ Hide every findings/notes highlight in the editor by running the `weAudit: Toggl
 
 ### Search & Filter Findings
 You can search for and filter the findings in the `List of Findings` panel by calling the `weAudit: Search and Filter Findings` command.
-By default, the `List of Findings` panel shows only findings that match the workspace commit hash. Use the `Show All Findings` command in the panel toolbar to reveal findings from other commits (notes remain visible). When the workspace opens, weAudit notifies you if there are hidden findings from other commits.
+By default, the `List of Findings` panel shows only findings that match the workspace commit hash. If either the finding hash or current workspace hash is unavailable, the finding stays visible. Use the `Show All Findings` command in the panel toolbar to reveal findings from other commits (notes remain visible). When the workspace opens, weAudit notifies you if there are hidden findings from other commits.
 
 ![Filter Findings](media/readme/gifs/filter_findings.gif)
 

@@ -522,20 +522,6 @@ class WARoot {
     }
 
     /**
-     * Return stat information for a path, or undefined when the path does not exist.
-     */
-    private statPath(filePath: string): fs.Stats | undefined {
-        try {
-            return fs.statSync(filePath);
-        } catch (error: unknown) {
-            if (this.isMissingPathError(error)) {
-                return;
-            }
-            throw error;
-        }
-    }
-
-    /**
      * Read a UTF-8 file by descriptor to avoid path check-then-read races.
      */
     private readUtf8FileByDescriptor(filePath: string): string | undefined {
@@ -642,8 +628,7 @@ class WARoot {
             }
         }
 
-        const gitDirStat = this.statPath(gitDir);
-        if (!gitDirStat?.isDirectory() || !this.isLikelyGitMetadataDirectory(gitDir)) {
+        if (!this.isLikelyGitMetadataDirectory(gitDir)) {
             return;
         }
 
@@ -652,8 +637,7 @@ class WARoot {
         if (commonDirPointer) {
             commonDir = path.isAbsolute(commonDirPointer) ? commonDirPointer : path.resolve(gitDir, commonDirPointer);
         }
-        const commonDirStat = this.statPath(commonDir);
-        if (!commonDirStat?.isDirectory() || !this.isLikelyGitMetadataDirectory(commonDir)) {
+        if (!this.isLikelyGitMetadataDirectory(commonDir)) {
             return;
         }
 
@@ -4714,7 +4698,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const entryCommitHash = this.getEntryCommitHash(entry);
         const currentCommitHash = this.getEntryCurrentCommitHash(entry);
         if (!entryCommitHash || !currentCommitHash) {
-            return false;
+            // If commit metadata is unavailable, keep the finding visible.
+            return true;
         }
         return entryCommitHash === currentCommitHash;
     }

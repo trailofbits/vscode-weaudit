@@ -39,6 +39,9 @@ function main(): void {
     syncNowButton?.addEventListener("click", handleSyncNow);
 
     window.addEventListener("message", (event) => {
+        if (event.origin !== window.origin) {
+            return;
+        }
         const message = event.data as SetSyncConfigMessage;
         if (message.command !== "set-sync-config") {
             return;
