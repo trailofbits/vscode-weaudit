@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import * as assert from "node:assert";
 
 import {
     EntryType,
@@ -57,12 +57,12 @@ describe("validateSerializedData", () => {
     describe("positive cases", () => {
         it("accepts a fully populated valid payload", () => {
             const data = createValidSerializedData();
-            expect(validateSerializedData(data)).to.equal(true);
+            assert.strictEqual(validateSerializedData(data), true);
         });
 
         it("accepts minimal payload with empty arrays", () => {
             const data = createDefaultSerializedData();
-            expect(validateSerializedData(data)).to.equal(true);
+            assert.strictEqual(validateSerializedData(data), true);
         });
 
         it("accepts legacy data without partiallyAuditedFiles field", () => {
@@ -75,7 +75,7 @@ describe("validateSerializedData", () => {
                 resolvedEntries: [],
                 // Note: partiallyAuditedFiles is intentionally omitted
             };
-            expect(validateSerializedData(data)).to.equal(true);
+            assert.strictEqual(validateSerializedData(data), true);
         });
 
         it("accepts payload with empty string remotes", () => {
@@ -83,7 +83,7 @@ describe("validateSerializedData", () => {
             data.clientRemote = "";
             data.gitRemote = "";
             data.gitSha = "";
-            expect(validateSerializedData(data)).to.equal(true);
+            assert.strictEqual(validateSerializedData(data), true);
         });
 
         it("accepts entry with EntryType.Note", () => {
@@ -91,7 +91,7 @@ describe("validateSerializedData", () => {
             const noteEntry = createValidEntry();
             noteEntry.entryType = EntryType.Note;
             data.treeEntries = [noteEntry];
-            expect(validateSerializedData(data)).to.equal(true);
+            assert.strictEqual(validateSerializedData(data), true);
         });
 
         it("accepts entry with multiple locations", () => {
@@ -105,13 +105,13 @@ describe("validateSerializedData", () => {
                 description: "with description",
             });
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(true);
+            assert.strictEqual(validateSerializedData(data), true);
         });
 
         it("accepts entries in resolvedEntries array", () => {
             const data = createDefaultSerializedData();
             data.resolvedEntries = [createValidEntry()];
-            expect(validateSerializedData(data)).to.equal(true);
+            assert.strictEqual(validateSerializedData(data), true);
         });
     });
 
@@ -125,10 +125,10 @@ describe("validateSerializedData", () => {
                 auditedFiles: [],
                 resolvedEntries: [],
             };
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
-        it("rejects missing auditedFiles", () => {
+        it("defaults missing auditedFiles to an empty array", () => {
             const data: any = {
                 clientRemote: "",
                 gitRemote: "",
@@ -137,10 +137,11 @@ describe("validateSerializedData", () => {
                 auditedFiles: undefined,
                 resolvedEntries: [],
             };
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), true);
+            assert.deepStrictEqual(data.auditedFiles, []);
         });
 
-        it("rejects missing resolvedEntries", () => {
+        it("defaults missing resolvedEntries to an empty array", () => {
             const data: any = {
                 clientRemote: "",
                 gitRemote: "",
@@ -149,7 +150,8 @@ describe("validateSerializedData", () => {
                 auditedFiles: [],
                 resolvedEntries: undefined,
             };
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), true);
+            assert.deepStrictEqual(data.resolvedEntries, []);
         });
     });
 
@@ -159,7 +161,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.entryType = 99;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects invalid entryType (negative number)", () => {
@@ -167,7 +169,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.entryType = -1;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entry missing label", () => {
@@ -175,7 +177,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.label;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entry with undefined label", () => {
@@ -183,7 +185,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.label = undefined;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entry missing author", () => {
@@ -191,7 +193,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.author;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entry with undefined author", () => {
@@ -199,7 +201,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.author = undefined;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entry missing details", () => {
@@ -207,7 +209,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.details;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entry with undefined details", () => {
@@ -215,7 +217,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.details = undefined;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entry missing locations", () => {
@@ -223,7 +225,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.locations;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entry with undefined locations", () => {
@@ -231,7 +233,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.locations = undefined;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entry missing entryType", () => {
@@ -239,7 +241,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.entryType;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
     });
 
@@ -249,7 +251,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.locations[0].path;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects location with undefined path", () => {
@@ -257,7 +259,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.locations[0].path = undefined;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects location missing startLine", () => {
@@ -265,7 +267,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.locations[0].startLine;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects location with undefined startLine", () => {
@@ -273,7 +275,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.locations[0].startLine = undefined;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects location missing endLine", () => {
@@ -281,7 +283,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.locations[0].endLine;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects location with undefined endLine", () => {
@@ -289,7 +291,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.locations[0].endLine = undefined;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects location missing label", () => {
@@ -297,7 +299,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.locations[0].label;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects location with undefined label", () => {
@@ -305,7 +307,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.locations[0].label = undefined;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
     });
 
@@ -313,25 +315,25 @@ describe("validateSerializedData", () => {
         it("rejects auditedFile missing path", () => {
             const data = createDefaultSerializedData();
             data.auditedFiles = [{ author: "testuser" } as any];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects auditedFile with undefined path", () => {
             const data = createDefaultSerializedData();
             data.auditedFiles = [{ path: undefined, author: "testuser" } as any];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects auditedFile missing author", () => {
             const data = createDefaultSerializedData();
             data.auditedFiles = [{ path: "src/test.ts" } as any];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects auditedFile with undefined author", () => {
             const data = createDefaultSerializedData();
             data.auditedFiles = [{ path: "src/test.ts", author: undefined } as any];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
     });
 
@@ -342,31 +344,31 @@ describe("validateSerializedData", () => {
         it("rejects partiallyAuditedFile missing path", () => {
             const data = createDefaultSerializedData();
             data.partiallyAuditedFiles = [{ author: "testuser", startLine: 0, endLine: 10 } as any];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects partiallyAuditedFile missing author", () => {
             const data = createDefaultSerializedData();
             data.partiallyAuditedFiles = [{ path: "src/test.ts", startLine: 0, endLine: 10 } as any];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects partiallyAuditedFile with all fields undefined", () => {
             const data = createDefaultSerializedData();
             data.partiallyAuditedFiles = [{ path: undefined, author: undefined, startLine: undefined, endLine: undefined } as any];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects partiallyAuditedFile with only startLine defined", () => {
             const data = createDefaultSerializedData();
             data.partiallyAuditedFiles = [{ startLine: 5 } as any];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects partiallyAuditedFile with only endLine defined", () => {
             const data = createDefaultSerializedData();
             data.partiallyAuditedFiles = [{ endLine: 10 } as any];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
     });
 
@@ -376,7 +378,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.details.severity;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entryDetails with undefined severity", () => {
@@ -384,7 +386,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.details.severity = undefined;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entryDetails missing difficulty", () => {
@@ -392,7 +394,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.details.difficulty;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entryDetails with undefined difficulty", () => {
@@ -400,7 +402,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.details.difficulty = undefined;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entryDetails missing type", () => {
@@ -408,7 +410,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.details.type;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entryDetails with undefined type", () => {
@@ -416,7 +418,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             entry.details.type = undefined;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entryDetails missing description", () => {
@@ -424,7 +426,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.details.description;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entryDetails missing exploit", () => {
@@ -432,7 +434,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.details.exploit;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects entryDetails missing recommendation", () => {
@@ -440,7 +442,7 @@ describe("validateSerializedData", () => {
             const entry: any = createValidEntry();
             delete entry.details.recommendation;
             data.treeEntries = [entry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
     });
 
@@ -450,7 +452,7 @@ describe("validateSerializedData", () => {
             const invalidEntry: any = createValidEntry();
             delete invalidEntry.label;
             data.resolvedEntries = [invalidEntry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         it("rejects invalid entryType in resolvedEntries", () => {
@@ -458,7 +460,7 @@ describe("validateSerializedData", () => {
             const invalidEntry: any = createValidEntry();
             invalidEntry.entryType = 999;
             data.resolvedEntries = [invalidEntry];
-            expect(validateSerializedData(data)).to.equal(false);
+            assert.strictEqual(validateSerializedData(data), false);
         });
     });
 });

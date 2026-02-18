@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import * as assert from "node:assert";
 import * as sinon from "sinon";
 
 import {
@@ -64,9 +64,9 @@ describe("Webview Message Handlers", () => {
                 }
 
                 const commands = commandExecutor.getExecutedCommands();
-                expect(commands).to.have.length(1);
-                expect(commands[0].command).to.equal("weAudit.updateCurrentSelectedEntry");
-                expect(commands[0].args).to.deep.equal(["severity", "High", true]);
+                assert.strictEqual(commands.length, 1);
+                assert.strictEqual(commands[0].command, "weAudit.updateCurrentSelectedEntry");
+                assert.deepStrictEqual(commands[0].args, ["severity", "High", true]);
             });
 
             it("handles non-persistent updates", () => {
@@ -84,7 +84,7 @@ describe("Webview Message Handlers", () => {
                 }
 
                 const commands = commandExecutor.getExecutedCommands();
-                expect(commands[0].args[2]).to.be.false;
+                assert.strictEqual(commands[0].args[2], false);
             });
 
             it("handles empty value", () => {
@@ -102,7 +102,7 @@ describe("Webview Message Handlers", () => {
                 }
 
                 const commands = commandExecutor.getExecutedCommands();
-                expect(commands[0].args[1]).to.equal("");
+                assert.strictEqual(commands[0].args[1], "");
             });
         });
 
@@ -120,8 +120,8 @@ describe("Webview Message Handlers", () => {
                 }
 
                 const commands = commandExecutor.getExecutedCommands();
-                expect(commands).to.have.length(1);
-                expect(commands[0].command).to.equal("weAudit.showSelectedEntryInFindingDetails");
+                assert.strictEqual(commands.length, 1);
+                assert.strictEqual(commands[0].command, "weAudit.showSelectedEntryInFindingDetails");
             });
         });
     });
@@ -149,9 +149,9 @@ describe("Webview Message Handlers", () => {
                 }
 
                 const commands = commandExecutor.getExecutedCommands();
-                expect(commands).to.have.length(1);
-                expect(commands[0].command).to.equal("weAudit.updateGitConfig");
-                expect(commands[0].args).to.deep.equal(["/workspace/project1", "https://github.com/client/repo", "https://github.com/audit/repo", "abc123"]);
+                assert.strictEqual(commands.length, 1);
+                assert.strictEqual(commands[0].command, "weAudit.updateGitConfig");
+                assert.deepStrictEqual(commands[0].args, ["/workspace/project1", "https://github.com/client/repo", "https://github.com/audit/repo", "abc123"]);
             });
 
             it("shows error when rootLabel is not found in map", () => {
@@ -176,9 +176,9 @@ describe("Webview Message Handlers", () => {
                 }
 
                 const errors = errorHandler.getErrors();
-                expect(errors).to.have.length(1);
-                expect(errors[0]).to.include("unknownProject");
-                expect(errors[0]).to.include("not a workspace root");
+                assert.strictEqual(errors.length, 1);
+                assert.ok(errors[0].includes("unknownProject"));
+                assert.ok(errors[0].includes("not a workspace root"));
             });
         });
 
@@ -204,9 +204,9 @@ describe("Webview Message Handlers", () => {
                 }
 
                 const commands = commandExecutor.getExecutedCommands();
-                expect(commands).to.have.length(1);
-                expect(commands[0].command).to.equal("weAudit.pushGitConfigView");
-                expect(commands[0].args).to.deep.equal(["/workspace/project2"]);
+                assert.strictEqual(commands.length, 1);
+                assert.strictEqual(commands[0].command, "weAudit.pushGitConfigView");
+                assert.deepStrictEqual(commands[0].args, ["/workspace/project2"]);
             });
 
             it("shows error when workspace root is not found", () => {
@@ -230,9 +230,9 @@ describe("Webview Message Handlers", () => {
                 const commands = commandExecutor.getExecutedCommands();
                 const errors = errorHandler.getErrors();
 
-                expect(commands).to.have.length(0);
-                expect(errors).to.have.length(1);
-                expect(errors[0]).to.include("nonexistent");
+                assert.strictEqual(commands.length, 0);
+                assert.strictEqual(errors.length, 1);
+                assert.ok(errors[0].includes("nonexistent"));
             });
         });
 
@@ -252,10 +252,10 @@ describe("Webview Message Handlers", () => {
                 }
 
                 const commands = commandExecutor.getExecutedCommands();
-                expect(commands).to.have.length(2);
-                expect(commands[0].command).to.equal("weAudit.getGitConfigRoots");
-                expect(commands[1].command).to.equal("weAudit.pushGitConfigView");
-                expect(commands[1].args).to.deep.equal(["/workspace/project1"]);
+                assert.strictEqual(commands.length, 2);
+                assert.strictEqual(commands[0].command, "weAudit.getGitConfigRoots");
+                assert.strictEqual(commands[1].command, "weAudit.pushGitConfigView");
+                assert.deepStrictEqual(commands[1].args, ["/workspace/project1"]);
             });
 
             it("passes null when no current root path", () => {
@@ -272,7 +272,7 @@ describe("Webview Message Handlers", () => {
                 }
 
                 const commands = commandExecutor.getExecutedCommands();
-                expect(commands[1].args).to.deep.equal([null]);
+                assert.deepStrictEqual(commands[1].args, [null]);
             });
         });
     });
@@ -286,10 +286,10 @@ describe("Webview Message Handlers", () => {
                 isPersistent: true,
             };
 
-            expect(message.command).to.equal("update-entry");
-            expect("field" in message).to.be.true;
-            expect("value" in message).to.be.true;
-            expect("isPersistent" in message).to.be.true;
+            assert.strictEqual(message.command, "update-entry");
+            assert.strictEqual("field" in message, true);
+            assert.strictEqual("value" in message, true);
+            assert.strictEqual("isPersistent" in message, true);
         });
 
         it("identifies update-repository-config messages correctly", () => {
@@ -301,9 +301,9 @@ describe("Webview Message Handlers", () => {
                 commitHash: "abc123",
             };
 
-            expect(message.command).to.equal("update-repository-config");
-            expect("rootLabel" in message).to.be.true;
-            expect("clientURL" in message).to.be.true;
+            assert.strictEqual(message.command, "update-repository-config");
+            assert.strictEqual("rootLabel" in message, true);
+            assert.strictEqual("clientURL" in message, true);
         });
 
         it("identifies choose-workspace-root messages correctly", () => {
@@ -312,8 +312,8 @@ describe("Webview Message Handlers", () => {
                 rootLabel: "project",
             };
 
-            expect(message.command).to.equal("choose-workspace-root");
-            expect("rootLabel" in message).to.be.true;
+            assert.strictEqual(message.command, "choose-workspace-root");
+            assert.strictEqual("rootLabel" in message, true);
         });
 
         it("identifies webview-ready messages correctly", () => {
@@ -321,7 +321,7 @@ describe("Webview Message Handlers", () => {
                 command: "webview-ready",
             };
 
-            expect(message.command).to.equal("webview-ready");
+            assert.strictEqual(message.command, "webview-ready");
         });
 
         it("identifies set-workspace-roots messages correctly", () => {
@@ -330,9 +330,9 @@ describe("Webview Message Handlers", () => {
                 rootLabels: ["project1", "project2"],
             };
 
-            expect(message.command).to.equal("set-workspace-roots");
-            expect("rootLabels" in message).to.be.true;
-            expect(message.rootLabels).to.have.length(2);
+            assert.strictEqual(message.command, "set-workspace-roots");
+            assert.strictEqual("rootLabels" in message, true);
+            assert.strictEqual(message.rootLabels.length, 2);
         });
     });
 
@@ -348,8 +348,8 @@ describe("Webview Message Handlers", () => {
                 dirToPathMap.set(rootPathAndLabel.rootLabel, rootPathAndLabel.rootPath);
             }
 
-            expect(dirToPathMap.get("project1")).to.equal("/workspace/project1");
-            expect(dirToPathMap.get("project2")).to.equal("/workspace/project2");
+            assert.strictEqual(dirToPathMap.get("project1"), "/workspace/project1");
+            assert.strictEqual(dirToPathMap.get("project2"), "/workspace/project2");
         });
 
         it("clears and rebuilds map on setGitConfigRoots", () => {
@@ -362,8 +362,8 @@ describe("Webview Message Handlers", () => {
                 dirToPathMap.set(root.rootLabel, root.rootPath);
             }
 
-            expect(dirToPathMap.has("oldProject")).to.be.false;
-            expect(dirToPathMap.get("newProject")).to.equal("/new/path");
+            assert.strictEqual(dirToPathMap.has("oldProject"), false);
+            assert.strictEqual(dirToPathMap.get("newProject"), "/new/path");
         });
 
         it("handles empty roots list", () => {
@@ -376,7 +376,7 @@ describe("Webview Message Handlers", () => {
                 dirToPathMap.set(root.rootLabel, root.rootPath);
             }
 
-            expect(dirToPathMap.size).to.equal(0);
+            assert.strictEqual(dirToPathMap.size, 0);
         });
     });
 
@@ -395,7 +395,7 @@ describe("Webview Message Handlers", () => {
             }
 
             // Should keep existing because it was found
-            expect(currentRootPathAndLabel.rootLabel).to.equal("project1");
+            assert.strictEqual(currentRootPathAndLabel.rootLabel, "project1");
         });
 
         it("switches to first root when current root not found", () => {
@@ -412,7 +412,7 @@ describe("Webview Message Handlers", () => {
             }
 
             // Should switch to first available root
-            expect(currentRootPathAndLabel.rootLabel).to.equal("project1");
+            assert.strictEqual(currentRootPathAndLabel.rootLabel, "project1");
         });
 
         it("keeps empty state when no roots available", () => {
@@ -425,8 +425,8 @@ describe("Webview Message Handlers", () => {
                 currentRootPathAndLabel = newRoots[0];
             }
 
-            expect(currentRootPathAndLabel.rootPath).to.equal("");
-            expect(currentRootPathAndLabel.rootLabel).to.equal("");
+            assert.strictEqual(currentRootPathAndLabel.rootPath, "");
+            assert.strictEqual(currentRootPathAndLabel.rootLabel, "");
         });
     });
 });
