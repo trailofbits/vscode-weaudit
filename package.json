@@ -68,6 +68,12 @@
                     "id": "savedFindings",
                     "name": "weAudit Files",
                     "contextualTitle": "weAudit"
+                },
+                {
+                    "type": "webview",
+                    "id": "docsOverlay",
+                    "name": "Docs Overlay",
+                    "contextualTitle": "weAudit"
                 }
             ]
         },
@@ -272,6 +278,21 @@
             {
                 "command": "weAudit.boundaryMoveDown",
                 "title": "weAudit: Move Finding Down"
+            },
+            {
+                "command": "weAudit.generateDocOverlay",
+                "title": "Open Docs Overlay",
+                "category": "weAudit"
+            },
+            {
+                "command": "weAudit.toggleDocOverlay",
+                "title": "Toggle Documentation Overlay Visibility",
+                "category": "weAudit"
+            },
+            {
+                "command": "weAudit.clearDocOverlay",
+                "title": "Clear All Documentation Overlays",
+                "category": "weAudit"
             }
         ],
         "keybindings": [
@@ -605,6 +626,22 @@
                 }
             },
             {
+                "title": "Documentation Overlay",
+                "order": 3,
+                "properties": {
+                    "weAudit.docOverlay.visibleOnLoad": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Show documentation overlays automatically when a session is loaded."
+                    },
+                    "weAudit.docOverlay.anthropicApiKey": {
+                        "type": "string",
+                        "default": "",
+                        "markdownDescription": "Anthropic API key used for documentation overlay generation. Set this instead of the `ANTHROPIC_API_KEY` environment variable."
+                    }
+                }
+            },
+            {
                 "title": "Highlight colors",
                 "order": 2,
                 "properties": {
@@ -685,6 +722,7 @@
         "vscode-extension-tester": "^8.21.0"
     },
     "dependencies": {
+        "@anthropic-ai/claude-agent-sdk": "^0.2.47",
         "@vscode/webview-ui-toolkit": "^1.4.0",
         "asciichart": "^1.5.25"
     }
