@@ -81,6 +81,7 @@ class WARoot {
 
     // firstTimeRequestingClientRemote is used to prevent repeatedly asking for the client remote
     private firstTimeRequestingClientRemote = true;
+    private hasShownHeadResolutionError = false;
 
     constructor(wsPath: string, wsLabel: string) {
         this.auditedFiles = [];
@@ -550,10 +551,8 @@ class WARoot {
      */
     private isLikelyGitMetadataDirectory(dirPath: string): boolean {
         const normalizedPath = path.normalize(path.resolve(dirPath));
-        if (path.basename(normalizedPath) === ".git") {
-            return true;
-        }
-        return normalizedPath.includes(`${path.sep}.git${path.sep}`);
+        const segments = normalizedPath.split(path.sep).filter((segment) => segment.length > 0);
+        return segments.some((segment) => segment === ".git" || segment.endsWith(".git"));
     }
 
     /**
@@ -741,6 +740,24 @@ class WARoot {
             return;
         }
         return this.readGitHeadSha(gitDirs.gitDir, gitDirs.commonDir);
+    }
+
+    /**
+     * Resolve HEAD commit hash for this workspace root and show a one-time error on failure.
+     */
+    resolveHeadGitShaOrShowError(): string | undefined {
+        const sha = this.findHeadGitSha();
+        if (sha) {
+            this.hasShownHeadResolutionError = false;
+            return sha;
+        }
+
+        if (!this.hasShownHeadResolutionError) {
+            const label = this.rootLabel || this.rootPath;
+            void vscode.window.showErrorMessage(`weAudit: Could not resolve HEAD commit hash for workspace root "${label}".`);
+            this.hasShownHeadResolutionError = true;
+        }
+        return;
     }
 
     /**
@@ -3635,7 +3652,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (wsRoot === undefined) {
             return "";
         }
-        return wsRoot.findHeadGitSha() ?? wsRoot.findGitSha() ?? "";
+        return wsRoot.resolveHeadGitShaOrShowError() ?? "";
     }
 
     /**
@@ -4685,7 +4702,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (!wsRoot) {
             return "";
         }
-        return wsRoot.findHeadGitSha() ?? wsRoot.findGitSha() ?? "";
+        return wsRoot.resolveHeadGitShaOrShowError() ?? "";
     }
 
     /**
