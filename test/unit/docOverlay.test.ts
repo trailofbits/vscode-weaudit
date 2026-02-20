@@ -442,49 +442,39 @@ describe("buildPrompt", () => {
 
 describe("detectClaudeBinary", () => {
     let tmpDir: string;
+    // Keep a reference to the original mock so tests can temporarily override it.
+    const originalGetConfiguration = fakeVscode.workspace.getConfiguration;
 
     beforeEach(() => {
         tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "weaudit-bin-test-"));
+        fakeVscode.workspace.getConfiguration = originalGetConfiguration;
     });
 
     afterEach(() => {
         fs.rmSync(tmpDir, { recursive: true, force: true });
+        fakeVscode.workspace.getConfiguration = originalGetConfiguration;
     });
 
-    it("returns the CLAUDE_BINARY env var path when the file exists", () => {
+    it("returns the VS Code claude-code config path when it exists on disk", () => {
         const binPath = path.join(tmpDir, "claude");
         fs.writeFileSync(binPath, "");
-        const original = process.env["CLAUDE_BINARY"];
-        process.env["CLAUDE_BINARY"] = binPath;
-        try {
-            assert.strictEqual(detectClaudeBinary(), binPath);
-        } finally {
-            if (original === undefined) delete process.env["CLAUDE_BINARY"];
-            else process.env["CLAUDE_BINARY"] = original;
-        }
+        fakeVscode.workspace.getConfiguration = (_section: string) => ({
+            get: (key: string, defaultValue: unknown) => (key === "binaryPath" ? binPath : defaultValue),
+        });
+        assert.strictEqual(detectClaudeBinary(), binPath);
     });
 
-    it("does not return CLAUDE_BINARY path when it does not exist on disk", () => {
+    it("skips the VS Code claude-code config path when it does not exist on disk", () => {
         const nonExistentPath = path.join(tmpDir, "nonexistent-claude");
-        const original = process.env["CLAUDE_BINARY"];
-        process.env["CLAUDE_BINARY"] = nonExistentPath;
-        try {
-            const result = detectClaudeBinary();
-            assert.notStrictEqual(result, nonExistentPath);
-        } finally {
-            if (original === undefined) delete process.env["CLAUDE_BINARY"];
-            else process.env["CLAUDE_BINARY"] = original;
-        }
+        fakeVscode.workspace.getConfiguration = (_section: string) => ({
+            get: (key: string, defaultValue: unknown) => (key === "binaryPath" ? nonExistentPath : defaultValue),
+        });
+        const result = detectClaudeBinary();
+        assert.notStrictEqual(result, nonExistentPath);
     });
 
     it("always returns a string", () => {
-        const original = process.env["CLAUDE_BINARY"];
-        delete process.env["CLAUDE_BINARY"];
-        try {
-            assert.strictEqual(typeof detectClaudeBinary(), "string");
-        } finally {
-            if (original !== undefined) process.env["CLAUDE_BINARY"] = original;
-        }
+        assert.strictEqual(typeof detectClaudeBinary(), "string");
     });
 });
 
