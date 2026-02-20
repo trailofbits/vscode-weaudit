@@ -3,6 +3,7 @@
 import * as vscode from "vscode";
 
 import { AuditMarker } from "./codeMarker";
+import { DocOverlayManager } from "./docOverlay/docOverlayManager";
 import { MultipleSavedFindings } from "./multiConfigs";
 import { activateFindingDetailsWebview } from "./panels/findingDetailsPanel";
 import { activateGitConfigWebview } from "./panels/gitConfigPanel";
@@ -23,6 +24,7 @@ export function activate(context: vscode.ExtensionContext): void {
     new MultipleSavedFindings(context);
     activateFindingDetailsWebview(context);
     activateGitConfigWebview(context);
+    new DocOverlayManager(context);
 }
 
 async function openResource(resource: vscode.Uri, startLine: number, endLine: number): Promise<void> {
