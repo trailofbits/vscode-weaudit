@@ -30,20 +30,13 @@ export interface AgentRunOpts {
 /**
  * Attempts to locate the Claude Code CLI binary without blocking the UI.
  * Detection order:
- *   1. `CLAUDE_BINARY` environment variable
- *   2. `claude-code.binaryPath` VS Code setting (Claude Code extension config)
- *   3. Common installation paths (~/.local/bin, /usr/local/bin, Homebrew, etc.)
- *   4. `which claude` / `where claude` shell lookup (last resort — spawns a subprocess)
+ *   1. `claude-code.binaryPath` VS Code setting (Claude Code extension config)
+ *   2. Common installation paths (~/.local/bin, /usr/local/bin, Homebrew, etc.)
+ *   3. `which claude` / `where claude` shell lookup (last resort — spawns a subprocess)
  * @returns The resolved absolute path, or an empty string if not found.
  */
 export function detectClaudeBinary(): string {
-    // 1. Explicit env var override.
-    const fromEnv = process.env["CLAUDE_BINARY"]?.trim();
-    if (fromEnv && fs.existsSync(fromEnv)) {
-        return fromEnv;
-    }
-
-    // 2. VS Code extension configuration (Claude Code extension).
+    // 1. VS Code extension configuration (Claude Code extension).
     try {
         // eslint-disable-next-line @typescript-eslint/no-require-imports
         const vscodeModule = require("vscode") as typeof vscode;
@@ -57,7 +50,7 @@ export function detectClaudeBinary(): string {
         // Not in VS Code host (e.g., unit tests) — skip.
     }
 
-    // 3. Common installation paths.
+    // 2. Common installation paths.
     const home = os.homedir();
     const candidates: string[] = [
         path.join(home, ".local", "bin", "claude"),
@@ -75,7 +68,7 @@ export function detectClaudeBinary(): string {
         }
     }
 
-    // 4. Shell which/where lookup (spawns a subprocess — fast, 2 s timeout).
+    // 3. Shell which/where lookup (spawns a subprocess — fast, 2 s timeout).
     try {
         const cmd = process.platform === "win32" ? "where claude" : "which claude";
         const result = childProcess.execSync(cmd, { encoding: "utf-8", timeout: 2000 }).trim().split("\n")[0]?.trim() ?? "";
@@ -113,13 +106,7 @@ export async function runDocumentationAgent(opts: AgentRunOpts, token: vscode.Ca
     const abortController = new AbortController();
     const cancelListener = token.onCancellationRequested(() => abortController.abort());
 
-    // Merge process.env so the subprocess has PATH, HOME, etc., but override the API key.
     const env: Record<string, string> = {};
-    for (const [k, v] of Object.entries(process.env)) {
-        if (v !== undefined) {
-            env[k] = v;
-        }
-    }
     env["ANTHROPIC_API_KEY"] = opts.apiKey;
 
     opts.onProgress("Starting documentation agent", false);
