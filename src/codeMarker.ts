@@ -1324,6 +1324,9 @@ class WARoot {
             );
 
             fs.writeFileSync(fileName, data, { flag: "w+" });
+            void vscode.commands.executeCommand("weAudit.notifyFindingFileSaved", fileName).then(undefined, () => {
+                // The sync manager command can be unavailable during early activation.
+            });
         }
     }
 

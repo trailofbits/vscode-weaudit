@@ -345,28 +345,31 @@ describe("weAudit Command UI Tests", () => {
 
     describe("Auditing", () => {
         it("marks a region as reviewed and toggles it off", async function () {
-            const beforeCount = (await readSerializedData())?.partiallyAuditedFiles?.length ?? 0;
-            await selectTextInSampleFile("Sample file");
-            await workbench.executeCommand("weAudit: Mark Region as Reviewed");
-
-            let createdRegion: { path: string; startLine: number; endLine: number } | undefined;
-            const created = await waitForCondition(async () => {
+            const targetRegion = { path: SAMPLE_RELATIVE_PATH, startLine: 0, endLine: 0 };
+            const hasTargetRegion = async (): Promise<boolean> => {
                 const data = await readSerializedData();
                 const regions = data?.partiallyAuditedFiles ?? [];
-                createdRegion = regions.find((region) => region.path === SAMPLE_RELATIVE_PATH);
-                return (data?.partiallyAuditedFiles?.length ?? 0) > beforeCount && createdRegion !== undefined;
-            });
+                return regions.some(
+                    (region) => region.path === targetRegion.path && region.startLine === targetRegion.startLine && region.endLine === targetRegion.endLine,
+                );
+            };
+
+            // Normalize state so this test always starts with the target region unmarked.
+            if (await hasTargetRegion()) {
+                await selectTextInSampleFile("Sample file");
+                await workbench.executeCommand("weAudit: Mark Region as Reviewed");
+                const normalized = await waitForCondition(async () => !(await hasTargetRegion()));
+                assert.equal(normalized, true);
+            }
+
+            await selectTextInSampleFile("Sample file");
+            await workbench.executeCommand("weAudit: Mark Region as Reviewed");
+            const created = await waitForCondition(async () => hasTargetRegion());
             assert.equal(created, true);
-            assert.notEqual(createdRegion, undefined);
 
             await selectTextInSampleFile("Sample file");
             await workbench.executeCommand("weAudit: Mark Region as Reviewed");
-
-            const removed = await waitForCondition(async () => {
-                const data = await readSerializedData();
-                const regions = data?.partiallyAuditedFiles ?? [];
-                return regions.length === beforeCount && regions.every((region) => region.path !== SAMPLE_RELATIVE_PATH);
-            });
+            const removed = await waitForCondition(async () => !(await hasTargetRegion()));
             assert.equal(removed, true);
         });
 

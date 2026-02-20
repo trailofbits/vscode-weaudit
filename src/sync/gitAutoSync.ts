@@ -42,6 +42,7 @@ type WorkspaceRootMapping = {
 
 interface SyncSession extends ShutdownFlushSession, vscode.Disposable {
     syncNow(): Promise<void>;
+    notifyWorkspaceFileChange(filePath: string): void;
 }
 
 /**
@@ -437,6 +438,11 @@ export class GitAutoSyncManager implements vscode.Disposable {
                 void this.syncNow();
             }),
         );
+        this.disposables.push(
+            vscode.commands.registerCommand("weAudit.notifyFindingFileSaved", (filePath: string) => {
+                this.notifyFindingFileSaved(filePath);
+            }),
+        );
 
         this.disposables.push(
             vscode.workspace.onDidChangeWorkspaceFolders(() => {
@@ -524,6 +530,22 @@ export class GitAutoSyncManager implements vscode.Disposable {
         this.sessions.clear();
         for (const disposable of this.disposables) {
             disposable.dispose();
+        }
+    }
+
+    /**
+     * Notify active sessions that a local .weaudit file was saved.
+     * This is a fallback in case filesystem watcher events are dropped.
+     */
+    private notifyFindingFileSaved(filePath: string): void {
+        if (this.disposed) {
+            return;
+        }
+        if (typeof filePath !== "string" || filePath.trim().length === 0) {
+            return;
+        }
+        for (const session of this.sessions.values()) {
+            session.notifyWorkspaceFileChange(filePath);
         }
     }
 
@@ -800,6 +822,19 @@ class GitSyncSession implements SyncSession {
     }
 
     /**
+     * Record an explicit local .weaudit save and schedule a debounced local sync.
+     */
+    notifyWorkspaceFileChange(filePath: string): void {
+        if (!this.acceptWorkspaceChanges) {
+            return;
+        }
+        if (!this.isWorkspaceFile(filePath)) {
+            return;
+        }
+        this.scheduleLocalSyncForFile(filePath);
+    }
+
+    /**
      * Build workspace mappings to repo-relative paths.
      */
     private buildWorkspaceMappings(workspaceRoots: string[]): WorkspaceRootMapping[] {
@@ -910,9 +945,32 @@ class GitSyncSession implements SyncSession {
         if (!this.acceptWorkspaceChanges) {
             return;
         }
+        if (!this.isWorkspaceFile(filePath)) {
+            return;
+        }
         if (await this.shouldIgnoreChange(filePath)) {
             return;
         }
+        this.scheduleLocalSyncForFile(filePath);
+    }
+
+    /**
+     * Returns true when the path belongs to one of this session's workspace roots.
+     */
+    private isWorkspaceFile(filePath: string): boolean {
+        for (const mapping of this.workspaceMappings) {
+            const relativePath = path.relative(mapping.workspaceRoot, filePath);
+            if (!relativePath.startsWith("..") && !path.isAbsolute(relativePath)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Add a local file to the dirty set and debounce a local sync.
+     */
+    private scheduleLocalSyncForFile(filePath: string): void {
         this.dirtyFiles.add(filePath);
         if (this.debounceTimer) {
             clearTimeout(this.debounceTimer);
@@ -1344,6 +1402,20 @@ class CentralGitSyncSession implements SyncSession {
     }
 
     /**
+     * Record an explicit local .weaudit save and schedule a debounced local sync.
+     */
+    notifyWorkspaceFileChange(filePath: string): void {
+        if (!this.acceptWorkspaceChanges) {
+            return;
+        }
+        if (!this.getMappingForWorkspaceFile(filePath)) {
+            return;
+        }
+        this.log(`weAudit: central sync received explicit local save ${filePath}.`);
+        this.scheduleLocalSyncForFile(filePath);
+    }
+
+    /**
      * Seed the dirty set with the current user's .weaudit file if it exists.
      */
     private seedLocalUserFile(): boolean {
@@ -1439,11 +1511,21 @@ class CentralGitSyncSession implements SyncSession {
         if (!this.acceptWorkspaceChanges) {
             return;
         }
+        if (!this.getMappingForWorkspaceFile(filePath)) {
+            return;
+        }
         if (await this.shouldIgnoreChange(filePath)) {
             this.log(`weAudit: central sync ignoring echoed change for ${filePath}.`);
             return;
         }
         this.log(`weAudit: central sync detected local change ${filePath}.`);
+        this.scheduleLocalSyncForFile(filePath);
+    }
+
+    /**
+     * Add a local file to the dirty set and debounce a local sync.
+     */
+    private scheduleLocalSyncForFile(filePath: string): void {
         this.dirtyFiles.add(filePath);
         if (this.debounceTimer) {
             clearTimeout(this.debounceTimer);
