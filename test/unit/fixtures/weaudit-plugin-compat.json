@@ -1,0 +1,36 @@
+{
+    "clientRemote": "",
+    "gitRemote": "https://github.com/trailofbits/audit-test",
+    "gitSha": "a35eb79e752c376b105aa095428f1b41289dd2fd",
+    "treeEntries": [
+        {
+            "label": "This is a bug, believe it or not",
+            "entryType": 0,
+            "author": "special_author",
+            "details": {
+                "severity": "High",
+                "difficulty": "Medium",
+                "type": "",
+                "description": "this is a description",
+                "exploit": "",
+                "recommendation": "Short term, \nLong term, \n",
+                "resolution": "Open",
+                "provenance": {
+                    "source": "llm",
+                    "created": "2026-02-08T17:52:17.870848",
+                    "campaign": "bens campaign",
+                    "commitHash": "a35eb79e752c376b105aa095428f1b41289dd2fd"
+                }
+            },
+            "locations": [
+                {
+                    "path": "contracts/Vault.sol",
+                    "startLine": 87,
+                    "endLine": 88,
+                    "label": "",
+                    "description": "This is some very not nice code."
+                }
+            ]
+        }
+    ]
+}

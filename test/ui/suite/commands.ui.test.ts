@@ -1,4 +1,4 @@
-import { expect } from "chai";
+import assert from "node:assert/strict";
 import { InputBox, Workbench, EditorView, ActivityBar, TextEditor, VSBrowser } from "vscode-extension-tester";
 import { Key } from "selenium-webdriver";
 import * as path from "path";
@@ -249,7 +249,7 @@ describe("weAudit Command UI Tests", () => {
             await createTestFinding(workbench, customTitle);
             const entries = await readSerializedEntries();
             const containsCustomTitle = entries?.some((entry) => entry.label === customTitle) ?? false;
-            expect(containsCustomTitle).to.equal(true);
+            assert.equal(containsCustomTitle, true);
         });
 
         it("creates a note with the provided title", async function () {
@@ -257,7 +257,7 @@ describe("weAudit Command UI Tests", () => {
             await createTestNote(workbench, customTitle);
             const entries = await readSerializedEntries();
             const containsCustomTitle = entries?.some((entry) => entry.label === customTitle && entry.entryType === 1) ?? false;
-            expect(containsCustomTitle).to.equal(true);
+            assert.equal(containsCustomTitle, true);
         });
 
         it("does not create an entry when the input is cancelled", async function () {
@@ -270,7 +270,7 @@ describe("weAudit Command UI Tests", () => {
                 const afterCount = (await readSerializedEntries())?.length ?? 0;
                 return afterCount === beforeCount;
             });
-            expect(unchanged).to.equal(true);
+            assert.equal(unchanged, true);
         });
     });
 
@@ -290,7 +290,7 @@ describe("weAudit Command UI Tests", () => {
                 const hasOriginal = entries?.some((entry) => entry.label === originalTitle) ?? false;
                 return hasUpdated && !hasOriginal;
             });
-            expect(updated).to.equal(true);
+            assert.equal(updated, true);
         });
 
         it("adds an additional region using the quick pick", async function () {
@@ -313,7 +313,7 @@ describe("weAudit Command UI Tests", () => {
                 const entry = entries?.find((candidate) => candidate.label === title);
                 return (entry?.locations.length ?? 0) >= 2;
             });
-            expect(hasSecondRegion).to.equal(true);
+            assert.equal(hasSecondRegion, true);
         });
 
         // it("adds a labeled region to an existing finding", async function () {
@@ -345,29 +345,32 @@ describe("weAudit Command UI Tests", () => {
 
     describe("Auditing", () => {
         it("marks a region as reviewed and toggles it off", async function () {
-            const beforeCount = (await readSerializedData())?.partiallyAuditedFiles?.length ?? 0;
-            await selectTextInSampleFile("Sample file");
-            await workbench.executeCommand("weAudit: Mark Region as Reviewed");
-
-            let createdRegion: { path: string; startLine: number; endLine: number } | undefined;
-            const created = await waitForCondition(async () => {
+            const targetRegion = { path: SAMPLE_RELATIVE_PATH, startLine: 0, endLine: 0 };
+            const hasTargetRegion = async (): Promise<boolean> => {
                 const data = await readSerializedData();
                 const regions = data?.partiallyAuditedFiles ?? [];
-                createdRegion = regions.find((region) => region.path === SAMPLE_RELATIVE_PATH);
-                return (data?.partiallyAuditedFiles?.length ?? 0) > beforeCount && createdRegion !== undefined;
-            });
-            expect(created).to.equal(true);
-            expect(createdRegion).to.not.equal(undefined);
+                return regions.some(
+                    (region) => region.path === targetRegion.path && region.startLine === targetRegion.startLine && region.endLine === targetRegion.endLine,
+                );
+            };
+
+            // Normalize state so this test always starts with the target region unmarked.
+            if (await hasTargetRegion()) {
+                await selectTextInSampleFile("Sample file");
+                await workbench.executeCommand("weAudit: Mark Region as Reviewed");
+                const normalized = await waitForCondition(async () => !(await hasTargetRegion()));
+                assert.equal(normalized, true);
+            }
 
             await selectTextInSampleFile("Sample file");
             await workbench.executeCommand("weAudit: Mark Region as Reviewed");
+            const created = await waitForCondition(async () => hasTargetRegion());
+            assert.equal(created, true);
 
-            const removed = await waitForCondition(async () => {
-                const data = await readSerializedData();
-                const regions = data?.partiallyAuditedFiles ?? [];
-                return regions.length === beforeCount && regions.every((region) => region.path !== SAMPLE_RELATIVE_PATH);
-            });
-            expect(removed).to.equal(true);
+            await selectTextInSampleFile("Sample file");
+            await workbench.executeCommand("weAudit: Mark Region as Reviewed");
+            const removed = await waitForCondition(async () => !(await hasTargetRegion()));
+            assert.equal(removed, true);
         });
 
         it("marks a file as reviewed and toggles it off", async function () {
@@ -378,7 +381,7 @@ describe("weAudit Command UI Tests", () => {
                 const audited = data?.auditedFiles ?? [];
                 return audited.some((file) => file.path === SAMPLE_RELATIVE_PATH);
             });
-            expect(added).to.equal(true);
+            assert.equal(added, true);
 
             await workbench.executeCommand("weAudit: Mark File as Reviewed");
 
@@ -387,7 +390,7 @@ describe("weAudit Command UI Tests", () => {
                 const audited = data?.auditedFiles ?? [];
                 return !audited.some((file) => file.path === SAMPLE_RELATIVE_PATH);
             });
-            expect(removed).to.equal(true);
+            assert.equal(removed, true);
         });
 
         it("navigates to the next partially audited region", async function () {
@@ -417,7 +420,7 @@ describe("weAudit Command UI Tests", () => {
             // The cursor should have moved into one of the two audited regions.
             const inFirstRegion = cursorLine >= DEFAULT_FINDING_RANGE.start && cursorLine <= DEFAULT_FINDING_RANGE.end;
             const inSecondRegion = cursorLine >= SECONDARY_RANGE.start && cursorLine <= SECONDARY_RANGE.end;
-            expect(inFirstRegion || inSecondRegion).to.equal(true);
+            assert.equal(inFirstRegion || inSecondRegion, true);
         });
     });
 
@@ -431,7 +434,7 @@ describe("weAudit Command UI Tests", () => {
                 const entries = await readSerializedEntries();
                 return entries?.some((entry) => entry.label === title) ?? false;
             });
-            expect(existsBefore).to.equal(true);
+            assert.equal(existsBefore, true);
 
             await moveCursorTo(35);
             await workbench.executeCommand("weAudit: Delete Location Under Cursor");
@@ -440,7 +443,7 @@ describe("weAudit Command UI Tests", () => {
                 const entries = await readSerializedEntries();
                 return !(entries?.some((entry) => entry.label === title) ?? false);
             });
-            expect(deleted).to.equal(true);
+            assert.equal(deleted, true);
         });
 
         it("removes one location from a multi-region finding without deleting it", async function () {
@@ -458,7 +461,7 @@ describe("weAudit Command UI Tests", () => {
                 const entry = entries?.find((e) => e.label === title);
                 return (entry?.locations.length ?? 0) >= 2;
             });
-            expect(hasTwoRegions).to.equal(true);
+            assert.equal(hasTwoRegions, true);
 
             // Delete the second location by placing cursor inside it
             await moveCursorTo(42);
@@ -469,7 +472,7 @@ describe("weAudit Command UI Tests", () => {
                 const entry = entries?.find((e) => e.label === title);
                 return entry !== undefined && entry.locations.length === 1;
             });
-            expect(hasOneRegion).to.equal(true);
+            assert.equal(hasOneRegion, true);
         });
     });
 
@@ -480,7 +483,10 @@ describe("weAudit Command UI Tests", () => {
 
             // Default mode is "list" — tree items should include the finding title directly
             const listItems = await getWeAuditTreeItems(workbench);
-            expect(listItems.some((item) => item.includes(title))).to.equal(true);
+            assert.equal(
+                listItems.some((item) => item.includes(title)),
+                true,
+            );
 
             // Toggle to "byFile" mode
             await workbench.executeCommand("weAudit: Toggle View Mode");
@@ -488,7 +494,10 @@ describe("weAudit Command UI Tests", () => {
 
             // In byFile mode, tree items should include a path-like organizer node
             const byFileItems = await getWeAuditTreeItems(workbench);
-            expect(byFileItems.some((item) => item.includes("sample.ts"))).to.equal(true);
+            assert.equal(
+                byFileItems.some((item) => item.includes("sample.ts")),
+                true,
+            );
 
             // Toggle back to "list" mode for clean state
             await workbench.executeCommand("weAudit: Toggle View Mode");

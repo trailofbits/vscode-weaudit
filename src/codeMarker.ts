@@ -33,6 +33,7 @@ import {
     FindingType,
     isEnumValue,
     EntryType,
+    EntryResolution,
     RemoteAndPermalink,
     validateSerializedData,
     createPathOrganizer,
@@ -47,11 +48,14 @@ import {
     WorkspaceRootEntry,
     configEntryEquals,
     RootPathAndLabel,
+    isEntryResolution,
 } from "./types";
 import { normalizePathForOS } from "./utilities/normalizePath";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
+// Special path label used to group entries that have no locations.
+const NO_LOCATION_PATH_LABEL = "(no location)";
 
 /**
  * Class representing a WeAudit workspace root. Each root maintains its own set of
@@ -77,6 +81,7 @@ class WARoot {
 
     // firstTimeRequestingClientRemote is used to prevent repeatedly asking for the client remote
     private firstTimeRequestingClientRemote = true;
+    private hasShownHeadResolutionError = false;
 
     constructor(wsPath: string, wsLabel: string) {
         this.auditedFiles = [];
@@ -166,6 +171,48 @@ class WARoot {
                 this.currentlySelectedConfigs.push(configEntry);
             }
         });
+    }
+
+    /**
+     * Refresh configuration entries from disk and select newly discovered configs by default.
+     * @param selectNew Whether to auto-select configs that were not previously known.
+     */
+    refreshConfigurations(selectNew: boolean): void {
+        const vscodeFolder = path.join(this.rootPath, ".vscode");
+        const nextConfigs: ConfigurationEntry[] = [];
+        if (!fs.existsSync(vscodeFolder)) {
+            this.configs = [];
+            this.currentlySelectedConfigs = [];
+            return;
+        }
+
+        fs.readdirSync(vscodeFolder).forEach((file) => {
+            if (path.extname(file) !== SERIALIZED_FILE_EXTENSION) {
+                return;
+            }
+            const parsedPath = path.parse(file);
+            const configEntry = {
+                path: path.join(vscodeFolder, file),
+                username: parsedPath.name,
+                root: { label: this.rootLabel } as WorkspaceRootEntry,
+            } as ConfigurationEntry;
+            nextConfigs.push(configEntry);
+        });
+
+        const wasKnown = (config: ConfigurationEntry): boolean =>
+            this.configs.some((entry) => entry.path === config.path && entry.username === config.username);
+        const wasSelected = (config: ConfigurationEntry): boolean =>
+            this.currentlySelectedConfigs.some((entry) => entry.path === config.path && entry.username === config.username);
+
+        const nextSelected: ConfigurationEntry[] = [];
+        for (const configEntry of nextConfigs) {
+            if (wasSelected(configEntry) || (selectNew && !wasKnown(configEntry))) {
+                nextSelected.push(configEntry);
+            }
+        }
+
+        this.configs = nextConfigs;
+        this.currentlySelectedConfigs = nextSelected;
     }
 
     /**
@@ -450,41 +497,267 @@ class WARoot {
             return this.gitSha;
         }
 
-        const gitPath = path.join(this.rootPath, ".git", "HEAD");
-        if (!fs.existsSync(gitPath)) {
+        // Resolve gitdir/commondir so worktrees don't fall back to the wrong HEAD.
+        const gitDirs = this.resolveGitDirectories();
+        if (gitDirs === undefined) {
+            return;
+        }
+        const sha = this.readGitHeadSha(gitDirs.gitDir, gitDirs.commonDir);
+        if (!sha) {
+            return;
+        }
+        this.gitSha = sha;
+        this.persistGitHash();
+        return this.gitSha;
+    }
+
+    /**
+     * Return true when a filesystem error indicates the path could not be resolved.
+     */
+    private isMissingPathError(error: unknown): boolean {
+        if (!(error instanceof Error)) {
+            return false;
+        }
+        const errorCode = (error as NodeJS.ErrnoException).code;
+        return errorCode === "ENOENT" || errorCode === "ENOTDIR";
+    }
+
+    /**
+     * Read a UTF-8 file by descriptor to avoid path check-then-read races.
+     */
+    private readUtf8FileByDescriptor(filePath: string): string | undefined {
+        let fileDescriptor: number | undefined;
+        try {
+            fileDescriptor = fs.openSync(filePath, fs.constants.O_RDONLY);
+            const fileStat = fs.fstatSync(fileDescriptor);
+            if (!fileStat.isFile()) {
+                return;
+            }
+            return fs.readFileSync(fileDescriptor, "utf8");
+        } catch (error: unknown) {
+            if (this.isMissingPathError(error)) {
+                return;
+            }
+            throw error;
+        } finally {
+            if (fileDescriptor !== undefined) {
+                fs.closeSync(fileDescriptor);
+            }
+        }
+    }
+
+    /**
+     * Return true when a directory path appears to reference git metadata storage.
+     */
+    private isLikelyGitMetadataDirectory(dirPath: string): boolean {
+        const normalizedPath = path.normalize(path.resolve(dirPath));
+        const segments = normalizedPath.split(path.sep).filter((segment) => segment.length > 0);
+        return segments.some((segment) => segment === ".git" || segment.endsWith(".git"));
+    }
+
+    /**
+     * Validate a git ref path to reject traversal and malformed ref names.
+     */
+    private isValidGitRefPath(refPath: string): boolean {
+        if (!refPath.startsWith("refs/")) {
+            return false;
+        }
+        if (refPath.includes("\\") || refPath.includes("\0")) {
+            return false;
+        }
+        if (refPath.includes("..") || refPath.includes("//") || refPath.includes("@{")) {
+            return false;
+        }
+        if (refPath.endsWith("/") || refPath.endsWith(".lock")) {
+            return false;
+        }
+        return /^[A-Za-z0-9._/-]+$/.test(refPath);
+    }
+
+    /**
+     * Resolve a relative path under a git metadata directory and reject traversal outside the base.
+     */
+    private resolvePathWithinGitDirectory(gitDir: string, relativePath: string): string | undefined {
+        if (path.isAbsolute(relativePath) || relativePath.includes("\0")) {
+            return;
+        }
+        const normalizedBaseDir = path.resolve(gitDir);
+        const resolvedPath = path.resolve(normalizedBaseDir, relativePath);
+        const relativeToBase = path.relative(normalizedBaseDir, resolvedPath);
+        if (relativeToBase.startsWith("..") || path.isAbsolute(relativeToBase)) {
+            return;
+        }
+        return resolvedPath;
+    }
+
+    /**
+     * Resolve the git directory and common directory for this workspace root.
+     * Worktrees store HEAD in a per-worktree gitdir with refs in a commondir,
+     * so we resolve both to return the checked-out commit hash.
+     */
+    private resolveGitDirectories(): { gitDir: string; commonDir: string } | undefined {
+        const gitPath = path.join(this.rootPath, ".git");
+        let gitDir = gitPath;
+        let gitPathDescriptor: number | undefined;
+        try {
+            gitPathDescriptor = fs.openSync(gitPath, fs.constants.O_RDONLY);
+            const gitStat = fs.fstatSync(gitPathDescriptor);
+            if (gitStat.isFile()) {
+                const gitDirPointer = fs.readFileSync(gitPathDescriptor, "utf8").trim();
+                const gitDirMatch = gitDirPointer.match(/^gitdir:\s*(.+)\s*$/i);
+                if (!gitDirMatch) {
+                    console.error(`[weAudit] Could not parse gitdir pointer at ${gitPath}`);
+                    return;
+                }
+                gitDir = gitDirMatch[1].trim();
+                if (!path.isAbsolute(gitDir)) {
+                    gitDir = path.resolve(this.rootPath, gitDir);
+                }
+            } else if (!gitStat.isDirectory()) {
+                return;
+            }
+        } catch (error: unknown) {
+            if (this.isMissingPathError(error)) {
+                return;
+            }
+            throw error;
+        } finally {
+            if (gitPathDescriptor !== undefined) {
+                fs.closeSync(gitPathDescriptor);
+            }
+        }
+
+        if (!this.isLikelyGitMetadataDirectory(gitDir)) {
             return;
         }
 
-        let gitHead = fs.readFileSync(gitPath, "utf8");
+        let commonDir = gitDir;
+        const commonDirPointer = this.readUtf8FileByDescriptor(path.join(gitDir, "commondir"))?.trim();
+        if (commonDirPointer) {
+            commonDir = path.isAbsolute(commonDirPointer) ? commonDirPointer : path.resolve(gitDir, commonDirPointer);
+        }
+        if (!this.isLikelyGitMetadataDirectory(commonDir)) {
+            return;
+        }
+
+        return { gitDir, commonDir };
+    }
+
+    /**
+     * Read the current commit hash from the git HEAD file, resolving refs and packed refs as needed.
+     */
+    private readGitHeadSha(gitDir: string, commonDir: string): string | undefined {
+        const gitHeadPath = path.join(gitDir, "HEAD");
+        const gitHead = this.readUtf8FileByDescriptor(gitHeadPath)?.trim();
         if (!gitHead) {
             return;
         }
 
         const headPath = gitHead.match(/ref: (.*)/);
         if (!headPath) {
-            // probably a detached head
-            // check if gitHead has the correct hash length
-            gitHead = gitHead.trim();
+            // Probably a detached head; validate expected length.
             if (gitHead.length !== 40) {
                 console.error("[weAudit] Could not determine the git sha. Seemed to be a detached head but the hash length was not 40: " + gitHead);
                 return;
             }
-            this.gitSha = gitHead.trim();
-            this.persistGitHash();
-            return this.gitSha;
+            return gitHead;
         }
 
-        const shaPath = path.join(this.rootPath, ".git", headPath[1]);
-        if (!fs.existsSync(shaPath)) {
+        const refPath = headPath[1].trim();
+        if (!this.isValidGitRefPath(refPath)) {
+            console.error(`[weAudit] Could not determine the git sha due to invalid ref path: ${refPath}`);
             return;
         }
-        const shaCommit = fs.readFileSync(shaPath, "utf8");
-        if (!shaCommit) {
+        return this.readRefSha(refPath, gitDir, commonDir);
+    }
+
+    /**
+     * Read a ref SHA from loose refs, falling back to packed refs if needed.
+     */
+    private readRefSha(refPath: string, gitDir: string, commonDir: string): string | undefined {
+        const refPaths: string[] = [];
+        const gitDirRefPath = this.resolvePathWithinGitDirectory(gitDir, refPath);
+        if (gitDirRefPath) {
+            refPaths.push(gitDirRefPath);
+        }
+        if (commonDir !== gitDir) {
+            const commonDirRefPath = this.resolvePathWithinGitDirectory(commonDir, refPath);
+            if (commonDirRefPath) {
+                refPaths.push(commonDirRefPath);
+            }
+        }
+
+        for (const candidate of refPaths) {
+            const shaCommit = this.readUtf8FileByDescriptor(candidate)?.trim();
+            if (shaCommit) {
+                return shaCommit;
+            }
+        }
+
+        const packedSha = this.readPackedRefSha(commonDir, refPath);
+        if (packedSha) {
+            return packedSha;
+        }
+        if (commonDir !== gitDir) {
+            return this.readPackedRefSha(gitDir, refPath);
+        }
+        return;
+    }
+
+    /**
+     * Look up a ref's SHA in the packed-refs file.
+     */
+    private readPackedRefSha(gitDir: string, refPath: string): string | undefined {
+        const packedRefsPath = this.resolvePathWithinGitDirectory(gitDir, "packed-refs");
+        if (!packedRefsPath) {
             return;
         }
-        this.gitSha = shaCommit.trim();
-        this.persistGitHash();
-        return this.gitSha;
+        const packedRefs = this.readUtf8FileByDescriptor(packedRefsPath);
+        if (!packedRefs) {
+            return;
+        }
+        for (const line of packedRefs.split(/\r?\n/)) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("^")) {
+                continue;
+            }
+            const [sha, ref] = trimmed.split(/\s+/);
+            if (ref === refPath) {
+                return sha;
+            }
+        }
+        return;
+    }
+
+    /**
+     * Find the current HEAD git sha without using the configured gitSha cache.
+     * @returns The git sha or undefined if it could not be found
+     */
+    findHeadGitSha(): string | undefined {
+        // Resolve gitdir/commondir so worktrees read the checked-out commit hash.
+        const gitDirs = this.resolveGitDirectories();
+        if (gitDirs === undefined) {
+            return;
+        }
+        return this.readGitHeadSha(gitDirs.gitDir, gitDirs.commonDir);
+    }
+
+    /**
+     * Resolve HEAD commit hash for this workspace root and show a one-time error on failure.
+     */
+    resolveHeadGitShaOrShowError(): string | undefined {
+        const sha = this.findHeadGitSha();
+        if (sha) {
+            this.hasShownHeadResolutionError = false;
+            return sha;
+        }
+
+        if (!this.hasShownHeadResolutionError) {
+            const label = this.rootLabel || this.rootPath;
+            void vscode.window.showErrorMessage(`weAudit: Could not resolve HEAD commit hash for workspace root "${label}".`);
+            this.hasShownHeadResolutionError = true;
+        }
+        return;
     }
 
     /**
@@ -929,6 +1202,33 @@ class WARoot {
             existsFile = false;
         }
 
+        // Only persist git config for the current user; keep existing values for other users to avoid overwrites.
+        let clientRemoteToSave = this.clientRemote;
+        let gitRemoteToSave = this.gitRemote;
+        let gitShaToSave = this.gitSha;
+        if (username !== this.username) {
+            clientRemoteToSave = "";
+            gitRemoteToSave = "";
+            gitShaToSave = "";
+            if (existsFile) {
+                try {
+                    const existingRaw = fs.readFileSync(fileName, "utf8");
+                    const existingData = JSON.parse(existingRaw) as Partial<SerializedData>;
+                    if (typeof existingData.clientRemote === "string") {
+                        clientRemoteToSave = existingData.clientRemote;
+                    }
+                    if (typeof existingData.gitRemote === "string") {
+                        gitRemoteToSave = existingData.gitRemote;
+                    }
+                    if (typeof existingData.gitSha === "string") {
+                        gitShaToSave = existingData.gitSha;
+                    }
+                } catch {
+                    // If we cannot read existing git config, fall back to empty fields for non-current users.
+                }
+            }
+        }
+
         // filter local entries of the affected user
         let filteredAuditedFiles = this.auditedFiles.filter((file) => file.author === username);
         let filteredPartiallyAuditedEntries = this.partiallyAuditedFiles.filter((entry) => entry.author === username);
@@ -998,9 +1298,9 @@ class WARoot {
         }
 
         if (
-            !!this.clientRemote ||
-            !!this.gitRemote ||
-            !!this.gitSha ||
+            !!clientRemoteToSave ||
+            !!gitRemoteToSave ||
+            !!gitShaToSave ||
             reducedEntries.length !== 0 ||
             filteredAuditedFiles.length !== 0 ||
             filteredPartiallyAuditedEntries.length !== 0 ||
@@ -1028,9 +1328,9 @@ class WARoot {
             // save findings to file
             const data = JSON.stringify(
                 {
-                    clientRemote: this.clientRemote,
-                    gitRemote: this.gitRemote,
-                    gitSha: this.gitSha,
+                    clientRemote: clientRemoteToSave,
+                    gitRemote: gitRemoteToSave,
+                    gitSha: gitShaToSave,
                     treeEntries: reducedEntries,
                     auditedFiles: filteredAuditedFiles,
                     partiallyAuditedFiles: filteredPartiallyAuditedEntries,
@@ -1041,6 +1341,9 @@ class WARoot {
             );
 
             fs.writeFileSync(fileName, data, { flag: "w+" });
+            void vscode.commands.executeCommand("weAudit.notifyFindingFileSaved", fileName).then(undefined, () => {
+                // The sync manager command can be unavailable during early activation.
+            });
         }
     }
 
@@ -1265,6 +1568,16 @@ class MultiRootManager {
      */
     getRoots(): WARoot[] {
         return this.roots;
+    }
+
+    /**
+     * Refresh configuration entries for each workspace root.
+     * @param selectNew Whether to auto-select configs discovered since last refresh.
+     */
+    refreshConfigurations(selectNew: boolean): void {
+        for (const root of this.roots) {
+            root.refreshConfigurations(selectNew);
+        }
     }
 
     /**
@@ -1547,11 +1860,9 @@ class MultiRootManager {
      * Updates the saved data for the given user.
      * @param username the username to update the saved data for
      */
-    updateSavedData(username: string): void {
+    async updateSavedData(username: string): Promise<void> {
         //Iterate over all workspace roots
-        for (const root of this.roots) {
-            void root.updateSavedData(username);
-        }
+        await Promise.all(this.roots.map((root) => root.updateSavedData(username)));
     }
 
     /**
@@ -1613,6 +1924,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     private pathToEntryMap: Map<string, FullLocationEntry[]>;
     private pathToEntryMapDirty = true;
     private locationEntryCache = new WeakMap<FullLocation, FullLocationEntry>();
+    // Preserve which workspace root produced locationless entries so they can be filtered and saved correctly.
+    private entryOriginRoots = new WeakMap<FullEntry, RootPathAndLabel>();
 
     private treeViewMode: TreeViewMode;
 
@@ -1627,8 +1940,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     private decorationManager: DecorationManager;
     private decorationsEnabled = true;
 
+    // Track in-flight save operations per username to avoid reloading stale data.
+    private savingCounts = new Map<string, number>();
+
     // Cached configuration for sorting entries alphabetically
     private sortEntriesAlphabetically: boolean;
+
+    // Whether entries should be filtered by the current workspace commit hash.
+    private filterByCurrentCommit = true;
+    private hasShownCommitMismatchToast = false;
 
     // State for navigating through partially audited regions
     private currentPartiallyAuditedIndex = -1;
@@ -1651,8 +1971,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         this.username = this.setUsernameConfigOrDefault();
         this.findAndLoadConfigurationUsernames();
         this.resolvedEntriesTree = new ResolvedEntries(context, this.resolvedEntries);
+        // Initialize context key so the toolbar toggle renders correctly.
+        void vscode.commands.executeCommand("setContext", "weAudit.filterCurrentCommit", this.filterByCurrentCommit);
 
         vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
+        this.maybeShowCommitMismatchToast();
 
         // Fill the Git configuration webview with the current git configuration
         vscode.commands.registerCommand(
@@ -1713,6 +2036,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // Pushes the roots and currently selected configurations to the MultiConfig
         vscode.commands.registerCommand("weAudit.getMultiConfigRoots", () => {
+            this.workspaces.refreshConfigurations(true);
             const rootPathsAndLabels = this.workspaces
                 .getRoots()
                 .map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel);
@@ -1737,6 +2061,15 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.toggleTreeViewMode();
         });
 
+        // Commit filter controls for the List of Findings toolbar.
+        vscode.commands.registerCommand("weAudit.enableCurrentCommitFilter", () => {
+            this.setCommitFilterEnabled(true);
+        });
+
+        vscode.commands.registerCommand("weAudit.disableCurrentCommitFilter", () => {
+            this.setCommitFilterEnabled(false);
+        });
+
         vscode.commands.registerCommand("weAudit.addFinding", () => {
             this.addFinding();
         });
@@ -1749,8 +2082,22 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.navigateToNextPartiallyAuditedRegion();
         });
 
+        // Add explicit TP/FN commands so findings aren't resolved like notes.
         vscode.commands.registerCommand("weAudit.resolveFinding", (node: FullEntry) => {
             this.resolveFinding(node);
+        });
+
+        vscode.commands.registerCommand("weAudit.markTruePositive", (node: FullEntry) => {
+            this.markTruePositive(node);
+        });
+
+        vscode.commands.registerCommand("weAudit.markFalsePositive", (node: FullEntry) => {
+            this.markFalsePositive(node);
+        });
+
+        // Legacy alias for backward compatibility.
+        vscode.commands.registerCommand("weAudit.markFalseNegative", (node: FullEntry) => {
+            this.markFalsePositive(node);
         });
 
         vscode.commands.registerCommand("weAudit.deleteFinding", (node: FullEntry) => {
@@ -1913,7 +2260,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
             // refresh the currently selected files, findings tree and file decorations
             vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
-            this.resolvedEntriesTree.setResolvedEntries(this.resolvedEntries);
+            this.refreshResolvedEntriesTree();
             this.refreshTree();
             this.decorate();
             if (!savedData) {
@@ -2037,6 +2384,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             void this.exportFindingsInMarkdown();
         });
 
+        // Reload selected configs from disk to pick up external sync updates.
+        vscode.commands.registerCommand("weAudit.reloadSavedFindingsFromDisk", () => {
+            this.reloadSavedFindingsFromDisk();
+        });
+
         // Gets the filtered entries from the current tree that correspond to a specific username and workspace root
         vscode.commands.registerCommand("weAudit.getFilteredEntriesForSaving", (username: string, root: WARoot) => {
             return this.getFilteredEntriesForSaving(username, root);
@@ -2138,6 +2490,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     async getCodeToCopyFromLocation(entry: FullEntry | FullLocationEntry): Promise<FromLocationResponse | void> {
         const location = isLocationEntry(entry) ? entry.location : entry.locations[0];
+        if (location === undefined) {
+            // Locationless entries have no source code region.
+            vscode.window.showErrorMessage("weAudit: Cannot copy code for an entry without locations.");
+            return;
+        }
         const permalink = await this.getClientPermalink(location);
         if (permalink === undefined) {
             return;
@@ -2258,6 +2615,18 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // TODO: determine how to update the entry from the field string
         switch (field) {
+            case "resolution": {
+                // Route resolution changes through the unified helper so list placement stays consistent.
+                if (!isEntryResolution(value)) {
+                    return;
+                }
+                const normalizedResolution = this.normalizeResolutionForEntry(entry, value);
+                if (normalizedResolution === undefined) {
+                    return;
+                }
+                this.applyEntryResolution(entry, normalizedResolution, isPersistent);
+                return;
+            }
             case "severity":
                 entry.details.severity = isEnumValue(FindingSeverity, value) ? value : FindingSeverity.Undefined;
                 break;
@@ -2320,6 +2689,29 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     /**
+     * Returns whether commit filtering is enabled.
+     */
+    public isCommitFilterEnabled(): boolean {
+        return this.filterByCurrentCommit;
+    }
+
+    /**
+     * Enable or disable commit-based filtering of entries.
+     */
+    public setCommitFilterEnabled(enabled: boolean): void {
+        if (this.filterByCurrentCommit === enabled) {
+            return;
+        }
+        this.filterByCurrentCommit = enabled;
+        void vscode.commands.executeCommand("setContext", "weAudit.filterCurrentCommit", enabled);
+        this.markPathMapDirty();
+        this.refreshTree();
+        this.refreshResolvedEntriesTree();
+        this.decorate();
+        this.refreshAllFileDecorations();
+    }
+
+    /**
      * Toggles the tree view mode between linear and organized per file,
      * updates the configuration and
      * refreshes the tree.
@@ -2333,6 +2725,24 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const label = treeViewModeLabel(this.treeViewMode);
         void vscode.workspace.getConfiguration("weAudit").update("general.treeViewMode", label, true);
         this.refreshTree();
+    }
+
+    /**
+     * Refresh file decorations for every location in the current tree entries.
+     */
+    private refreshAllFileDecorations(): void {
+        const seen = new Set<string>();
+        for (const entry of this.treeEntries) {
+            for (const location of entry.locations) {
+                const uri = vscode.Uri.file(path.join(location.rootPath, location.path));
+                const key = uri.fsPath;
+                if (seen.has(key)) {
+                    continue;
+                }
+                seen.add(key);
+                this._onDidChangeFileDecorationsEmitter.fire(uri);
+            }
+        }
     }
 
     /**
@@ -2654,6 +3064,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      */
     async copyEntryPermalink(entry: FullEntry | FullLocationEntry): Promise<void> {
         const location = isLocationEntry(entry) ? entry.location : entry.locations[0];
+        if (location === undefined) {
+            // Locationless entries have no permalink target.
+            vscode.window.showErrorMessage("weAudit: Cannot copy a permalink for an entry without locations.");
+            return;
+        }
         const remoteAndPermalink = await this.getEntryRemoteAndPermalink(location);
         if (remoteAndPermalink === undefined) {
             return;
@@ -2666,6 +3081,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param entry The entry to copy the permalinks of
      */
     async copyEntryPermalinks(entry: FullEntry): Promise<void> {
+        if (entry.locations.length === 0) {
+            // Locationless entries have no permalinks to gather.
+            vscode.window.showErrorMessage("weAudit: Cannot copy permalinks for an entry without locations.");
+            return;
+        }
         const permalinkList = [];
         for (const location of entry.locations) {
             const remoteAndPermalink = await this.getEntryRemoteAndPermalink(location);
@@ -2724,6 +3144,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param entry The entry to open an issue for
      */
     async openGithubIssue(entry: FullEntry): Promise<void> {
+        if (entry.locations.length === 0) {
+            // Locationless entries cannot resolve a repository or file target.
+            vscode.window.showErrorMessage("weAudit: Cannot open a GitHub issue for an entry without locations.");
+            return;
+        }
         // open github issue with the issue body with the finding text and permalink
         const title = encodeURIComponent(entry.label);
 
@@ -2909,7 +3334,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 entry.details = createDefaultEntryDetails();
             }
             this.resolvedEntries.push(removed);
-            this.resolvedEntriesTree.refresh();
+            this.refreshResolvedEntriesTree();
         }
 
         void this.updateSavedData(removed.author);
@@ -2926,12 +3351,108 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     /**
-     * Deletes the entry from the tree entries list and adds it to the
-     * resolved entries list.
+     * Resolves a note and moves it to the resolved entries list.
+     * Findings must be marked as true positive or false negative instead.
      * @param entry the entry to resolve.
      */
     resolveFinding(entry: FullEntry): void {
-        this.deleteAndResolveFinding(entry, true);
+        // Notes can be resolved; findings must be triaged as TP/FN.
+        if (entry.entryType !== EntryType.Note) {
+            vscode.window.showInformationMessage("Findings cannot be resolved. Mark them as True Positive or False Positive instead.");
+            return;
+        }
+        this.applyEntryResolution(entry, EntryResolution.Resolved, true);
+    }
+
+    /**
+     * Marks a finding as a true positive and moves it to the resolved entries list.
+     * @param entry the finding to mark.
+     */
+    private markTruePositive(entry: FullEntry): void {
+        // Findings only: use TP to close the entry.
+        if (entry.entryType !== EntryType.Finding) {
+            vscode.window.showInformationMessage("Only findings can be marked as True Positive.");
+            return;
+        }
+        this.applyEntryResolution(entry, EntryResolution.TruePositive, true);
+    }
+
+    /**
+     * Marks a finding as a false negative and moves it to the resolved entries list.
+     * @param entry the finding to mark.
+     */
+    private markFalsePositive(entry: FullEntry): void {
+        // Findings only: use FP to close the entry.
+        if (entry.entryType !== EntryType.Finding) {
+            vscode.window.showInformationMessage("Only findings can be marked as False Positive.");
+            return;
+        }
+        this.applyEntryResolution(entry, EntryResolution.FalsePositive, true);
+    }
+
+    /**
+     * Normalizes a resolution choice to ensure it is valid for the entry type.
+     * @param entry The entry being updated.
+     * @param resolution The requested resolution.
+     * @returns The normalized resolution or undefined if it is not allowed.
+     */
+    private normalizeResolutionForEntry(entry: FullEntry, resolution: EntryResolution): EntryResolution | undefined {
+        if (entry.entryType === EntryType.Note) {
+            if (resolution === EntryResolution.Open || resolution === EntryResolution.Resolved) {
+                return resolution;
+            }
+            return;
+        }
+
+        if (resolution === EntryResolution.Open || resolution === EntryResolution.TruePositive || resolution === EntryResolution.FalsePositive) {
+            return resolution;
+        }
+        return;
+    }
+
+    /**
+     * Applies a resolution to an entry and moves it between active and resolved lists as needed.
+     * @param entry The entry to update.
+     * @param resolution The resolution to apply.
+     * @param persist Whether to persist the change immediately.
+     */
+    private applyEntryResolution(entry: FullEntry, resolution: EntryResolution, persist: boolean): void {
+        // Keep resolution state and list placement in sync.
+        if (entry.details === undefined) {
+            entry.details = createDefaultEntryDetails();
+        }
+        entry.details.resolution = resolution;
+
+        const shouldBeResolved = resolution !== EntryResolution.Open;
+        const treeIndex = getEntryIndexFromArray(entry, this.treeEntries);
+        const resolvedIndex = getEntryIndexFromArray(entry, this.resolvedEntries);
+
+        if (shouldBeResolved) {
+            if (treeIndex !== -1) {
+                const removed = this.treeEntries.splice(treeIndex, 1)[0];
+                if (resolvedIndex === -1) {
+                    this.resolvedEntries.push(removed);
+                }
+            } else if (resolvedIndex === -1) {
+                this.resolvedEntries.push(entry);
+            }
+        } else {
+            if (resolvedIndex !== -1) {
+                const removed = this.resolvedEntries.splice(resolvedIndex, 1)[0];
+                if (treeIndex === -1) {
+                    this.treeEntries.push(removed);
+                }
+            } else if (treeIndex === -1) {
+                this.treeEntries.push(entry);
+            }
+        }
+
+        this.refreshResolvedEntriesTree();
+        this.refreshAndDecorateEntry(entry);
+
+        if (persist) {
+            void this.updateSavedData(entry.author);
+        }
     }
 
     /**
@@ -2962,17 +3483,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             entry.details = createDefaultEntryDetails();
         }
 
-        this.treeEntries.push(entry);
-        const idx = getEntryIndexFromArray(entry, this.resolvedEntries);
-        if (idx === -1) {
-            console.log("error in restoreFinding");
-            return;
-        }
-        this.resolvedEntries.splice(idx, 1);
-        this.resolvedEntriesTree.refresh();
-
-        this.refreshAndDecorateEntry(entry);
-        void this.updateSavedData(entry.author);
+        // Restoring always reopens the entry so it returns to the active list.
+        this.applyEntryResolution(entry, EntryResolution.Open, true);
     }
 
     /**
@@ -2986,7 +3498,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
         this.resolvedEntries.splice(idx, 1);
-        this.resolvedEntriesTree.refresh();
+        this.refreshResolvedEntriesTree();
         void this.updateSavedData(entry.author);
     }
 
@@ -3005,7 +3517,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         for (const author of authors) {
             void this.updateSavedData(author);
         }
-        this.resolvedEntriesTree.refresh();
+        this.refreshResolvedEntriesTree();
     }
 
     /**
@@ -3015,8 +3527,6 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (this.resolvedEntries.length === 0) {
             return;
         }
-
-        this.treeEntries = this.treeEntries.concat(this.resolvedEntries);
 
         // get authors and paths tuples of the resolved findings
         const authorSet: Set<string> = new Set();
@@ -3031,9 +3541,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         for (const entry of spliced) {
+            // Restoring reopens entries so they reappear in the active list.
+            entry.details.resolution = EntryResolution.Open;
+            this.treeEntries.push(entry);
             this.refreshEntry(entry);
         }
-        this.resolvedEntriesTree.refresh();
+        this.refreshResolvedEntriesTree();
         this.decorate();
     }
 
@@ -3078,12 +3591,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 return;
             }
 
+            const commitHash = this.getCommitHashForLocations(locations);
             const entry: FullEntry = {
                 label: title,
                 entryType: entryType,
                 author: this.username,
                 locations: locations,
-                details: createDefaultEntryDetails(),
+                details: createDefaultEntryDetails(commitHash),
             };
             this.treeEntries.push(entry);
             void this.updateSavedData(this.username);
@@ -3099,7 +3613,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             entryType: locationEntry.parentEntry.entryType,
             author: this.username,
             locations: [locationEntry.location],
-            details: createDefaultEntryDetails(),
+            details: createDefaultEntryDetails(this.getCommitHashForLocations([locationEntry.location])),
         };
         this.treeEntries.push(entry);
         void this.updateSavedData(this.username);
@@ -3124,6 +3638,21 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         return locations;
+    }
+
+    /**
+     * Resolve the git commit hash for the workspace root of the provided locations.
+     * Uses the first location as the root reference.
+     */
+    private getCommitHashForLocations(locations: FullLocation[]): string {
+        if (locations.length === 0) {
+            return "";
+        }
+        const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(locations[0].rootPath);
+        if (wsRoot === undefined) {
+            return "";
+        }
+        return wsRoot.resolveHeadGitShaOrShowError() ?? "";
     }
 
     /**
@@ -3166,7 +3695,40 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param username the username to update the saved data for
      */
     updateSavedData(username: string): void {
-        this.workspaces.updateSavedData(username);
+        this.incrementSaving(username);
+        void this.workspaces.updateSavedData(username).finally(() => {
+            this.decrementSaving(username);
+        });
+    }
+
+    /**
+     * Mark that a save operation is starting for a given username.
+     */
+    private incrementSaving(username: string): void {
+        const current = this.savingCounts.get(username) ?? 0;
+        this.savingCounts.set(username, current + 1);
+    }
+
+    /**
+     * Mark that a save operation has finished for a given username.
+     */
+    private decrementSaving(username: string): void {
+        const current = this.savingCounts.get(username);
+        if (current === undefined) {
+            return;
+        }
+        if (current <= 1) {
+            this.savingCounts.delete(username);
+        } else {
+            this.savingCounts.set(username, current - 1);
+        }
+    }
+
+    /**
+     * Check whether a save operation is in progress for a given username.
+     */
+    private isSaving(username: string): boolean {
+        return (this.savingCounts.get(username) ?? 0) > 0;
     }
 
     /**
@@ -3178,26 +3740,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @returns
      */
     getFilteredEntriesForSaving(username: string, root: WARoot): [FullEntry[], FullEntry[]] {
-        const filteredEntries = this.treeEntries.filter((entry) => {
-            let inWs = false;
-            for (const location of entry.locations) {
-                if (location.rootPath === root.rootPath) {
-                    inWs = true;
-                    break;
-                }
-            }
-            return entry.author === username && inWs;
-        });
-        const filteredResolvedEntries = this.resolvedEntries.filter((entry) => {
-            let inWs = false;
-            for (const location of entry.locations) {
-                if (location.rootPath === root.rootPath) {
-                    inWs = true;
-                    break;
-                }
-            }
-            return entry.author === username && inWs;
-        });
+        // Include locationless entries that originated from this root when saving.
+        const filteredEntries = this.treeEntries.filter((entry) => entry.author === username && this.entryMatchesRoot(entry, root));
+        const filteredResolvedEntries = this.resolvedEntries.filter((entry) => entry.author === username && this.entryMatchesRoot(entry, root));
         return [filteredEntries, filteredResolvedEntries];
     }
 
@@ -3219,10 +3764,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // create a quick pick to select the entry to add the region to
         const items = this.treeEntries
             .filter((entry) => {
-                if (entry.locations.length === 0 || entry.locations[0].rootPath !== locations[0].rootPath) {
-                    return false;
+                if (entry.locations.length === 0) {
+                    // Allow attaching the first location to entries imported without locations.
+                    return true;
                 }
-                return true;
+                return entry.locations[0].rootPath === locations[0].rootPath;
             })
             .map((entry) => {
                 return {
@@ -3368,6 +3914,13 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             ),
         } as FullSerializedData;
 
+        // Keep track of which workspace root produced entries with no locations.
+        for (const entry of fullParsedEntries.treeEntries.concat(fullParsedEntries.resolvedEntries)) {
+            if (entry.locations.length === 0) {
+                this.entryOriginRoots.set(entry, { rootPath: rootPath, rootLabel: wsRoot.getRootLabel() });
+            }
+        }
+
         // Normalize all the paths from loaded files. These can come from different OSes with different path
         // conventions. We do a best effort to match them to the current OS format.
         fullParsedEntries.treeEntries.forEach((entry) => {
@@ -3390,6 +3943,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             partiallyAuditedFile.path = normalizePathForOS(rootPath, partiallyAuditedFile.path);
         });
 
+        this.ensureEntryDetailsProvenance(fullParsedEntries.treeEntries);
+        this.ensureEntryDetailsProvenance(fullParsedEntries.resolvedEntries);
+        // Ensure resolution defaults for legacy data and keep list placement consistent.
+        this.ensureEntryDetailsResolution(fullParsedEntries.treeEntries, fullParsedEntries.resolvedEntries);
+
         if (update) {
             if (add) {
                 // Remove potential entries of username which appear on the tree.
@@ -3403,18 +3961,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                         .map((selectedConfig) => selectedConfig.username)
                         .includes(config.username)
                 ) {
-                    this.treeEntries = this.treeEntries.filter(
-                        (entry) =>
-                            entry.author !== config.username ||
-                            entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
-                    );
+                    this.treeEntries = this.treeEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
                     wsRoot.filterAudited(config.username);
                     wsRoot.filterPartiallyAudited(config.username);
-                    this.resolvedEntries = this.resolvedEntries.filter(
-                        (entry) =>
-                            entry.author !== config.username ||
-                            entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
-                    );
+                    this.resolvedEntries = this.resolvedEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
                 }
 
                 const newTreeEntries = fullParsedEntries.treeEntries;
@@ -3431,24 +3981,129 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     this.resolvedEntries = this.resolvedEntries.concat(fullParsedEntries.resolvedEntries);
                 }
             } else {
-                this.treeEntries = this.treeEntries.filter(
-                    (entry) =>
-                        entry.author !== config.username ||
-                        entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
-                );
+                this.treeEntries = this.treeEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
                 wsRoot.filterAudited(config.username);
                 wsRoot.filterPartiallyAudited(config.username);
-                this.resolvedEntries = this.resolvedEntries.filter(
-                    (entry) =>
-                        entry.author !== config.username ||
-                        entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) !== -1,
-                );
+                this.resolvedEntries = this.resolvedEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
             }
         }
 
         this.markPathMapDirty();
 
         return fullParsedEntries;
+    }
+
+    /**
+     * Reload all selected configurations from disk to keep the tree in sync with external changes.
+     */
+    reloadSavedFindingsFromDisk(): void {
+        this.workspaces.refreshConfigurations(true);
+        const selectedConfigs = this.workspaces.getSelectedConfigurations();
+        for (const config of selectedConfigs) {
+            if (this.isSaving(config.username)) {
+                continue;
+            }
+            if (!fs.existsSync(config.path)) {
+                // If a synced file disappeared, clear the in-memory entries for that user/root.
+                this.removeEntriesForConfig(config);
+                continue;
+            }
+            this.loadSavedDataFromConfig(config, true, false);
+            this.loadSavedDataFromConfig(config, true, true);
+        }
+
+        vscode.commands.executeCommand("weAudit.refreshSavedFindings", selectedConfigs);
+        this.refreshResolvedEntriesTree();
+        this.refreshTree();
+        this.decorate();
+    }
+
+    /**
+     * Ensure all entry details include a provenance value.
+     */
+    private ensureEntryDetailsProvenance(entries: FullEntry[]): void {
+        for (const entry of entries) {
+            const provenance = entry.details.provenance;
+            const legacyCommitHash = (entry.details as { commitHash?: string }).commitHash;
+            if (provenance === undefined) {
+                entry.details.provenance = this.createDefaultProvenance("human", legacyCommitHash);
+            } else if (typeof provenance === "string") {
+                entry.details.provenance = this.createDefaultProvenance(provenance, legacyCommitHash);
+            } else {
+                entry.details.provenance = {
+                    source: provenance.source ?? "human",
+                    created: provenance.created ?? new Date().toISOString(),
+                    campaign: provenance.campaign ?? null,
+                    commitHash: provenance.commitHash ?? legacyCommitHash ?? "",
+                };
+            }
+            if (legacyCommitHash !== undefined) {
+                delete (entry.details as { commitHash?: string }).commitHash;
+            }
+        }
+    }
+
+    /**
+     * Ensure all entries have a resolution value consistent with their current list placement.
+     * @param openEntries Entries in the active list.
+     * @param resolvedEntries Entries in the resolved list.
+     */
+    private ensureEntryDetailsResolution(openEntries: FullEntry[], resolvedEntries: FullEntry[]): void {
+        for (const entry of openEntries) {
+            // Active entries must be open to keep the tree and decorations consistent.
+            if (!isEntryResolution(entry.details.resolution) || entry.details.resolution !== EntryResolution.Open) {
+                entry.details.resolution = EntryResolution.Open;
+            }
+        }
+
+        for (const entry of resolvedEntries) {
+            if (entry.entryType === EntryType.Note) {
+                // Notes resolve to a single terminal state.
+                entry.details.resolution = EntryResolution.Resolved;
+                continue;
+            }
+
+            // Legacy resolved findings default to Unclassified unless already triaged.
+            const resolutionValue = String(entry.details.resolution);
+            if (resolutionValue === "False Negative") {
+                entry.details.resolution = EntryResolution.FalsePositive;
+            }
+
+            if (
+                entry.details.resolution !== EntryResolution.TruePositive &&
+                entry.details.resolution !== EntryResolution.FalsePositive &&
+                entry.details.resolution !== EntryResolution.Unclassified
+            ) {
+                entry.details.resolution = EntryResolution.Unclassified;
+            }
+        }
+    }
+
+    /**
+     * Build a provenance object for extension-created findings/notes.
+     */
+    private createDefaultProvenance(source: string, commitHash?: string): { source: string; created: string; campaign: string | null; commitHash: string } {
+        return {
+            source,
+            created: new Date().toISOString(),
+            campaign: null,
+            commitHash: commitHash ?? "",
+        };
+    }
+
+    /**
+     * Remove entries for a config's username within its workspace root from in-memory state.
+     */
+    private removeEntriesForConfig(config: ConfigurationEntry): void {
+        const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(config.path);
+        if (wsRoot === undefined) {
+            return;
+        }
+        this.treeEntries = this.treeEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
+        wsRoot.filterAudited(config.username);
+        wsRoot.filterPartiallyAudited(config.username);
+        this.resolvedEntries = this.resolvedEntries.filter((entry) => entry.author !== config.username || !this.entryMatchesConfig(entry, config));
+        this.markPathMapDirty();
     }
 
     /**
@@ -3479,6 +4134,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         outer: for (const entry of this.treeEntries) {
             // if any of the locations is on this file, badge it
             if (entry.entryType === EntryType.Finding && entry.locations) {
+                // Commit filtering should also constrain file badges.
+                if (!this.entryMatchesCommitFilter(entry)) {
+                    continue;
+                }
                 for (const location of entry.locations) {
                     for (const [wsRoot, relativePath] of allRootsAndPaths) {
                         if (location.path === relativePath && location.rootPath === wsRoot.rootPath) {
@@ -3576,6 +4235,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         const labelDecorations: vscode.DecorationOptions[] = [];
 
         for (const treeItem of this.treeEntries) {
+            // Keep editor highlights in sync with commit filtering.
+            if (!this.entryMatchesCommitFilter(treeItem)) {
+                continue;
+            }
             const isOwnEntry = this.username === treeItem.author;
             const findingDecoration = isOwnEntry ? ownDecorations : otherDecorations;
             const noteDecoration = isOwnEntry ? ownNoteDecorations : otherNoteDecorations;
@@ -3643,10 +4306,27 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         if (element === undefined) {
             const pathLabels = Array.from(this.pathToEntryMap.keys()).sort();
+            const unlocatedEntries = this.treeEntries.filter((entry) => entry.locations.length === 0 && this.isEntryVisible(entry));
+            if (unlocatedEntries.length > 0) {
+                // Keep locationless entries visible in group-by-file mode under a dedicated bucket.
+                pathLabels.push(NO_LOCATION_PATH_LABEL);
+            }
             return pathLabels.map((label) => createPathOrganizer(label));
         } else {
             // get entries with same path as element
             if (isPathOrganizerEntry(element)) {
+                if (element.pathLabel === NO_LOCATION_PATH_LABEL) {
+                    const unlocatedEntries = this.treeEntries.filter((entry) => entry.locations.length === 0 && this.isEntryVisible(entry));
+                    if (this.sortEntriesAlphabetically) {
+                        return [...unlocatedEntries].sort((a, b) => {
+                            if (a.entryType !== b.entryType) {
+                                return a.entryType === EntryType.Finding ? -1 : 1;
+                            }
+                            return a.label.localeCompare(b.label);
+                        });
+                    }
+                    return unlocatedEntries;
+                }
                 const entries = this.pathToEntryMap.get(element.pathLabel) ?? [];
                 if (this.sortEntriesAlphabetically) {
                     return [...entries].sort((a, b) => {
@@ -3708,7 +4388,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             notes.sort((a, b) => a.label.localeCompare(b.label));
         }
 
-        return entries.concat(notes).filter((entry) => this.hasVisibleLocation(entry));
+        return entries.concat(notes).filter((entry) => this.isEntryVisible(entry));
     }
 
     /**
@@ -3750,6 +4430,18 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             if (entry.location.endLine !== entry.location.startLine) {
                 description += "-" + (entry.location.endLine + 1).toString();
             }
+            // Show location label/description in the list to disambiguate multi-location findings.
+            const locationLabel = (entry.location.label ?? "").trim();
+            const locationDescription = (entry.location.description ?? "").trim();
+            let locationDetails = "";
+            if (locationLabel && locationDescription) {
+                locationDetails = `${locationLabel}: ${locationDescription}`;
+            } else {
+                locationDetails = locationLabel || locationDescription;
+            }
+            if (locationDetails) {
+                description += ` ${locationDetails}`;
+            }
             let mainLabel: string;
             if (this.treeViewMode === TreeViewMode.List) {
                 mainLabel = entry.location.label;
@@ -3779,24 +4471,49 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // if it's not a location entry or a path organizer entry, it's a normal entry
         const state =
             entry.locations && entry.locations.length > 1 && this.treeViewMode === TreeViewMode.List
-                ? vscode.TreeItemCollapsibleState.Expanded
+                ? vscode.TreeItemCollapsibleState.Collapsed
                 : vscode.TreeItemCollapsibleState.None;
         const treeItem = new vscode.TreeItem(entry.label, state);
 
         if (entry.entryType === EntryType.Note) {
             treeItem.iconPath = new vscode.ThemeIcon("bookmark");
         } else {
-            treeItem.iconPath = new vscode.ThemeIcon("bug");
+            // Tint the finding icon by severity to make the list easier to scan.
+            let severityColor: vscode.ThemeColor | undefined;
+            switch (entry.details.severity) {
+                case FindingSeverity.High:
+                    severityColor = new vscode.ThemeColor("problemsErrorIcon.foreground");
+                    break;
+                case FindingSeverity.Medium:
+                    severityColor = new vscode.ThemeColor("problemsWarningIcon.foreground");
+                    break;
+                case FindingSeverity.Low:
+                    severityColor = new vscode.ThemeColor("problemsInfoIcon.foreground");
+                    break;
+                case FindingSeverity.Informational:
+                    severityColor = new vscode.ThemeColor("descriptionForeground");
+                    break;
+                case FindingSeverity.Undetermined:
+                case FindingSeverity.Undefined:
+                    severityColor = undefined;
+                    break;
+            }
+            treeItem.iconPath = new vscode.ThemeIcon("bug", severityColor);
         }
 
         const mainLocation = entry.locations[0];
+        if (mainLocation === undefined) {
+            // Entries imported without locations still appear, but cannot be navigated.
+            treeItem.description = `No location (${entry.author})`;
+            treeItem.tooltip = `${entry.author}'s ${entry.entryType === EntryType.Note ? "note" : "finding"} (no location)`;
+            treeItem.contextValue = entry.entryType === EntryType.Note ? "note" : "finding";
+            return treeItem;
+        }
 
         const basePath = path.basename(mainLocation.path);
         treeItem.description = basePath + ":" + (mainLocation.startLine + 1).toString();
 
-        if (entry.author !== this.username) {
-            treeItem.description += " (" + entry.author + ")";
-        }
+        treeItem.description += " (" + entry.author + ")";
 
         treeItem.command = {
             command: "weAudit.openFileLines",
@@ -3899,6 +4616,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
     }
 
     private isLocationVisible(entry: FullEntry, location: FullLocation): boolean {
+        // Respect commit filtering when deciding whether a location is visible.
+        if (!this.entryMatchesCommitFilter(entry)) {
+            return false;
+        }
         const absolutePath = path.join(location.rootPath, location.path);
         const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(absolutePath);
         if (wsRoot === undefined) {
@@ -3925,6 +4646,169 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
         }
         return false;
+    }
+
+    /**
+     * Returns whether an entry should be shown in the tree view.
+     * Locationless entries are scoped to the config root they were loaded from.
+     */
+    private isEntryVisible(entry: FullEntry): boolean {
+        // Commit filtering applies before any workspace/user visibility checks.
+        if (!this.entryMatchesCommitFilter(entry)) {
+            return false;
+        }
+        if (entry.locations.length > 0) {
+            return this.hasVisibleLocation(entry);
+        }
+        const origin = this.entryOriginRoots.get(entry);
+        if (origin === undefined) {
+            return !this.workspaces.moreThanOneRoot() && this.workspaces.getSelectedConfigurations().some((config) => config.username === entry.author);
+        }
+        return this.workspaces.getSelectedConfigurations().some((config) => config.username === entry.author && config.root.label === origin.rootLabel);
+    }
+
+    /**
+     * Return the commit hash stored on an entry's provenance, or an empty string.
+     */
+    public getEntryCommitHash(entry: FullEntry): string {
+        const provenance = entry.details?.provenance;
+        if (provenance && typeof provenance === "object") {
+            return provenance.commitHash ?? "";
+        }
+        return "";
+    }
+
+    /**
+     * Resolve the workspace root for an entry, including locationless entries.
+     */
+    public getEntryWorkspaceRoot(entry: FullEntry): WARoot | undefined {
+        if (entry.locations.length > 0) {
+            const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(entry.locations[0].rootPath);
+            return wsRoot;
+        }
+        const origin = this.entryOriginRoots.get(entry);
+        if (origin) {
+            const [wsRoot] = this.workspaces.getCorrespondingRootAndPath(origin.rootPath);
+            return wsRoot;
+        }
+        return undefined;
+    }
+
+    /**
+     * Get the current commit hash for the entry's workspace root.
+     */
+    public getEntryCurrentCommitHash(entry: FullEntry): string {
+        const wsRoot = this.getEntryWorkspaceRoot(entry);
+        if (!wsRoot) {
+            return "";
+        }
+        return wsRoot.resolveHeadGitShaOrShowError() ?? "";
+    }
+
+    /**
+     * Return whether an entry should be included when commit filtering is enabled.
+     */
+    private entryMatchesCommitFilter(entry: FullEntry): boolean {
+        if (!this.filterByCurrentCommit) {
+            return true;
+        }
+        if (entry.entryType !== EntryType.Finding) {
+            return true;
+        }
+        const entryCommitHash = this.getEntryCommitHash(entry);
+        const currentCommitHash = this.getEntryCurrentCommitHash(entry);
+        if (!entryCommitHash || !currentCommitHash) {
+            // If commit metadata is unavailable, keep the finding visible.
+            return true;
+        }
+        return entryCommitHash === currentCommitHash;
+    }
+
+    /**
+     * Count findings whose commit hashes differ from the current workspace commit hash.
+     */
+    private countFindingsWithDifferentCommit(): number {
+        let count = 0;
+        for (const entry of this.treeEntries) {
+            if (entry.entryType !== EntryType.Finding) {
+                continue;
+            }
+            const entryCommitHash = this.getEntryCommitHash(entry);
+            const currentCommitHash = this.getEntryCurrentCommitHash(entry);
+            if (!entryCommitHash || !currentCommitHash) {
+                continue;
+            }
+            if (entryCommitHash !== currentCommitHash) {
+                count += 1;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * Returns resolved entries filtered by the current commit filter.
+     */
+    private getFilteredResolvedEntries(): FullEntry[] {
+        return this.resolvedEntries.filter((entry) => this.entryMatchesCommitFilter(entry));
+    }
+
+    /**
+     * Refresh the resolved findings view with the commit-filtered entries.
+     */
+    private refreshResolvedEntriesTree(): void {
+        this.resolvedEntriesTree.setResolvedEntries(this.getFilteredResolvedEntries());
+    }
+
+    /**
+     * Show a one-time toast when mismatched findings are hidden by commit filtering.
+     */
+    private maybeShowCommitMismatchToast(): void {
+        if (this.hasShownCommitMismatchToast) {
+            return;
+        }
+        this.hasShownCommitMismatchToast = true;
+        const count = this.countFindingsWithDifferentCommit();
+        if (count === 0) {
+            return;
+        }
+        const actionLabel = "Show All Findings";
+        void vscode.window
+            .showInformationMessage(`weAudit: ${count} finding(s) apply to different commit hashes. Run "${actionLabel}" to view them.`, actionLabel)
+            .then((choice) => {
+                if (choice === actionLabel) {
+                    void vscode.commands.executeCommand("weAudit.disableCurrentCommitFilter");
+                }
+            });
+    }
+
+    /**
+     * Returns true when an entry belongs to the config's workspace root.
+     * Locationless entries use their recorded origin root.
+     */
+    private entryMatchesConfig(entry: FullEntry, config: ConfigurationEntry): boolean {
+        if (entry.locations.length > 0) {
+            return entry.locations.findIndex((loc) => this.workspaces.getUniqueLabel(loc.rootPath) !== config.root.label) === -1;
+        }
+        const origin = this.entryOriginRoots.get(entry);
+        if (origin !== undefined) {
+            return origin.rootLabel === config.root.label;
+        }
+        return !this.workspaces.moreThanOneRoot();
+    }
+
+    /**
+     * Returns true when an entry should be saved under the provided workspace root.
+     * Locationless entries use their recorded origin root.
+     */
+    private entryMatchesRoot(entry: FullEntry, root: WARoot): boolean {
+        if (entry.locations.length > 0) {
+            return entry.locations.some((location) => location.rootPath === root.rootPath);
+        }
+        const origin = this.entryOriginRoots.get(entry);
+        if (origin !== undefined) {
+            return origin.rootPath === root.rootPath;
+        }
+        return !this.workspaces.moreThanOneRoot();
     }
 
     private markPathMapDirty(): void {
@@ -3971,6 +4855,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
      * @param entry the entry to refresh and decorate
      */
     refreshAndDecorateEntry(entry: FullEntry): void {
+        if (entry.locations.length === 0) {
+            // Ensure locationless entries still trigger a tree refresh.
+            this.refreshTree();
+            return;
+        }
         for (const loc of entry.locations) {
             const uri = vscode.Uri.file(path.join(loc.rootPath, loc.path));
             this.decorateWithUri(uri);
@@ -4109,6 +4998,12 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
                     return;
                 }
 
+                // Locationless entries cannot accept dropped locations.
+                if (target.locations.length === 0) {
+                    vscode.window.showErrorMessage("weAudit: Error moving a location to a finding without locations.");
+                    return;
+                }
+
                 // Prevent mixing findings that belong to different workspace roots, because it is a headache to synchronize this.
                 if (target.locations[0].rootPath !== locationEntry.location.rootPath) {
                     vscode.window.showErrorMessage(
@@ -4221,6 +5116,12 @@ class DragAndDropController implements vscode.TreeDragAndDropController<TreeEntr
             // get its parent entry and continue to the next if statement
             if (isLocationEntry(target)) {
                 target = target.parentEntry;
+            }
+
+            // Entries without locations cannot be merged because we cannot verify roots.
+            if (entry.locations.length === 0 || target.locations.length === 0) {
+                vscode.window.showErrorMessage("weAudit: Error merging findings that do not have locations.");
+                return;
             }
 
             // Prevent mixing findings that belong to different workspace roots, because it is a headache to synchronize this.
@@ -4442,8 +5343,22 @@ export class AuditMarker {
             entry.details = createDefaultEntryDetails();
         }
 
-        // Fills the Finding details webview with the currently selected entry details
-        vscode.commands.executeCommand("weAudit.setWebviewFindingDetails", entry.details, entry.label);
+        // Active entries should always present an open resolution in the details view.
+        entry.details.resolution = EntryResolution.Open;
+
+        // Fills the Finding details webview with the currently selected entry details.
+        // Include commit hashes so the details view can warn about mismatches.
+        const entryCommitHash = treeDataProvider.getEntryCommitHash(entry);
+        const currentCommitHash = treeDataProvider.getEntryCurrentCommitHash(entry);
+        vscode.commands.executeCommand(
+            "weAudit.setWebviewFindingDetails",
+            entry.details,
+            entry.label,
+            entry.entryType,
+            entry.author,
+            entryCommitHash,
+            currentCommitHash,
+        );
     }
 
     /**

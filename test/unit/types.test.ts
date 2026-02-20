@@ -4,6 +4,7 @@ import {
     type ConfigurationEntry,
     type Entry,
     EntryType,
+    EntryResolution,
     FindingDifficulty,
     FindingSeverity,
     FindingType,
@@ -54,7 +55,16 @@ describe("types.ts", () => {
             assert.strictEqual(details.type, FindingType.Undefined);
             assert.strictEqual(details.description, "");
             assert.strictEqual(details.exploit, "");
-            assert.strictEqual(details.recommendation, "Short term, \nLong term, \n");
+            assert.strictEqual(details.recommendation, "Short term,\nLong term,");
+            assert.strictEqual(details.resolution, EntryResolution.Open);
+            assert.ok(details.provenance);
+            if (typeof details.provenance !== "object" || details.provenance === null) {
+                assert.fail("Expected provenance to be an object.");
+            }
+            assert.strictEqual(details.provenance.source, "human");
+            assert.strictEqual(details.provenance.campaign, null);
+            assert.ok(details.provenance.created.length > 0);
+            assert.strictEqual(details.provenance.commitHash, "");
         });
     });
 
@@ -81,6 +91,7 @@ describe("types.ts", () => {
                     description: "Test description",
                     exploit: "Test exploit",
                     recommendation: "Test recommendation",
+                    resolution: EntryResolution.Open,
                 },
                 locations: [
                     {
@@ -122,16 +133,18 @@ describe("types.ts", () => {
             assert.strictEqual(validateSerializedData(data), false);
         });
 
-        it("should return false when auditedFiles is undefined", () => {
+        it("should default auditedFiles when missing", () => {
             const data = createValidSerializedData();
             (data as unknown as { auditedFiles: undefined }).auditedFiles = undefined;
-            assert.strictEqual(validateSerializedData(data), false);
+            assert.strictEqual(validateSerializedData(data), true);
+            assert.deepStrictEqual(data.auditedFiles, []);
         });
 
-        it("should return false when resolvedEntries is undefined", () => {
+        it("should default resolvedEntries when missing", () => {
             const data = createValidSerializedData();
             (data as unknown as { resolvedEntries: undefined }).resolvedEntries = undefined;
-            assert.strictEqual(validateSerializedData(data), false);
+            assert.strictEqual(validateSerializedData(data), true);
+            assert.deepStrictEqual(data.resolvedEntries, []);
         });
 
         it("should return false for entry with invalid entryType", () => {
@@ -180,6 +193,12 @@ describe("types.ts", () => {
             const data = createValidSerializedData();
             data.treeEntries[0].entryType = EntryType.Note;
             assert.strictEqual(validateSerializedData(data), true);
+        });
+
+        it("should return false for entry with invalid resolution", () => {
+            const data = createValidSerializedData();
+            (data.treeEntries[0].details as unknown as { resolution: string }).resolution = "Not a resolution";
+            assert.strictEqual(validateSerializedData(data), false);
         });
 
         // Regression: validatepartiallyAuditedFile requires all fields (path, author, startLine, endLine)

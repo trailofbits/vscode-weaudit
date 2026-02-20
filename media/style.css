@@ -4,8 +4,55 @@
     padding-bottom: 1em;
 }
 
+.detailsRow {
+    display: flex;
+    gap: 1em;
+    flex-wrap: wrap;
+}
+
+.detailsRow .detailsDiv {
+    flex: 1 1 220px;
+}
+
+.detailsRowCompact {
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.detailsRowCompact .detailsDiv {
+    flex: 0 1 auto;
+    min-width: 0;
+}
+
+.detailsRowCompact .detailSpan {
+    white-space: nowrap;
+}
+
 .detailSpan {
     padding-right: 0.5em;
+}
+
+.detailValue {
+    flex: 1;
+}
+
+.detailsActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    padding-bottom: 1em;
+}
+
+.detailsWarning {
+    display: none;
+    padding: 0.5em 0.75em;
+    margin-bottom: 1em;
+    border-left: 3px solid var(--vscode-inputValidation-warningBorder, #d7ba7d);
+    background: var(--vscode-inputValidation-warningBackground, rgba(255, 197, 61, 0.12));
+    color: var(--vscode-inputValidation-warningForeground, inherit);
+    border-radius: 2px;
+    font-size: 0.9em;
+    line-height: 1.4;
 }
 
 vscode-dropdown,
@@ -16,4 +63,19 @@ vscode-text-field {
 
 vscode-dropdown {
     max-width: 250px;
+}
+
+vscode-dropdown.detailsDropdown {
+    width: 4rem;
+    max-width: 100%;
+    flex: 0 0 auto;
+}
+
+vscode-button {
+    --button-primary-background: #98253a;
+    --button-primary-hover-background: #7a1d2f;
+    --button-primary-foreground: #ffffff;
+    --button-secondary-background: #98253a;
+    --button-secondary-hover-background: #7a1d2f;
+    --button-secondary-foreground: #ffffff;
 }

@@ -1,7 +1,75 @@
 import * as vscode from "vscode";
 import * as path from "path";
 
-import { FullEntry, EntryType } from "./types";
+import { FullEntry, EntryType, EntryResolution, FindingSeverity } from "./types";
+
+/**
+ * Returns a short status badge for a resolved entry.
+ * @param entry The resolved entry to label.
+ * @returns A short status badge string.
+ */
+function getResolutionBadge(entry: FullEntry): string {
+    if (entry.entryType === EntryType.Note) {
+        return "RESOLVED";
+    }
+
+    if (entry.details?.resolution === EntryResolution.TruePositive) {
+        return "TP";
+    }
+    const resolutionValue = String(entry.details?.resolution);
+    if (resolutionValue === "False Positive" || resolutionValue === "False Negative") {
+        return "FP";
+    }
+    if (entry.details?.resolution === EntryResolution.Unclassified) {
+        return "UNCLASSIFIED";
+    }
+
+    return "UNCLASSIFIED";
+}
+
+/**
+ * Returns an emoji that reflects the resolution status for resolved findings.
+ * @param entry The resolved entry to label.
+ * @returns An emoji for the resolution, or an empty string when not applicable.
+ */
+function getResolutionEmoji(entry: FullEntry): string {
+    if (entry.entryType !== EntryType.Finding) {
+        return "";
+    }
+
+    if (entry.details?.resolution === EntryResolution.TruePositive) {
+        return "✅";
+    }
+
+    const resolutionValue = String(entry.details?.resolution);
+    if (entry.details?.resolution === EntryResolution.FalsePositive || resolutionValue === "False Positive" || resolutionValue === "False Negative") {
+        return "❌";
+    }
+
+    return "";
+}
+
+/**
+ * Returns a theme color used to tint finding icons by severity.
+ * @param severity The severity value to map to a theme color.
+ * @returns A theme color for the icon, or undefined to use the default color.
+ */
+function getSeverityColor(severity: FindingSeverity | undefined): vscode.ThemeColor | undefined {
+    switch (severity) {
+        case FindingSeverity.High:
+            return new vscode.ThemeColor("problemsErrorIcon.foreground");
+        case FindingSeverity.Medium:
+            return new vscode.ThemeColor("problemsWarningIcon.foreground");
+        case FindingSeverity.Low:
+            return new vscode.ThemeColor("problemsInfoIcon.foreground");
+        case FindingSeverity.Informational:
+            return new vscode.ThemeColor("descriptionForeground");
+        case FindingSeverity.Undetermined:
+        case FindingSeverity.Undefined:
+        default:
+            return undefined;
+    }
+}
 
 export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
     private resolvedEntries: FullEntry[];
@@ -35,22 +103,29 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
     }
 
     getTreeItem(entry: FullEntry): vscode.TreeItem {
-        const label = entry.label;
+        const resolutionEmoji = getResolutionEmoji(entry);
+        const label = resolutionEmoji ? `${resolutionEmoji} ${entry.label}` : entry.label;
         const treeItem = new vscode.TreeItem(label, vscode.TreeItemCollapsibleState.None);
         if (entry.entryType === EntryType.Note) {
             treeItem.iconPath = new vscode.ThemeIcon("bookmark");
         } else {
-            treeItem.iconPath = new vscode.ThemeIcon("bug");
+            treeItem.iconPath = new vscode.ThemeIcon("bug", getSeverityColor(entry.details?.severity));
         }
+        const badge = getResolutionBadge(entry);
         const mainLocation = entry.locations[0];
-        treeItem.command = {
-            command: "weAudit.openFileLines",
-            title: "Open File",
-            arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
-        };
-
-        treeItem.description = path.basename(mainLocation.path);
-        treeItem.tooltip = entry.author + "'s findings";
+        if (mainLocation !== undefined) {
+            treeItem.command = {
+                command: "weAudit.openFileLines",
+                title: "Open File",
+                arguments: [vscode.Uri.file(path.join(mainLocation.rootPath, mainLocation.path)), mainLocation.startLine, mainLocation.endLine],
+            };
+            treeItem.description = `${path.basename(mainLocation.path)} [${badge}]`;
+            treeItem.tooltip = `${entry.author}'s ${entry.entryType === EntryType.Note ? "note" : "finding"} (${badge})`;
+        } else {
+            treeItem.description = `No location [${badge}]`;
+            treeItem.tooltip = `${entry.author}'s ${entry.entryType === EntryType.Note ? "note" : "finding"} (${badge}, no location)`;
+        }
+        treeItem.contextValue = entry.entryType === EntryType.Note ? "resolvedNote" : "resolvedFinding";
 
         return treeItem;
     }

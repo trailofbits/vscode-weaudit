@@ -26,7 +26,7 @@ jobs:
               run: npx biome check --formatter-enabled=true --linter-enabled=false .
 
             - name: Run ESLint
-              run: npx eslint --ext ts --color -c .eslintrc.cjs src
+              run: npx eslint --ext ts --color -c .eslintrc.mjs src
 
             - name: Run TypeScript type check
               run: npx tsc --noEmit

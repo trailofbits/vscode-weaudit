@@ -33,12 +33,13 @@ See the [Build and install](#build-and-install) section below for how to build a
 -   [**Detailed Findings**](#detailed-findings) - Fill detailed information about a finding.
 -   [**GitHub/Gitlab Issues**](#githubgitlab-issues) - Create formatted GitHub or Gitlab issues with the Detailed Findings information.
 -   [**Multi-region Findings**](#multi-region-findings) - Group multiple locations under a single finding.
--   [**Resolve and Restore**](#resolve-and-restore) - Resolved findings will not be highlighted in the editor but are still visible in the sidebar.
+-   [**Resolve and Restore**](#resolve-and-restore) - Resolved notes and triaged findings will not be highlighted in the editor but remain visible in the sidebar.
 -   [**Copy Permalinks**](#copy-permalinks) - Copy GitHub permalinks to findings, or to a selected code region.
 -   [**Daily Log**](#daily-log) - View a daily log of all the marked files and LOC per day.
 -   [**View Mode**](#view-mode) - View findings in a list, or grouped by filename.
 -   [**Multiple Users**](#multiple-users) - Findings can be viewed from multiple different users.
 -   [**Hide Findings**](#hide-findings) - Hide all findings associated with a specific user.
+-   [**Auto Sync (Git)**](#auto-sync-git) - Automatically sync .weaudit files across auditors via a dedicated branch.
 -   [**Search & Filter Findings**](#search--filter-findings) - Search and filter the findings in the _List of Findings_ panel.
 -   [**Export Findings**](#export-findings) - Export findings to a markdown file.
 -   [**Drag & drop Findings and Locations**](#drag--drop-findings-and-locations) - Drag and drop findings and locations in the _List of Findings_ panel.
@@ -53,6 +54,7 @@ Findings and notes can be added to the current selection by calling the `weAudit
 ![Create Finding](media/readme/gifs/create_finding.gif)
 
 Clicking on a finding in the _List of Findings_ view will navigate to the region of code previously marked.
+In the _List of Findings_ view, finding icons are tinted by severity when a severity is set.
 
 A file with a finding will have a `!` annotation that is visible both in the file tree, and in the file name above the editor.
 
@@ -90,6 +92,11 @@ You can quickly navigate through all partially audited regions in your workspace
 ### Detailed Findings
 
 You can fill detailed information about a finding by clicking on it in the _List of Findings_ view in the sidebar. The respective _Finding Details_ panel will open, where you can fill the information.
+The panel also shows a read-only provenance field (defaulting to "human"), with the author's username and any campaign tag shown next to it.
+The Description, Exploit Scenario, and Recommendations fields auto-expand as you type, starting at roughly two lines tall, up to half the panel height, then scroll.
+The action buttons at the top let you triage findings (True/False Positive), resolve notes, or open a GitHub issue.
+Resolution changes are applied through those action buttons.
+If the finding's commit hash does not match the current workspace commit hash, a warning banner appears in the details view.
 
 ![Finding Details](media/readme/finding_details.png)
 
@@ -102,6 +109,7 @@ You can create a GitHub/Gitlab issue with the detailed findings information by c
 ### Multi-region Findings
 
 You can add multiple regions to a single finding or note. Once you select the code region to be added, call the `weAudit: Add Region to a Finding` and select the finding to add the region to from the quick pick menu. The regions will be highlighted in the editor, and the finding will be updated in the _List of Findings_ panel.
+In the _List of Findings_ view, multi-location entries are collapsed by default; expand them to see each location's label and description.
 
 ![Add Region to a Finding](media/readme/gifs/multi_region_finding.gif)
 
@@ -113,7 +121,8 @@ You can also use the dedicated keyboard shortcuts to make quick adjustments with
 
 ### Resolve and Restore
 
-You can resolve a finding by clicking on the corresponding `Resolve` button in the _List of Findings_ panel. The finding will no longer be highlighted in the editor, but will still be visible in the _Resolved Findings_ panel. You can restore a resolved finding by clicking on the corresponding `Restore` button in the _Resolved Findings_ panel.
+Notes can be resolved from the _List of Findings_ panel. Findings are triaged instead: mark them as `True Positive` or `False Positive` from the same panel. Resolved notes and triaged findings are no longer highlighted in the editor but remain visible in the _Resolved Findings_ panel with a status badge and a ✅/❌ indicator for true/false positives. Resolved findings keep their severity-tinted bug icon in the _Resolved Findings_ panel to make triaged items easier to scan. The _Resolved Findings_ panel is collapsed by default in the weAudit sidebar; expand it when you need to review or restore entries. You can restore any resolved entry by clicking the corresponding `Restore` button in the _Resolved Findings_ panel.
+When commit filtering is enabled, the _Resolved Findings_ panel follows the same commit hash rules as the main list.
 
 ![Resolve and Restore](media/readme/gifs/resolve_finding.gif)
 
@@ -147,21 +156,53 @@ You can view findings in a list, or grouped by filename by clicking on the `View
 
 You can share the weAudit file with you co-auditors to share findings. This file is located in the `.vscode` folder in your workspace named `$USERNAME.weaudit`.
 
-In the `weAudit Files` panel, you can toggle to show or hide the findings from each user by clicking on the entries.
+In the `weAudit Files` panel, you can toggle to show or hide the findings from each user by clicking on the entries. The `weAudit Files` panel is collapsed by default in the weAudit sidebar; expand it to manage contributors.
+Newly discovered `.weaudit` files are shown automatically by default; use the panel to hide them if needed.
 There are color settings for other user's findings and notes, and for your own findings and notes.
+Findings and notes show the author's username after the filename/line number in the _List of Findings_ panel.
 
 ![Multiple Users](media/readme/multi_user.png)
+
+### Third-party .weaudit compatibility
+
+weAudit can read `.weaudit` files generated by third-party tools. If a file omits `auditedFiles` or `resolvedEntries`, weAudit treats them as empty so findings can still load.
+Entries without any locations are shown in the tree, but they cannot be navigated or have permalinks until a location is added.
 
 ### Hide Findings
 You can hide all findings associated with a specific user by clicking on that user's name on the  `weAudit Files` panel.
 
 ![Hide Findings associated to a user](media/readme/gifs/hide_findings.gif)
 
+### Auto Sync (Git)
+weAudit can automatically sync `.weaudit` files across auditors using git.
+
+**Modes**
+- **Central repo (default):** syncs all `.weaudit` files to a separate centralized git repository (ideal for read-only clones). The central repo URL is stored globally, but each workspace's mode controls whether it is used.
+- **Repo branch:** uses a dedicated sync branch (default: `weaudit-sync`) on a remote in each repo.
+
+In central repo mode, each repository is assigned a repo key derived from its git remote. If any remote lives under the `trailofbits` GitHub organization, that remote is preferred when building the key.
+
+To enable, set `weAudit.sync.enabled` to `true` in your settings. By default, weAudit:
+- pulls the latest sync branch before committing local `.weaudit` changes;
+- polls every minute for remote updates (configurable);
+- syncs only `.vscode/*.weaudit` files (daily log data stays local).
+
+Repo-branch sync runs from a dedicated git worktree stored in VS Code's global storage, so your current branch and working tree stay untouched. Central repo sync uses a dedicated clone in the same global storage location.
+Sync operations are serialized per repo across VS Code windows on the same machine. When another window is already syncing, weAudit waits briefly for the lock; if it remains busy, the sync is skipped and will retry on the next poll or change. If a pull/rebase conflict occurs, weAudit shows a warning toast and leaves local changes queued for the next sync attempt.
+On extension shutdown, weAudit performs a best-effort sync flush (up to about 3 seconds). VS Code extensions cannot hard-block app/window close, so shutdown can still interrupt in-flight sync operations.
+
+You can configure these settings in the **Sync Configuration** panel in the weAudit sidebar.
+The panel shows the timestamp of the last successful sync.
+
+You can trigger a manual sync at any time with the `weAudit: Sync Findings Now` command.
+
 ### Toggle Highlights
 Hide every findings/notes highlight in the editor by running the `weAudit: Toggle Findings Highlighting` command from the Command Palette. Run the command again to bring the highlights back whenever you need to review them.
 
 ### Search & Filter Findings
 You can search for and filter the findings in the `List of Findings` panel by calling the `weAudit: Search and Filter Findings` command.
+By default, the `List of Findings` panel shows only findings that match the workspace commit hash. If either the finding hash or current workspace hash is unavailable, the finding stays visible. Use the `Show All Findings` command in the panel toolbar to reveal findings from other commits (notes remain visible). When the workspace opens, weAudit notifies you if there are hidden findings from other commits.
+If weAudit cannot resolve `HEAD` for a workspace root, it now shows an error and does not fall back to the persisted `gitSha` value for commit filtering.
 
 ![Filter Findings](media/readme/gifs/filter_findings.gif)
 
@@ -185,6 +226,20 @@ You can drag and drop findings and locations in the _List of Findings_ panel to:
 -   `weAudit.general.githubOrganizationName`: Organization name for audit repository (enhances permalink heuristic)
 -   `weAudit.general.username`: Username to use as finding's author (defaults to system username if empty)
 -   `weAudit.general.permalinkSeparator`: Separator to use in permalinks (\\n is interpreted as newline)
+
+#### Sync settings
+
+-   `weAudit.sync.enabled`: Enable git-based auto sync (opt-in)
+-   `weAudit.sync.mode`: Sync mode ("repo-branch" or "central-repo")
+-   `weAudit.sync.remoteName`: Git remote to use (default: "origin")
+-   `weAudit.sync.branchName`: Sync branch name (default: "weaudit-sync")
+-   `weAudit.sync.centralRepoUrl`: Centralized git repository URL for multi-repo sync
+-   `weAudit.sync.centralBranch`: Branch name in the centralized sync repository (default: "weaudit-sync")
+-   `weAudit.sync.repoKeyOverride`: Optional override for the repo key used in centralized sync
+-   `weAudit.sync.pollMinutes`: Remote polling interval in minutes (default: 1)
+-   `weAudit.sync.debounceMs`: Debounce delay for local changes in milliseconds
+
+Repo-branch settings are stored per-workspace. Central repo settings (mode, central repo URL/branch, and optional override) are stored globally.
 
 #### Background colors
 

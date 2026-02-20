@@ -15,6 +15,17 @@ export enum EntryType {
 }
 
 /**
+ * Represents the resolution status of an entry.
+ */
+export enum EntryResolution {
+    Open = "Open",
+    Resolved = "Resolved",
+    TruePositive = "True Positive",
+    FalsePositive = "False Positive",
+    Unclassified = "Unclassified",
+}
+
+/**
  * Represent the client or audit repository.
  */
 export enum Repository {
@@ -123,7 +134,17 @@ export function createDefaultSerializedData(): SerializedData {
 
 export function validateSerializedData(data: SerializedData): boolean {
     // ignore clientRemote, gitRemote and gitSha as these are optional
-    if (data.treeEntries === undefined || data.auditedFiles === undefined || data.resolvedEntries === undefined) {
+    if (data.treeEntries === undefined || !Array.isArray(data.treeEntries)) {
+        return false;
+    }
+    // Backwards compatibility: allow older/third-party files to omit these fields.
+    if (data.auditedFiles === undefined) {
+        data.auditedFiles = [];
+    }
+    if (data.resolvedEntries === undefined) {
+        data.resolvedEntries = [];
+    }
+    if (!Array.isArray(data.auditedFiles) || !Array.isArray(data.resolvedEntries)) {
         return false;
     }
     for (const entry of data.treeEntries.concat(data.resolvedEntries)) {
@@ -137,6 +158,9 @@ export function validateSerializedData(data: SerializedData): boolean {
         }
     }
     if (data.partiallyAuditedFiles) {
+        if (!Array.isArray(data.partiallyAuditedFiles)) {
+            return false;
+        }
         for (const partiallyAuditedFile of data.partiallyAuditedFiles) {
             if (!validatepartiallyAuditedFile(partiallyAuditedFile)) {
                 return false;
@@ -185,19 +209,38 @@ function validateLocation(location: Location): boolean {
 }
 
 function validateEntryDetails(entryDetails: EntryDetails): boolean {
+    const provenanceValid =
+        entryDetails.provenance === undefined ||
+        typeof entryDetails.provenance === "string" ||
+        (typeof entryDetails.provenance === "object" &&
+            entryDetails.provenance !== null &&
+            typeof entryDetails.provenance.source === "string" &&
+            typeof entryDetails.provenance.created === "string" &&
+            (typeof entryDetails.provenance.campaign === "string" || entryDetails.provenance.campaign === null) &&
+            typeof entryDetails.provenance.commitHash === "string");
+    const resolutionValid = entryDetails.resolution === undefined || isEntryResolution(entryDetails.resolution) || entryDetails.resolution === "False Negative";
     return (
         entryDetails.severity !== undefined &&
         entryDetails.difficulty !== undefined &&
         entryDetails.type !== undefined &&
         entryDetails.description !== undefined &&
         entryDetails.exploit !== undefined &&
-        entryDetails.recommendation !== undefined
+        entryDetails.recommendation !== undefined &&
+        provenanceValid &&
+        resolutionValid
     );
 }
 
 // ====================================================================
 
 // The data used to fill the Finding Details panel
+export interface EntryProvenance {
+    source: string;
+    created: string;
+    campaign: string | null;
+    commitHash: string;
+}
+
 export interface EntryDetails {
     severity: FindingSeverity;
     difficulty: FindingDifficulty;
@@ -205,21 +248,46 @@ export interface EntryDetails {
     description: string;
     exploit: string;
     recommendation: string;
+    resolution?: EntryResolution;
+    provenance?: EntryProvenance | string;
 }
 
 /**
  * Creates a default entry details object.
+ * @param commitHash Optional commit hash to attach to the entry details.
  * @returns the default entry details object
  */
-export function createDefaultEntryDetails(): EntryDetails {
+export function createDefaultEntryDetails(commitHash?: string): EntryDetails {
     return {
         severity: FindingSeverity.Undefined,
         difficulty: FindingDifficulty.Undefined,
         type: FindingType.Undefined,
         description: "",
         exploit: "",
-        recommendation: "Short term, \nLong term, \n",
+        recommendation: "Short term,\nLong term,",
+        resolution: EntryResolution.Open,
+        provenance: {
+            source: "human",
+            created: new Date().toISOString(),
+            campaign: null,
+            commitHash: commitHash ?? "",
+        },
     };
+}
+
+/**
+ * Checks whether a value is a valid EntryResolution.
+ * @param value The value to validate.
+ * @returns True if the value is a valid EntryResolution.
+ */
+export function isEntryResolution(value: string | undefined): value is EntryResolution {
+    return (
+        value === EntryResolution.Open ||
+        value === EntryResolution.Resolved ||
+        value === EntryResolution.TruePositive ||
+        value === EntryResolution.FalsePositive ||
+        value === EntryResolution.Unclassified
+    );
 }
 
 /**

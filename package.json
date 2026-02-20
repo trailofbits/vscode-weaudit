@@ -2,7 +2,7 @@
     "name": "weaudit",
     "displayName": "weAudit",
     "description": "Bookmark findings and quickly navigate to areas of interest in the codebase",
-    "version": "1.3.1",
+    "version": "1.3.2",
     "publisher": "trailofbits",
     "author": "Trail of Bits",
     "categories": [],
@@ -55,6 +55,7 @@
                 {
                     "id": "resolvedFindings",
                     "name": "Resolved Findings",
+                    "visibility": "collapsed",
                     "contextualTitle": "weAudit"
                 },
                 {
@@ -65,8 +66,16 @@
                     "contextualTitle": "weAudit"
                 },
                 {
+                    "type": "webview",
+                    "id": "syncConfig",
+                    "name": "Sync Configuration",
+                    "visibility": "collapsed",
+                    "contextualTitle": "weAudit"
+                },
+                {
                     "id": "savedFindings",
                     "name": "weAudit Files",
+                    "visibility": "collapsed",
                     "contextualTitle": "weAudit"
                 }
             ]
@@ -134,8 +143,18 @@
             },
             {
                 "command": "weAudit.resolveFinding",
-                "title": "Resolve Finding",
+                "title": "Resolve Note",
                 "icon": "$(pass)"
+            },
+            {
+                "command": "weAudit.markTruePositive",
+                "title": "Mark True Positive",
+                "icon": "$(check)"
+            },
+            {
+                "command": "weAudit.markFalsePositive",
+                "title": "Mark False Positive",
+                "icon": "$(close)"
             },
             {
                 "command": "weAudit.editEntryTitle",
@@ -155,7 +174,7 @@
             {
                 "command": "weAudit.restoreFinding",
                 "title": "Restore Finding",
-                "icon": "$(check)"
+                "icon": "$(reply)"
             },
             {
                 "command": "weAudit.deleteFinding",
@@ -186,6 +205,16 @@
                 "command": "weAudit.toggleTreeViewMode",
                 "title": "Toggle View Mode",
                 "icon": "$(sort-precedence)"
+            },
+            {
+                "command": "weAudit.enableCurrentCommitFilter",
+                "title": "Show Current Commit Findings",
+                "icon": "$(git-commit)"
+            },
+            {
+                "command": "weAudit.disableCurrentCommitFilter",
+                "title": "Show All Findings",
+                "icon": "$(list-unordered)"
             },
             {
                 "command": "weAudit.toggleAudited",
@@ -240,6 +269,10 @@
             {
                 "command": "weAudit.toggleFindingsHighlighting",
                 "title": "weAudit: Toggle Findings Highlighting"
+            },
+            {
+                "command": "weAudit.syncNow",
+                "title": "weAudit: Sync Findings Now"
             },
             {
                 "command": "weAudit.editFindingBoundary",
@@ -384,6 +417,14 @@
                     "when": "false"
                 },
                 {
+                    "command": "weAudit.markTruePositive",
+                    "when": "false"
+                },
+                {
+                    "command": "weAudit.markFalsePositive",
+                    "when": "false"
+                },
+                {
                     "command": "weAudit.openGithubIssue",
                     "when": "false"
                 },
@@ -472,6 +513,16 @@
                     "group": "navigation@2"
                 },
                 {
+                    "command": "weAudit.enableCurrentCommitFilter",
+                    "when": "view == codeMarker && !weAudit.filterCurrentCommit",
+                    "group": "navigation@3"
+                },
+                {
+                    "command": "weAudit.disableCurrentCommitFilter",
+                    "when": "view == codeMarker && weAudit.filterCurrentCommit",
+                    "group": "navigation@3"
+                },
+                {
                     "command": "weAudit.setupRepositoriesCurrent",
                     "when": "view == gitConfig",
                     "group": "navigation@2"
@@ -489,6 +540,11 @@
                 {
                     "command": "weAudit.prevGitConfig",
                     "when": "view == gitConfig",
+                    "group": "navigation@0"
+                },
+                {
+                    "command": "weAudit.syncNow",
+                    "when": "view == syncConfig",
                     "group": "navigation@0"
                 },
                 {
@@ -520,13 +576,23 @@
                 },
                 {
                     "command": "weAudit.resolveFinding",
-                    "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
+                    "when": "view == codeMarker && viewItem == note",
                     "group": "inline@5"
+                },
+                {
+                    "command": "weAudit.markTruePositive",
+                    "when": "view == codeMarker && viewItem == finding",
+                    "group": "inline@5"
+                },
+                {
+                    "command": "weAudit.markFalsePositive",
+                    "when": "view == codeMarker && viewItem == finding",
+                    "group": "inline@6"
                 },
                 {
                     "command": "weAudit.deleteFinding",
                     "when": "view == codeMarker && viewItem != pathOrganizer && viewItem != additionalLocation",
-                    "group": "inline@6"
+                    "group": "inline@7"
                 },
                 {
                     "command": "weAudit.deleteLocation",
@@ -634,6 +700,63 @@
                         "description": "Background color for other user's notes (write as #RGB, #RGBA, #RRGGBB or #RRGGBBAA)."
                     }
                 }
+            },
+            {
+                "title": "Sync",
+                "order": 3,
+                "properties": {
+                    "weAudit.sync.enabled": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Enable git-based auto sync for .weaudit files."
+                    },
+                    "weAudit.sync.mode": {
+                        "type": "string",
+                        "enum": [
+                            "repo-branch",
+                            "central-repo"
+                        ],
+                        "default": "central-repo",
+                        "description": "Select whether to sync using a repo branch or a centralized sync repository."
+                    },
+                    "weAudit.sync.remoteName": {
+                        "type": "string",
+                        "default": "origin",
+                        "description": "The git remote to use for auto sync."
+                    },
+                    "weAudit.sync.branchName": {
+                        "type": "string",
+                        "default": "weaudit-sync",
+                        "description": "The branch name used for auto sync."
+                    },
+                    "weAudit.sync.centralRepoUrl": {
+                        "type": "string",
+                        "default": "git@github.com:trailofbits/weaudit-data.git",
+                        "description": "The centralized git repository URL used for multi-repo sync."
+                    },
+                    "weAudit.sync.centralBranch": {
+                        "type": "string",
+                        "default": "weaudit-sync",
+                        "description": "The branch name used in the centralized sync repository."
+                    },
+                    "weAudit.sync.repoKeyOverride": {
+                        "type": "string",
+                        "default": "",
+                        "description": "Optional override for the repo key used in centralized sync (applies to all repos)."
+                    },
+                    "weAudit.sync.pollMinutes": {
+                        "type": "number",
+                        "default": 1,
+                        "minimum": 1,
+                        "description": "Polling interval (in minutes) for pulling remote .weaudit changes."
+                    },
+                    "weAudit.sync.debounceMs": {
+                        "type": "number",
+                        "default": 1000,
+                        "minimum": 0,
+                        "description": "Debounce delay (in milliseconds) before syncing local .weaudit changes."
+                    }
+                }
             }
         ]
     },
@@ -642,7 +765,8 @@
         "compile": "node ./esbuild.js",
         "package": "node ./esbuild.js --production",
         "watch": "node ./esbuild.js --watch",
-        "lint": "eslint --ext ts --color -c .eslintrc.cjs src",
+        "lint": "eslint --ext ts --color -c .eslintrc.mjs src",
+        "lint:fix": "eslint --ext ts -c .eslintrc.mjs src --fix",
         "test": "npm run test:unit && npm run test:ext",
         "test:all": "npm run test:unit && npm run test:ext && npm run test:ui",
         "test:unit": "mocha -r ts-node/register/transpile-only \"test/unit/**/*.test.ts\" \"test/webview/**/*.test.ts\"",
@@ -652,7 +776,6 @@
         "test:ui": "extest setup-and-run './out/test/ui/**/*.test.js' --code_version max --storage .test-extensions --extensions_dir .test-extensions/extensions --mocha_config test/ui/.mocharc.json -- --disable-extensions",
         "test:ui-setup": "extest setup-tests --code_version max --storage .test-extensions --extensions_dir .test-extensions/extensions",
         "coverage": "nyc npm run test:unit",
-        "lint:fix": "eslint --ext ts -c .eslintrc.cjs src --fix",
         "format": "biome format --write .",
         "format:check": "biome check --formatter-enabled=true --linter-enabled=false .",
         "typecheck": "tsc --noEmit"

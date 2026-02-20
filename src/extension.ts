@@ -6,6 +6,11 @@ import { AuditMarker } from "./codeMarker";
 import { MultipleSavedFindings } from "./multiConfigs";
 import { activateFindingDetailsWebview } from "./panels/findingDetailsPanel";
 import { activateGitConfigWebview } from "./panels/gitConfigPanel";
+import { activateSyncConfigWebview } from "./panels/syncConfigPanel";
+import { GitAutoSyncManager } from "./sync/gitAutoSync";
+
+const SHUTDOWN_FLUSH_TIMEOUT_MS = 3000;
+let gitAutoSyncManager: GitAutoSyncManager | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
     // if there are no open folders, return
@@ -23,6 +28,22 @@ export function activate(context: vscode.ExtensionContext): void {
     new MultipleSavedFindings(context);
     activateFindingDetailsWebview(context);
     activateGitConfigWebview(context);
+    activateSyncConfigWebview(context);
+    gitAutoSyncManager = new GitAutoSyncManager(context);
+    context.subscriptions.push(gitAutoSyncManager);
+}
+
+/**
+ * Best-effort deactivation hook that flushes pending sync work before teardown.
+ */
+export async function deactivate(): Promise<void> {
+    if (!gitAutoSyncManager) {
+        return;
+    }
+
+    await gitAutoSyncManager.flushOnShutdown(SHUTDOWN_FLUSH_TIMEOUT_MS);
+    gitAutoSyncManager.dispose();
+    gitAutoSyncManager = undefined;
 }
 
 async function openResource(resource: vscode.Uri, startLine: number, endLine: number): Promise<void> {
