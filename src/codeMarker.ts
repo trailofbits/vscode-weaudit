@@ -2973,9 +2973,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             for (const root of this.workspaces.getRoots()) {
                 if (root !== wsRoot && root.gitRemote === wsRoot.gitRemote && root.codeQualityIssueNumber !== undefined) {
                     wsRoot.codeQualityIssueNumber = root.codeQualityIssueNumber;
-                    void wsRoot.updateSavedData(
-                        vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username,
-                    );
+                    void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
                     break;
                 }
             }
@@ -2983,10 +2981,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // If no CQ issue number is set, prompt the user
         if (wsRoot.codeQualityIssueNumber === undefined) {
-            const choice = await vscode.window.showQuickPick(
-                ["Enter existing issue number", "Create a new issue"],
-                { placeHolder: "No Code Quality issue configured. How would you like to proceed?" },
-            );
+            const choice = await vscode.window.showQuickPick(["Enter existing issue number", "Create a new issue"], {
+                placeHolder: "No Code Quality issue configured. How would you like to proceed?",
+            });
 
             if (choice === undefined) {
                 return;
@@ -3036,9 +3033,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     return;
                 }
                 wsRoot.codeQualityIssueNumber = Number(issueNumberStr);
-                void wsRoot.updateSavedData(
-                    vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username,
-                );
+                void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
                 // Fall through to the clipboard+comment flow for this first finding
             }
 
@@ -3058,9 +3053,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 return;
             }
             wsRoot.codeQualityIssueNumber = Number(issueNumberStr);
-            void wsRoot.updateSavedData(
-                vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username,
-            );
+            void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
         }
 
         const skipConfirmation: boolean = vscode.workspace.getConfiguration("weAudit").get("general.skipCodeQualityConfirmation", false);
@@ -3132,9 +3125,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         wsRoot.codeQualityIssueNumber = issueNumberStr === "" ? undefined : Number(issueNumberStr);
-        void wsRoot.updateSavedData(
-            vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username,
-        );
+        void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
 
         if (wsRoot.codeQualityIssueNumber !== undefined) {
             vscode.window.showInformationMessage(`Code Quality issue number set to #${wsRoot.codeQualityIssueNumber}.`);
