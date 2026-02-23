@@ -79,6 +79,12 @@ export enum FindingType {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
+/**
+ * Checks whether a value belongs to a string enum, logging a warning if it does not.
+ * @param enumObj The enum object to validate against.
+ * @param value The string value to check.
+ * @returns True if the value is a member of the enum.
+ */
 export function isEnumValue<T extends Record<string, string>>(enumObj: T, value: string): value is T[keyof T] {
     const valid = Object.values(enumObj).includes(value);
     if (!valid) {
@@ -132,6 +138,12 @@ export function createDefaultSerializedData(): SerializedData {
     };
 }
 
+/**
+ * Validates a serialized data object, ensuring all required fields are present
+ * and well-formed. Applies backwards-compatible defaults for optional fields.
+ * @param data The serialized data to validate (may be mutated to fill defaults).
+ * @returns True if the data is valid.
+ */
 export function validateSerializedData(data: SerializedData): boolean {
     // ignore clientRemote, gitRemote and gitSha as these are optional
     if (data.treeEntries === undefined || !Array.isArray(data.treeEntries)) {
@@ -170,6 +182,11 @@ export function validateSerializedData(data: SerializedData): boolean {
     return true;
 }
 
+/**
+ * Validates that an entry has all required fields and valid locations/details.
+ * @param entry The entry to validate.
+ * @returns True if the entry is valid.
+ */
 function validateEntry(entry: Entry): boolean {
     if (
         entry.label === undefined ||
@@ -196,18 +213,38 @@ function validateEntry(entry: Entry): boolean {
     return true;
 }
 
+/**
+ * Validates that an audited file has the required path and author fields.
+ * @param auditedFile The audited file to validate.
+ * @returns True if the audited file is valid.
+ */
 function validateAuditedFile(auditedFile: AuditedFile): boolean {
     return auditedFile.path !== undefined && auditedFile.author !== undefined;
 }
 
+/**
+ * Validates that a partially audited file has the required fields including line range.
+ * @param partiallyAuditedFile The partially audited file to validate.
+ * @returns True if the partially audited file is valid.
+ */
 function validatepartiallyAuditedFile(partiallyAuditedFile: PartiallyAuditedFile): boolean {
     return validateAuditedFile(partiallyAuditedFile) && partiallyAuditedFile.startLine !== undefined && partiallyAuditedFile.endLine !== undefined;
 }
 
+/**
+ * Validates that a location has all required fields (path, startLine, endLine, label).
+ * @param location The location to validate.
+ * @returns True if the location is valid.
+ */
 function validateLocation(location: Location): boolean {
     return location.path !== undefined && location.startLine !== undefined && location.endLine !== undefined && location.label !== undefined;
 }
 
+/**
+ * Validates that entry details have all required fields and valid provenance/resolution.
+ * @param entryDetails The entry details to validate.
+ * @returns True if the entry details are valid.
+ */
 function validateEntryDetails(entryDetails: EntryDetails): boolean {
     const provenanceValid =
         entryDetails.provenance === undefined ||
@@ -233,7 +270,9 @@ function validateEntryDetails(entryDetails: EntryDetails): boolean {
 
 // ====================================================================
 
-// The data used to fill the Finding Details panel
+/**
+ * Tracks the origin of an entry, including how and when it was created.
+ */
 export interface EntryProvenance {
     source: string;
     created: string;
@@ -241,6 +280,9 @@ export interface EntryProvenance {
     commitHash: string;
 }
 
+/**
+ * The metadata associated with a finding or note entry, displayed in the Finding Details panel.
+ */
 export interface EntryDetails {
     severity: FindingSeverity;
     difficulty: FindingDifficulty;
@@ -452,6 +494,12 @@ export function getEntryIndexFromArray(entry: Entry, array: Entry[]): number {
     return -1;
 }
 
+/**
+ * Merges two arrays of entries, removing duplicates based on entryEquals.
+ * @param a The first array.
+ * @param b The second array.
+ * @returns The merged array without duplicates.
+ */
 export function mergeTwoEntryArrays(a: Entry[], b: Entry[]): Entry[] {
     // merge two arrays of entries
     // without duplicates
@@ -541,11 +589,17 @@ export function mergeTwoPartiallyAuditedFileArrays(a: PartiallyAuditedFile[], b:
     return result;
 }
 
+/**
+ * Represents a file that has been fully audited by a user.
+ */
 export interface AuditedFile {
     path: string;
     author: string;
 }
 
+/**
+ * Represents a file that has been partially audited, covering a specific line range.
+ */
 export interface PartiallyAuditedFile {
     path: string;
     author: string;
@@ -553,6 +607,9 @@ export interface PartiallyAuditedFile {
     endLine: number;
 }
 
+/**
+ * Controls how findings are organized in the tree view.
+ */
 export enum TreeViewMode {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     List,
@@ -591,10 +648,12 @@ export function isLocationEntry(treeEntry: TreeEntry): treeEntry is FullLocation
     return (treeEntry as FullLocationEntry).parentEntry !== undefined;
 }
 
+/** Type predicate that checks if a tree entry is a PathOrganizerEntry. */
 export function isPathOrganizerEntry(treeEntry: TreeEntry): treeEntry is PathOrganizerEntry {
     return (treeEntry as PathOrganizerEntry).pathLabel !== undefined;
 }
 
+/** Type predicate that checks if a tree entry is a FullEntry (finding or note). */
 export function isEntry(treeEntry: TreeEntry): treeEntry is FullEntry {
     return (treeEntry as FullEntry).entryType !== undefined;
 }
@@ -606,26 +665,41 @@ export function isOldEntry(entry: Entry | FullEntry | FullLocationEntry): entry 
     return (entry as FullEntry).locations[0]?.rootPath === undefined && (entry as FullLocationEntry).location?.rootPath === undefined;
 }
 
+/**
+ * Represents a saved configuration file entry in the multi-config tree.
+ */
 export interface ConfigurationEntry {
     path: string;
     username: string;
     root: WorkspaceRootEntry;
 }
 
+/**
+ * Represents a workspace root node in the multi-config tree.
+ */
 export interface WorkspaceRootEntry {
     label: string;
 }
 
+/** Union type for entries displayed in the multi-config tree view. */
 export type ConfigTreeEntry = ConfigurationEntry | WorkspaceRootEntry;
 
+/** Type predicate that checks if a config tree entry is a ConfigurationEntry. */
 export function isConfigurationEntry(treeEntry: ConfigTreeEntry): treeEntry is ConfigurationEntry {
     return (treeEntry as ConfigurationEntry).username !== undefined;
 }
 
+/** Type predicate that checks if a config tree entry is a WorkspaceRootEntry. */
 export function isWorkspaceRootEntry(treeEntry: ConfigTreeEntry): treeEntry is WorkspaceRootEntry {
     return (treeEntry as WorkspaceRootEntry).label !== undefined;
 }
 
+/**
+ * Checks if two configuration entries are equal by comparing path, username, and root label.
+ * @param a The first configuration entry.
+ * @param b The second configuration entry.
+ * @returns True if the entries are equal.
+ */
 export function configEntryEquals(a: ConfigurationEntry, b: ConfigurationEntry): boolean {
     return a.path === b.path && a.username === b.username && a.root.label === b.root.label;
 }
