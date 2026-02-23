@@ -6,6 +6,10 @@ import { WebviewMessage, UpdateRepositoryMessage, SetWorkspaceRootsMessage } fro
 import { RootPathAndLabel } from "../types";
 import htmlBody from "./gitConfig.html";
 
+/**
+ * Registers the git configuration webview view provider.
+ * @param context The extension context for provider registration and subscriptions.
+ */
 export function activateGitConfigWebview(context: vscode.ExtensionContext): void {
     const provider = new GitConfigProvider(context.extensionUri);
 
@@ -78,6 +82,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
         });
     }
 
+    /** Initializes the webview with HTML content and registers the message listener. */
     public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken): void {
         this._view = webviewView;
 

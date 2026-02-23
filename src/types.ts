@@ -79,6 +79,13 @@ export enum FindingType {
 }
 /* eslint-enable @typescript-eslint/naming-convention */
 
+/**
+ * Checks whether a string value is a valid member of a given string enum.
+ * Logs a warning to the console if the value is invalid.
+ * @param enumObj The enum object to validate against.
+ * @param value The string value to check.
+ * @returns True if the value belongs to the enum.
+ */
 export function isEnumValue<T extends Record<string, string>>(enumObj: T, value: string): value is T[keyof T] {
     const valid = Object.values(enumObj).includes(value);
     if (!valid) {
@@ -132,6 +139,12 @@ export function createDefaultSerializedData(): SerializedData {
     };
 }
 
+/**
+ * Validates that a deserialized data object has the expected shape and required fields.
+ * Applies backwards-compatible defaults for optional fields that may be absent in older files.
+ * @param data The serialized data to validate.
+ * @returns True if the data is structurally valid.
+ */
 export function validateSerializedData(data: SerializedData): boolean {
     // ignore clientRemote, gitRemote and gitSha as these are optional
     if (data.treeEntries === undefined || !Array.isArray(data.treeEntries)) {
@@ -233,7 +246,9 @@ function validateEntryDetails(entryDetails: EntryDetails): boolean {
 
 // ====================================================================
 
-// The data used to fill the Finding Details panel
+/**
+ * Provenance metadata describing when and how an entry was created.
+ */
 export interface EntryProvenance {
     source: string;
     created: string;
@@ -241,6 +256,9 @@ export interface EntryProvenance {
     commitHash: string;
 }
 
+/**
+ * Detailed metadata for an audit finding or note, displayed in the Finding Details panel.
+ */
 export interface EntryDetails {
     severity: FindingSeverity;
     difficulty: FindingDifficulty;
@@ -452,6 +470,12 @@ export function getEntryIndexFromArray(entry: Entry, array: Entry[]): number {
     return -1;
 }
 
+/**
+ * Merges two arrays of entries, removing duplicates based on {@link entryEquals}.
+ * @param a The first array.
+ * @param b The second array.
+ * @returns A new array containing all unique entries from both arrays.
+ */
 export function mergeTwoEntryArrays(a: Entry[], b: Entry[]): Entry[] {
     // merge two arrays of entries
     // without duplicates
@@ -541,11 +565,17 @@ export function mergeTwoPartiallyAuditedFileArrays(a: PartiallyAuditedFile[], b:
     return result;
 }
 
+/**
+ * A file that has been fully marked as reviewed.
+ */
 export interface AuditedFile {
     path: string;
     author: string;
 }
 
+/**
+ * A file region (line range) that has been marked as partially reviewed.
+ */
 export interface PartiallyAuditedFile {
     path: string;
     author: string;
@@ -553,6 +583,9 @@ export interface PartiallyAuditedFile {
     endLine: number;
 }
 
+/**
+ * Controls how the findings tree view organizes its entries.
+ */
 export enum TreeViewMode {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     List,
@@ -591,10 +624,12 @@ export function isLocationEntry(treeEntry: TreeEntry): treeEntry is FullLocation
     return (treeEntry as FullLocationEntry).parentEntry !== undefined;
 }
 
+/** Type predicate that narrows a {@link TreeEntry} to a {@link PathOrganizerEntry}. */
 export function isPathOrganizerEntry(treeEntry: TreeEntry): treeEntry is PathOrganizerEntry {
     return (treeEntry as PathOrganizerEntry).pathLabel !== undefined;
 }
 
+/** Type predicate that narrows a {@link TreeEntry} to a {@link FullEntry}. */
 export function isEntry(treeEntry: TreeEntry): treeEntry is FullEntry {
     return (treeEntry as FullEntry).entryType !== undefined;
 }
@@ -606,26 +641,41 @@ export function isOldEntry(entry: Entry | FullEntry | FullLocationEntry): entry 
     return (entry as FullEntry).locations[0]?.rootPath === undefined && (entry as FullLocationEntry).location?.rootPath === undefined;
 }
 
+/**
+ * Represents a saved findings configuration file associated with a workspace root.
+ */
 export interface ConfigurationEntry {
     path: string;
     username: string;
     root: WorkspaceRootEntry;
 }
 
+/**
+ * Represents a workspace root node in the saved-findings tree.
+ */
 export interface WorkspaceRootEntry {
     label: string;
 }
 
+/** Union type for nodes in the saved-findings configuration tree. */
 export type ConfigTreeEntry = ConfigurationEntry | WorkspaceRootEntry;
 
+/** Type predicate that narrows a {@link ConfigTreeEntry} to a {@link ConfigurationEntry}. */
 export function isConfigurationEntry(treeEntry: ConfigTreeEntry): treeEntry is ConfigurationEntry {
     return (treeEntry as ConfigurationEntry).username !== undefined;
 }
 
+/** Type predicate that narrows a {@link ConfigTreeEntry} to a {@link WorkspaceRootEntry}. */
 export function isWorkspaceRootEntry(treeEntry: ConfigTreeEntry): treeEntry is WorkspaceRootEntry {
     return (treeEntry as WorkspaceRootEntry).label !== undefined;
 }
 
+/**
+ * Checks whether two configuration entries refer to the same saved-findings file.
+ * @param a The first configuration entry.
+ * @param b The second configuration entry.
+ * @returns True if path, username, and root label all match.
+ */
 export function configEntryEquals(a: ConfigurationEntry, b: ConfigurationEntry): boolean {
     return a.path === b.path && a.username === b.username && a.root.label === b.root.label;
 }

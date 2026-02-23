@@ -429,6 +429,11 @@ export class GitAutoSyncManager implements vscode.Disposable {
     private readonly disposables: vscode.Disposable[] = [];
     private disposed = false;
 
+    /**
+     * Creates the sync manager, registers the sync-now command, and starts watching
+     * for workspace folder and configuration changes.
+     * @param context The extension context for subscriptions and workspace state.
+     */
     constructor(private readonly context: vscode.ExtensionContext) {
         this.outputChannel = vscode.window.createOutputChannel("weAudit Sync");
         this.disposables.push(this.outputChannel);

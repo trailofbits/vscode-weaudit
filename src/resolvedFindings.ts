@@ -71,26 +71,38 @@ function getSeverityColor(severity: FindingSeverity | undefined): vscode.ThemeCo
     }
 }
 
+/**
+ * Tree data provider for the resolved findings view, displaying entries that have
+ * been marked as true positive, false positive, or resolved.
+ */
 export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
     private resolvedEntries: FullEntry[];
 
     private _onDidChangeTreeDataEmitter = new vscode.EventEmitter<FullEntry | undefined | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeDataEmitter.event;
 
+    /** Fires a tree-data-changed event to refresh the resolved findings view. */
     refresh(): void {
         this._onDidChangeTreeDataEmitter.fire();
     }
 
+    /**
+     * @param resolvedEntries The initial list of resolved entries to display.
+     */
     constructor(resolvedEntries: FullEntry[]) {
         this.resolvedEntries = resolvedEntries;
     }
 
+    /**
+     * Replaces the resolved entries list and refreshes the view.
+     * @param entries The new set of resolved entries.
+     */
     setResolvedEntries(entries: FullEntry[]): void {
         this.resolvedEntries = entries;
         this.refresh();
     }
 
-    // tree data provider
+    /** Returns the resolved entries at the tree root, or an empty array for child elements. */
     getChildren(element?: FullEntry): FullEntry[] {
         if (element === undefined) {
             return this.resolvedEntries;
@@ -98,10 +110,15 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
         return [];
     }
 
+    /** Returns undefined since the resolved entries tree is flat. */
     getParent(_element: FullEntry): undefined {
         return undefined;
     }
 
+    /**
+     * Builds a tree item for a resolved entry, including resolution badge and severity icon.
+     * @param entry The resolved entry to render.
+     */
     getTreeItem(entry: FullEntry): vscode.TreeItem {
         const resolutionEmoji = getResolutionEmoji(entry);
         const label = resolutionEmoji ? `${resolutionEmoji} ${entry.label}` : entry.label;
@@ -131,9 +148,17 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
     }
 }
 
+/**
+ * Manages the resolved findings tree view lifecycle, including creation and refresh.
+ */
 export class ResolvedEntries {
     private treeDataProvider: ResolvedEntriesTree;
 
+    /**
+     * Creates the resolved entries tree view and registers it with the extension context.
+     * @param context The extension context for subscriptions.
+     * @param resolvedEntries The initial set of resolved entries.
+     */
     constructor(context: vscode.ExtensionContext, resolvedEntries: FullEntry[]) {
         this.treeDataProvider = new ResolvedEntriesTree(resolvedEntries);
 
@@ -143,10 +168,15 @@ export class ResolvedEntries {
         context.subscriptions.push(treeView);
     }
 
+    /** Refreshes the resolved findings tree view. */
     public refresh(): void {
         this.treeDataProvider.refresh();
     }
 
+    /**
+     * Replaces the resolved entries and refreshes the tree view.
+     * @param entries The new set of resolved entries.
+     */
     public setResolvedEntries(entries: FullEntry[]): void {
         this.treeDataProvider.setResolvedEntries(entries);
         this.refresh();

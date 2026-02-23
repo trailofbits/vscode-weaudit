@@ -50,6 +50,7 @@ class SyncConfigProvider implements vscode.WebviewViewProvider {
         );
     }
 
+    /** Initializes the webview with HTML content and registers the message listener. */
     public resolveWebviewView(webviewView: vscode.WebviewView): void {
         this._view = webviewView;
 
