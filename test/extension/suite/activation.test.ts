@@ -66,6 +66,8 @@ suite("Extension Activation", () => {
             // Git config commands
             "weAudit.editClientRemote",
             "weAudit.editAuditRemote",
+            // Code Quality commands
+            "weAudit.editCodeQualityIssueNumber",
             // Multi-root workspace commands
             "weAudit.nextGitConfig",
             "weAudit.prevGitConfig",

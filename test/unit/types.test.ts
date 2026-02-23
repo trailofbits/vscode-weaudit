@@ -20,6 +20,7 @@ import {
     entryEquals,
     isConfigurationEntry,
     isEntry,
+    isEnumValue,
     isLocationEntry,
     isPathOrganizerEntry,
     isWorkspaceRootEntry,
@@ -624,6 +625,92 @@ describe("types.ts", () => {
                 root: { label: "root2" },
             };
             assert.strictEqual(configEntryEquals(a, b), false);
+        });
+    });
+
+    describe("FindingType.CodeQuality", () => {
+        it("should have CodeQuality enum value", () => {
+            assert.strictEqual(FindingType.CodeQuality, "Code Quality");
+        });
+
+        it("should be accepted by isEnumValue", () => {
+            assert.strictEqual(isEnumValue(FindingType, "Code Quality"), true);
+        });
+
+        it("should reject invalid finding type values", () => {
+            assert.strictEqual(isEnumValue(FindingType, "Not A Real Type"), false);
+        });
+
+        it("should allow creating entry details with CodeQuality type", () => {
+            const details = createDefaultEntryDetails();
+            details.type = FindingType.CodeQuality;
+            assert.strictEqual(details.type, "Code Quality");
+        });
+    });
+
+    describe("codeQualityIssueNumber in SerializedData", () => {
+        function createValidEntry(): Entry {
+            return {
+                label: "Test Finding",
+                entryType: EntryType.Finding,
+                author: "testuser",
+                details: {
+                    severity: FindingSeverity.High,
+                    difficulty: FindingDifficulty.Low,
+                    type: FindingType.CodeQuality,
+                    description: "Test description",
+                    exploit: "",
+                    recommendation: "",
+                },
+                locations: [
+                    {
+                        path: "src/test.ts",
+                        startLine: 1,
+                        endLine: 10,
+                        label: "Location 1",
+                        description: "",
+                    },
+                ],
+            };
+        }
+
+        it("should validate serialized data with codeQualityIssueNumber", () => {
+            const data: SerializedData = {
+                ...createDefaultSerializedData(),
+                treeEntries: [createValidEntry()],
+                codeQualityIssueNumber: 42,
+            };
+            assert.strictEqual(validateSerializedData(data), true);
+        });
+
+        it("should validate serialized data without codeQualityIssueNumber (backwards compatibility)", () => {
+            const data: SerializedData = createDefaultSerializedData();
+            assert.strictEqual(data.codeQualityIssueNumber, undefined);
+            assert.strictEqual(validateSerializedData(data), true);
+        });
+
+        it("should preserve codeQualityIssueNumber through JSON round-trip", () => {
+            const data: SerializedData = {
+                ...createDefaultSerializedData(),
+                codeQualityIssueNumber: 123,
+            };
+            const json = JSON.stringify(data);
+            const parsed = JSON.parse(json) as SerializedData;
+            assert.strictEqual(parsed.codeQualityIssueNumber, 123);
+        });
+
+        it("should have undefined codeQualityIssueNumber when not in JSON", () => {
+            const json = JSON.stringify({
+                clientRemote: "",
+                gitRemote: "",
+                gitSha: "",
+                treeEntries: [],
+                auditedFiles: [],
+                partiallyAuditedFiles: [],
+                resolvedEntries: [],
+            });
+            const parsed = JSON.parse(json) as SerializedData;
+            assert.strictEqual(parsed.codeQualityIssueNumber, undefined);
         });
     });
 });

@@ -28,6 +28,9 @@ function main(): void {
     const commitHash = document.getElementById("commit-hash") as TextField;
     commitHash?.addEventListener("change", handleFieldChange);
 
+    const cqIssueNumber = document.getElementById("cq-issue-number") as TextField;
+    cqIssueNumber?.addEventListener("change", handleFieldChange);
+
     // handle the message inside the webview
     window.addEventListener("message", (event) => {
         const message = event.data;
@@ -39,6 +42,7 @@ function main(): void {
                 clientURL.value = message.clientURL;
                 auditURL.value = message.auditURL;
                 commitHash.value = message.commitHash;
+                cqIssueNumber.value = message.cqIssueNumber ?? "";
                 break;
 
             case "set-workspace-roots":
@@ -67,6 +71,7 @@ function handleFieldChange(_e: Event): void {
     const clientURL = document.getElementById("client-url") as TextField;
     const auditURL = document.getElementById("audit-url") as TextField;
     const commitHash = document.getElementById("commit-hash") as TextField;
+    const cqIssueNumber = document.getElementById("cq-issue-number") as TextField;
     const rootDropdown = document.getElementById("workspace-root-list-dropdown") as Dropdown;
 
     const message: UpdateRepositoryMessage = {
@@ -75,6 +80,7 @@ function handleFieldChange(_e: Event): void {
         clientURL: clientURL.value,
         auditURL: auditURL.value,
         commitHash: commitHash.value,
+        cqIssueNumber: cqIssueNumber.value,
     };
     vscode.postMessage(message);
 }

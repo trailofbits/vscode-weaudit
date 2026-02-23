@@ -31,7 +31,10 @@ function main(): void {
     difficultyDropdown?.addEventListener("change", handlePersistentFieldChange);
 
     const typeDropdown = document.getElementById("type-dropdown") as Dropdown;
-    typeDropdown?.addEventListener("change", handlePersistentFieldChange);
+    typeDropdown?.addEventListener("change", (e: Event) => {
+        handlePersistentFieldChange(e);
+        updateFieldVisibility(typeDropdown.value);
+    });
 
     // for the text areas, we listen to to both the change and input events
     // on change events we persist the data into disk
@@ -71,6 +74,7 @@ function main(): void {
                 descriptionArea.value = message.description;
                 exploitArea.value = message.exploit;
                 recommendationArea.value = message.recommendation;
+                updateFieldVisibility(message.type as string);
                 break;
 
             case "hide-finding-details":
@@ -100,4 +104,22 @@ function handleFieldChange(e: Event, isPersistent: boolean): void {
         isPersistent: isPersistent,
     };
     vscode.postMessage(message);
+}
+
+const CODE_QUALITY_TYPE = "Code Quality";
+
+/**
+ * Shows or hides detail fields based on whether the finding type is "Code Quality".
+ * Code Quality findings only show title, type, and description.
+ */
+function updateFieldVisibility(type: string): void {
+    const isCodeQuality = type === CODE_QUALITY_TYPE;
+    const hiddenIds = ["severity-dropdown", "difficulty-dropdown", "exploit-area", "recommendation-area"];
+    for (const id of hiddenIds) {
+        const element = document.getElementById(id);
+        const parentDiv = element?.parentElement;
+        if (parentDiv) {
+            parentDiv.style.display = isCodeQuality ? "none" : "";
+        }
+    }
 }

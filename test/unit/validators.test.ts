@@ -461,4 +461,36 @@ describe("validateSerializedData", () => {
             expect(validateSerializedData(data)).to.equal(false);
         });
     });
+
+    describe("Code Quality finding type", () => {
+        it("accepts entry with FindingType.CodeQuality", () => {
+            const data = createDefaultSerializedData();
+            const entry = createValidEntry();
+            entry.details.type = FindingType.CodeQuality;
+            data.treeEntries = [entry];
+            expect(validateSerializedData(data)).to.equal(true);
+        });
+
+        it("accepts data with codeQualityIssueNumber field", () => {
+            const data: any = {
+                ...createValidSerializedData(),
+                codeQualityIssueNumber: 42,
+            };
+            expect(validateSerializedData(data)).to.equal(true);
+        });
+
+        it("accepts data without codeQualityIssueNumber (backwards compatibility)", () => {
+            const data = createValidSerializedData();
+            expect(data.codeQualityIssueNumber).to.be.undefined;
+            expect(validateSerializedData(data)).to.equal(true);
+        });
+
+        it("accepts Code Quality entry in resolvedEntries", () => {
+            const data = createDefaultSerializedData();
+            const entry = createValidEntry();
+            entry.details.type = FindingType.CodeQuality;
+            data.resolvedEntries = [entry];
+            expect(validateSerializedData(data)).to.equal(true);
+        });
+    });
 });

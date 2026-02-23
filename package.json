@@ -272,6 +272,10 @@
             {
                 "command": "weAudit.boundaryMoveDown",
                 "title": "weAudit: Move Finding Down"
+            },
+            {
+                "command": "weAudit.editCodeQualityIssueNumber",
+                "title": "weAudit: Set Code Quality Issue Number"
             }
         ],
         "keybindings": [
@@ -601,6 +605,11 @@
                         "type": "boolean",
                         "default": false,
                         "description": "Sort findings and notes alphabetically by name in the tree view."
+                    },
+                    "weAudit.general.skipCodeQualityConfirmation": {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Skip the confirmation dialog when opening a Code Quality comment. The comment will be copied to clipboard and the issue opened immediately."
                     }
                 }
             },

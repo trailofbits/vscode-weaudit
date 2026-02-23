@@ -64,6 +64,7 @@ export enum FindingType {
     Testing = "Testing",
     Timing = "Timing",
     UndefinedBehavior = "Undefined Behavior",
+    CodeQuality = "Code Quality",
     Undefined = "",
 }
 /* eslint-enable @typescript-eslint/naming-convention */
@@ -89,6 +90,8 @@ export interface SerializedData {
     // older versions do not have partiallyAuditedFiles
     partiallyAuditedFiles?: PartiallyAuditedFile[];
     resolvedEntries: Entry[];
+    // optional code quality issue number for the workspace root
+    codeQualityIssueNumber?: number;
 }
 
 /**
@@ -104,6 +107,8 @@ export interface FullSerializedData {
     // older versions do not have partiallyAuditedFiles
     partiallyAuditedFiles?: PartiallyAuditedFile[];
     resolvedEntries: FullEntry[];
+    // optional code quality issue number for the workspace root
+    codeQualityIssueNumber?: number;
 }
 
 /**
