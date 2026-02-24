@@ -13,6 +13,7 @@ export interface UpdateRepositoryMessage {
     clientURL: string;
     auditURL: string;
     commitHash: string;
+    cqIssueNumber: string;
 }
 
 export interface ChooseWorkspaceRootMessage {

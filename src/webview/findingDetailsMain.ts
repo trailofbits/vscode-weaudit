@@ -25,7 +25,10 @@ function main(): void {
     titleField?.addEventListener("change", handlePersistentFieldChange);
 
     const severityDropdown = document.getElementById("severity-dropdown") as Dropdown;
-    severityDropdown?.addEventListener("change", handlePersistentFieldChange);
+    severityDropdown?.addEventListener("change", (e: Event) => {
+        handlePersistentFieldChange(e);
+        updateFieldVisibility(severityDropdown.value);
+    });
 
     const difficultyDropdown = document.getElementById("difficulty-dropdown") as Dropdown;
     difficultyDropdown?.addEventListener("change", handlePersistentFieldChange);
@@ -71,6 +74,7 @@ function main(): void {
                 descriptionArea.value = message.description;
                 exploitArea.value = message.exploit;
                 recommendationArea.value = message.recommendation;
+                updateFieldVisibility(message.severity as string);
                 break;
 
             case "hide-finding-details":
@@ -100,4 +104,22 @@ function handleFieldChange(e: Event, isPersistent: boolean): void {
         isPersistent: isPersistent,
     };
     vscode.postMessage(message);
+}
+
+const CODE_QUALITY_SEVERITY = "Code Quality";
+
+/**
+ * Shows or hides detail fields based on whether the finding severity is "Code Quality".
+ * Code Quality findings only show title, severity, and description.
+ */
+function updateFieldVisibility(severity: string): void {
+    const isCodeQuality = severity === CODE_QUALITY_SEVERITY;
+    const hiddenIds = ["difficulty-dropdown", "type-dropdown", "exploit-area", "recommendation-area"];
+    for (const id of hiddenIds) {
+        const element = document.getElementById(id);
+        const parentDiv = element?.parentElement;
+        if (parentDiv) {
+            parentDiv.style.display = isCodeQuality ? "none" : "";
+        }
+    }
 }

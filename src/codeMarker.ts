@@ -75,6 +75,9 @@ class WARoot {
     // markedFilesDayLog contains a map associating a string representing a date to a file path.
     public markedFilesDayLog: Map<string, string[]>;
 
+    /** The GitHub issue number designated for Code Quality comments in this workspace root. */
+    public codeQualityIssueNumber: number | undefined;
+
     // firstTimeRequestingClientRemote is used to prevent repeatedly asking for the client remote
     private firstTimeRequestingClientRemote = true;
 
@@ -892,6 +895,9 @@ class WARoot {
             if (parsedEntries.gitSha !== undefined) {
                 this.gitSha = parsedEntries.gitSha;
             }
+            if (parsedEntries.codeQualityIssueNumber !== undefined) {
+                this.codeQualityIssueNumber = parsedEntries.codeQualityIssueNumber;
+            }
         }
 
         for (const entry of parsedEntries.treeEntries) {
@@ -1026,19 +1032,19 @@ class WARoot {
         // this means we are deleting the last element
         if (toCreateData || existsFile) {
             // save findings to file
-            const data = JSON.stringify(
-                {
-                    clientRemote: this.clientRemote,
-                    gitRemote: this.gitRemote,
-                    gitSha: this.gitSha,
-                    treeEntries: reducedEntries,
-                    auditedFiles: filteredAuditedFiles,
-                    partiallyAuditedFiles: filteredPartiallyAuditedEntries,
-                    resolvedEntries: reducedResolvedEntries,
-                },
-                null,
-                2,
-            );
+            const serializedObj: Record<string, unknown> = {
+                clientRemote: this.clientRemote,
+                gitRemote: this.gitRemote,
+                gitSha: this.gitSha,
+                treeEntries: reducedEntries,
+                auditedFiles: filteredAuditedFiles,
+                partiallyAuditedFiles: filteredPartiallyAuditedEntries,
+                resolvedEntries: reducedResolvedEntries,
+            };
+            if (this.codeQualityIssueNumber !== undefined) {
+                serializedObj.codeQualityIssueNumber = this.codeQualityIssueNumber;
+            }
+            const data = JSON.stringify(serializedObj, null, 2);
 
             fs.writeFileSync(fileName, data, { flag: "w+" });
         }
@@ -1049,11 +1055,17 @@ class WARoot {
      * @param clientRemote The client remote to be configured.
      * @param auditRemote The audit remote to be configured.
      * @param gitSha The git SHA digest to be configured.
+     * @param cqIssueNumber The Code Quality issue number (as string), or empty to clear.
      */
-    updateGitConfig(clientRemote: string, auditRemote: string, gitSha: string): void {
+    updateGitConfig(clientRemote: string, auditRemote: string, gitSha: string, cqIssueNumber?: string): void {
         this.clientRemote = clientRemote;
         this.gitRemote = auditRemote;
         this.gitSha = gitSha;
+
+        if (cqIssueNumber !== undefined) {
+            const parsed = Number(cqIssueNumber);
+            this.codeQualityIssueNumber = cqIssueNumber !== "" && Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+        }
 
         // persist the data
         void this.updateSavedData(this.username);
@@ -1355,12 +1367,12 @@ class MultiRootManager {
      * @param auditRemote The audit remote to be configured.
      * @param gitSha the git SHA to be configured.
      */
-    updateGitConfig(rootPath: string, clientRemote: string, auditRemote: string, gitSha: string): void {
+    updateGitConfig(rootPath: string, clientRemote: string, auditRemote: string, gitSha: string, cqIssueNumber?: string): void {
         const [wsRoot, _relativePath] = this.getCorrespondingRootAndPath(rootPath);
         if (wsRoot === undefined) {
             return;
         }
-        return wsRoot.updateGitConfig(clientRemote, auditRemote, gitSha);
+        return wsRoot.updateGitConfig(clientRemote, auditRemote, gitSha, cqIssueNumber);
     }
 
     /**
@@ -1681,6 +1693,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     wsRoot.clientRemote,
                     wsRoot.gitRemote,
                     wsRoot.gitSha,
+                    wsRoot.codeQualityIssueNumber !== undefined ? String(wsRoot.codeQualityIssueNumber) : "",
                 );
             },
             this,
@@ -1825,6 +1838,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             void this.workspaces.editGitHash();
         });
 
+        vscode.commands.registerCommand("weAudit.editCodeQualityIssueNumber", () => {
+            void this.editCodeQualityIssueNumber();
+        });
+
         // Set up the repositories for one workspace root specified by its path
         vscode.commands.registerCommand("weAudit.setupRepositoriesOne", (rootPath: string) => {
             const [wsRoot, _relativePath] = this.workspaces.getCorrespondingRootAndPath(rootPath);
@@ -1898,7 +1915,11 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
 
             for (const actualEntry of actualEntries) {
-                void this.openGithubIssue(actualEntry);
+                if (actualEntry.details.severity === FindingSeverity.CodeQuality) {
+                    void this.openCodeQualityComment(actualEntry);
+                } else {
+                    void this.openGithubIssue(actualEntry);
+                }
             }
         });
 
@@ -1932,9 +1953,12 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             this.updateCurrentlySelectedEntry(field, value, isPersistent);
         });
 
-        vscode.commands.registerCommand("weAudit.updateGitConfig", (rootPath: string, clientRemote: string, auditRemote: string, gitSha: string) => {
-            this.workspaces.updateGitConfig(rootPath, clientRemote, auditRemote, gitSha);
-        });
+        vscode.commands.registerCommand(
+            "weAudit.updateGitConfig",
+            (rootPath: string, clientRemote: string, auditRemote: string, gitSha: string, cqIssueNumber?: string) => {
+                this.workspaces.updateGitConfig(rootPath, clientRemote, auditRemote, gitSha, cqIssueNumber);
+            },
+        );
 
         // This command is used by Sarif Explorer and requires to accept Entry for backwards compatibility
         vscode.commands.registerCommand("weAudit.externallyLoadFindings", (results: Entry[]) => {
@@ -2862,6 +2886,260 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             issueBodyText += `Client PermaLink:\n${clientPermalinkString}\n`;
         }
         return issueBodyText;
+    }
+
+    /**
+     * Generates simplified markdown for a Code Quality finding comment.
+     * Only includes title, description, location descriptions, and permalinks.
+     * @param entry The Code Quality finding entry
+     * @returns The markdown string or undefined if permalink generation fails
+     */
+    private async getCQCommentMarkdown(entry: FullEntry): Promise<string | void> {
+        const clientPermalinks = [];
+        const auditPermalinks = [];
+        let locationDescriptions = "";
+
+        let atLeastOneUniqueClientRemote = false;
+
+        for (const [i, location] of entry.locations.entries()) {
+            const clientRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Client, location);
+            const auditRemoteAndPermalink = await this.getRemoteAndPermalink(Repository.Audit, location);
+            if (auditRemoteAndPermalink === undefined) {
+                return;
+            }
+            if (
+                clientRemoteAndPermalink !== undefined &&
+                clientRemoteAndPermalink.remote !== "" &&
+                clientRemoteAndPermalink.remote !== auditRemoteAndPermalink.remote
+            ) {
+                atLeastOneUniqueClientRemote = true;
+            }
+            const clientPermalink = clientRemoteAndPermalink === undefined ? "" : clientRemoteAndPermalink.permalink;
+            clientPermalinks.push(clientPermalink);
+            auditPermalinks.push(auditRemoteAndPermalink.permalink);
+
+            if (location.label !== "" || location.description !== "") {
+                locationDescriptions += `\n\n---\n`;
+                locationDescriptions += `#### Location ${i + 1} ${location.label ?? ""}\n`;
+                if (location.description !== "") {
+                    locationDescriptions += `${location.description}\n\n`;
+                }
+                locationDescriptions += `${auditRemoteAndPermalink.permalink}`;
+            }
+        }
+
+        const permalinks = auditPermalinks.join("\n");
+        const clientPermalinkString = clientPermalinks.join("\n");
+
+        let bodyText = `### Title\n${entry.label}\n\n`;
+        bodyText += `## Description\n${entry.details.description}${locationDescriptions}\n\n`;
+        bodyText += `Permalink:\n${permalinks}\n\n`;
+        if (clientPermalinkString !== "" && atLeastOneUniqueClientRemote) {
+            bodyText += `Client PermaLink:\n${clientPermalinkString}\n`;
+        }
+        return bodyText;
+    }
+
+    /**
+     * Opens a Code Quality comment flow: copies comment markdown to clipboard
+     * and opens the designated GitHub issue page. If no issue number is configured,
+     * prompts the user to enter one or create a new issue first.
+     * @param entry The Code Quality finding entry
+     */
+    async openCodeQualityComment(entry: FullEntry): Promise<void> {
+        // Find the workspace root for the entry
+        let wsRoot: WARoot | undefined;
+        for (const loc of entry.locations) {
+            const [_wsRoot] = this.workspaces.getCorrespondingRootAndPath(loc.rootPath);
+            if (_wsRoot !== undefined) {
+                wsRoot = _wsRoot;
+                break;
+            }
+        }
+
+        if (wsRoot === undefined) {
+            vscode.window.showErrorMessage("weAudit: Error opening Code Quality comment. None of the locations correspond to a workspace root.");
+            return;
+        }
+
+        // Generate the CQ comment markdown (getRemoteAndPermalink handles missing remote with a config prompt)
+        const commentBody = await this.getCQCommentMarkdown(entry);
+        if (commentBody === undefined) {
+            return;
+        }
+
+        // Check if another workspace root with the same audit repo has a CQ issue number
+        if (wsRoot.codeQualityIssueNumber === undefined) {
+            for (const root of this.workspaces.getRoots()) {
+                if (root !== wsRoot && root.gitRemote === wsRoot.gitRemote && root.codeQualityIssueNumber !== undefined) {
+                    wsRoot.codeQualityIssueNumber = root.codeQualityIssueNumber;
+                    void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
+                    break;
+                }
+            }
+        }
+
+        // If no CQ issue number is set, prompt the user
+        if (wsRoot.codeQualityIssueNumber === undefined) {
+            const choice = await vscode.window.showQuickPick(["Enter existing issue number", "Create a new issue"], {
+                ignoreFocusOut: true,
+                title: "Code Quality Issue Setup",
+                placeHolder: "No Code Quality issue configured. How would you like to proceed?",
+            });
+
+            if (choice === undefined) {
+                return;
+            }
+
+            if (choice === "Create a new issue") {
+                // Open browser to create a new issue with a generic description
+                const title = encodeURIComponent("Code Quality");
+                const issueBody =
+                    "This issue collects Code Quality findings for this audit.\n" +
+                    "Each finding is posted as a separate comment using the following template:\n\n" +
+                    "```\n" +
+                    "### Title\n" +
+                    "{finding title}\n\n" +
+                    "## Description\n" +
+                    "{finding description}\n\n" +
+                    "Permalink:\n" +
+                    "{audit permalink(s)}\n\n" +
+                    "Client PermaLink:\n" +
+                    "{client permalink(s)}\n" +
+                    "```\n";
+                const body = encodeURIComponent(issueBody);
+                const isGitHub = wsRoot.gitRemote.startsWith("https://github.com/") || wsRoot.gitRemote.startsWith("github.com/");
+                let issueUrl: string;
+                if (isGitHub) {
+                    issueUrl = `${wsRoot.gitRemote}/issues/new?title=${title}&body=${body}`;
+                } else {
+                    issueUrl = `${wsRoot.gitRemote}/-/issues/new?issue[title]=${title}&issue[description]=${body}`;
+                }
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                vscode.env.openExternal(issueUrl);
+
+                // Prompt for the resulting issue number
+                const issueNumberStr = await vscode.window.showInputBox({
+                    prompt: "Enter the issue number that was just created",
+                    ignoreFocusOut: true,
+                    validateInput: (value) => {
+                        const num = Number(value);
+                        if (!Number.isInteger(num) || num <= 0) {
+                            return "Please enter a valid positive integer";
+                        }
+                        return undefined;
+                    },
+                });
+                if (issueNumberStr === undefined) {
+                    return;
+                }
+                wsRoot.codeQualityIssueNumber = Number(issueNumberStr);
+                void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
+                // Fall through to the clipboard+comment flow for this first finding
+            }
+
+            // "Enter existing issue number"
+            const issueNumberStr = await vscode.window.showInputBox({
+                prompt: "Enter the Code Quality issue number",
+                ignoreFocusOut: true,
+                validateInput: (value) => {
+                    const num = Number(value);
+                    if (!Number.isInteger(num) || num <= 0) {
+                        return "Please enter a valid positive integer";
+                    }
+                    return undefined;
+                },
+            });
+            if (issueNumberStr === undefined) {
+                return;
+            }
+            wsRoot.codeQualityIssueNumber = Number(issueNumberStr);
+            void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
+        }
+
+        const skipConfirmation: boolean = vscode.workspace.getConfiguration("weAudit").get("general.skipCodeQualityConfirmation", false);
+
+        if (!skipConfirmation) {
+            // Prompt the user before copying and opening, consistent with the too-long-URL fallback in openGithubIssue
+            const action = await vscode.window.showInformationMessage(
+                `Code Quality comment will be copied to clipboard and issue #${wsRoot.codeQualityIssueNumber} will be opened in the browser.`,
+                "Copy comment and open issue",
+                "Open Settings",
+            );
+            if (action === "Open Settings") {
+                void vscode.commands.executeCommand("workbench.action.openSettings", "weAudit.general.skipCodeQualityConfirmation");
+                return;
+            }
+            if (action === undefined) {
+                return;
+            }
+        }
+
+        await vscode.env.clipboard.writeText(commentBody);
+        const issuePageUrl = `${wsRoot.gitRemote}/issues/${wsRoot.codeQualityIssueNumber}#sr-footer-heading`;
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        vscode.env.openExternal(issuePageUrl);
+    }
+
+    /**
+     * Prompts the user to set or change the Code Quality issue number for the active workspace root.
+     */
+    private async editCodeQualityIssueNumber(): Promise<void> {
+        const roots = this.workspaces.getRoots();
+        if (roots.length === 0) {
+            vscode.window.showErrorMessage("weAudit: No workspace roots available.");
+            return;
+        }
+
+        let wsRoot: WARoot;
+        if (roots.length === 1) {
+            wsRoot = roots[0];
+        } else {
+            const rootPaths = roots.map((r) => r.rootPath);
+            const selected = await vscode.window.showQuickPick(rootPaths, {
+                ignoreFocusOut: true,
+                title: "Select Workspace Root",
+                placeHolder: "Select a workspace root",
+            });
+            if (selected === undefined) {
+                return;
+            }
+            const [foundRoot] = this.workspaces.getCorrespondingRootAndPath(selected);
+            if (foundRoot === undefined) {
+                return;
+            }
+            wsRoot = foundRoot;
+        }
+
+        const currentValue = wsRoot.codeQualityIssueNumber;
+        const issueNumberStr = await vscode.window.showInputBox({
+            prompt: "Enter the Code Quality GitHub issue number",
+            value: currentValue !== undefined ? String(currentValue) : "",
+            validateInput: (value) => {
+                if (value === "") {
+                    return undefined; // allow clearing
+                }
+                const num = Number(value);
+                if (!Number.isInteger(num) || num <= 0) {
+                    return "Please enter a valid positive integer or leave empty to clear";
+                }
+                return undefined;
+            },
+        });
+        if (issueNumberStr === undefined) {
+            return;
+        }
+
+        wsRoot.codeQualityIssueNumber = issueNumberStr === "" ? undefined : Number(issueNumberStr);
+        void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
+
+        if (wsRoot.codeQualityIssueNumber !== undefined) {
+            vscode.window.showInformationMessage(`Code Quality issue number set to #${wsRoot.codeQualityIssueNumber}.`);
+        } else {
+            vscode.window.showInformationMessage("Code Quality issue number cleared.");
+        }
     }
 
     /**
@@ -4415,7 +4693,11 @@ export class AuditMarker {
             if (entry === undefined) {
                 return;
             }
-            void treeDataProvider.openGithubIssue(entry);
+            if (entry.details.severity === FindingSeverity.CodeQuality) {
+                void treeDataProvider.openCodeQualityComment(entry);
+            } else {
+                void treeDataProvider.openGithubIssue(entry);
+            }
         });
 
         // Activate the finding boundary CodeLens feature

@@ -79,7 +79,11 @@ const watchPlugin = {
             console.log("build complete");
         }
     } catch (err) {
-        process.stderr.write(err.stderr);
+        if (err.stderr) {
+            process.stderr.write(err.stderr);
+        } else {
+            console.error(err);
+        }
         process.exit(1);
     }
 })();

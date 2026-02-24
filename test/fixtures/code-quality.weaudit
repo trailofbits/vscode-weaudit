@@ -1,0 +1,55 @@
+{
+    "clientRemote": "https://github.com/client/project",
+    "gitRemote": "https://github.com/auditor/project-audit",
+    "gitSha": "abc123def456",
+    "treeEntries": [
+        {
+            "label": "Unused return value",
+            "entryType": 0,
+            "author": "alice",
+            "details": {
+                "severity": "Code Quality",
+                "difficulty": "",
+                "type": "",
+                "description": "The return value of this function call is not used.",
+                "exploit": "",
+                "recommendation": ""
+            },
+            "locations": [
+                {
+                    "path": "src/utils/helpers.ts",
+                    "startLine": 15,
+                    "endLine": 15,
+                    "label": "unused return",
+                    "description": ""
+                }
+            ]
+        },
+        {
+            "label": "SQL Injection in user input",
+            "entryType": 0,
+            "author": "alice",
+            "details": {
+                "severity": "High",
+                "difficulty": "Low",
+                "type": "Data Validation",
+                "description": "User input is not properly sanitized.",
+                "exploit": "An attacker could inject malicious SQL.",
+                "recommendation": "Use parameterized queries."
+            },
+            "locations": [
+                {
+                    "path": "src/database/queries.ts",
+                    "startLine": 42,
+                    "endLine": 45,
+                    "label": "executeQuery function",
+                    "description": ""
+                }
+            ]
+        }
+    ],
+    "auditedFiles": [],
+    "partiallyAuditedFiles": [],
+    "resolvedEntries": [],
+    "codeQualityIssueNumber": 99
+}

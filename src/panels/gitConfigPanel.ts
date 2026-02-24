@@ -26,7 +26,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
 
         vscode.commands.registerCommand(
             "weAudit.setGitConfigView",
-            (rootPathAndLabel: RootPathAndLabel, clientRepo: string, auditRepo: string, commitHash: string) => {
+            (rootPathAndLabel: RootPathAndLabel, clientRepo: string, auditRepo: string, commitHash: string, cqIssueNumber?: string) => {
                 this.currentRootPathAndLabel = rootPathAndLabel;
                 const msg: UpdateRepositoryMessage = {
                     command: "update-repository-config",
@@ -34,6 +34,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
                     clientURL: clientRepo,
                     auditURL: auditRepo,
                     commitHash,
+                    cqIssueNumber: cqIssueNumber ?? "",
                 };
                 this._view?.webview.postMessage(msg);
             },
@@ -142,7 +143,14 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
                             );
                             return;
                         }
-                        vscode.commands.executeCommand("weAudit.updateGitConfig", rootPath, message.clientURL, message.auditURL, message.commitHash);
+                        vscode.commands.executeCommand(
+                            "weAudit.updateGitConfig",
+                            rootPath,
+                            message.clientURL,
+                            message.auditURL,
+                            message.commitHash,
+                            message.cqIssueNumber,
+                        );
                         return;
                     case "choose-workspace-root":
                         rootPath = this.dirToPathMap.get(message.rootLabel);

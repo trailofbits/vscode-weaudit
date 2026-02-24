@@ -138,20 +138,34 @@ describe("Webview Message Handlers", () => {
                     clientURL: "https://github.com/client/repo",
                     auditURL: "https://github.com/audit/repo",
                     commitHash: "abc123",
+                    cqIssueNumber: "",
                 };
 
                 // Simulate message handler
                 if (message.command === "update-repository-config") {
                     const rootPath = dirToPathMap.get(message.rootLabel);
                     if (rootPath !== undefined) {
-                        commandExecutor.executeCommand("weAudit.updateGitConfig", rootPath, message.clientURL, message.auditURL, message.commitHash);
+                        commandExecutor.executeCommand(
+                            "weAudit.updateGitConfig",
+                            rootPath,
+                            message.clientURL,
+                            message.auditURL,
+                            message.commitHash,
+                            message.cqIssueNumber,
+                        );
                     }
                 }
 
                 const commands = commandExecutor.getExecutedCommands();
                 expect(commands).to.have.length(1);
                 expect(commands[0].command).to.equal("weAudit.updateGitConfig");
-                expect(commands[0].args).to.deep.equal(["/workspace/project1", "https://github.com/client/repo", "https://github.com/audit/repo", "abc123"]);
+                expect(commands[0].args).to.deep.equal([
+                    "/workspace/project1",
+                    "https://github.com/client/repo",
+                    "https://github.com/audit/repo",
+                    "abc123",
+                    "",
+                ]);
             });
 
             it("shows error when rootLabel is not found in map", () => {
@@ -165,6 +179,7 @@ describe("Webview Message Handlers", () => {
                     clientURL: "https://github.com/client/repo",
                     auditURL: "https://github.com/audit/repo",
                     commitHash: "abc123",
+                    cqIssueNumber: "",
                 };
 
                 // Simulate message handler
@@ -299,6 +314,7 @@ describe("Webview Message Handlers", () => {
                 clientURL: "https://example.com",
                 auditURL: "https://example.com",
                 commitHash: "abc123",
+                cqIssueNumber: "",
             };
 
             expect(message.command).to.equal("update-repository-config");

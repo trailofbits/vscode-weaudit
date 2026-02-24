@@ -31,6 +31,7 @@ export enum FindingSeverity {
     Low = "Low",
     Medium = "Medium",
     High = "High",
+    CodeQuality = "Code Quality",
     Undefined = "",
 }
 
@@ -89,6 +90,8 @@ export interface SerializedData {
     // older versions do not have partiallyAuditedFiles
     partiallyAuditedFiles?: PartiallyAuditedFile[];
     resolvedEntries: Entry[];
+    // optional code quality issue number for the workspace root
+    codeQualityIssueNumber?: number;
 }
 
 /**
@@ -104,6 +107,8 @@ export interface FullSerializedData {
     // older versions do not have partiallyAuditedFiles
     partiallyAuditedFiles?: PartiallyAuditedFile[];
     resolvedEntries: FullEntry[];
+    // optional code quality issue number for the workspace root
+    codeQualityIssueNumber?: number;
 }
 
 /**
