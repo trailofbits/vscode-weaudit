@@ -8,9 +8,9 @@
             "entryType": 0,
             "author": "alice",
             "details": {
-                "severity": "",
+                "severity": "Code Quality",
                 "difficulty": "",
-                "type": "Code Quality",
+                "type": "",
                 "description": "The return value of this function call is not used.",
                 "exploit": "",
                 "recommendation": ""

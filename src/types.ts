@@ -31,6 +31,7 @@ export enum FindingSeverity {
     Low = "Low",
     Medium = "Medium",
     High = "High",
+    CodeQuality = "Code Quality",
     Undefined = "",
 }
 
@@ -64,7 +65,6 @@ export enum FindingType {
     Testing = "Testing",
     Timing = "Timing",
     UndefinedBehavior = "Undefined Behavior",
-    CodeQuality = "Code Quality",
     Undefined = "",
 }
 /* eslint-enable @typescript-eslint/naming-convention */

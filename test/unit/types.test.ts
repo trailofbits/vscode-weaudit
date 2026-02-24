@@ -628,23 +628,23 @@ describe("types.ts", () => {
         });
     });
 
-    describe("FindingType.CodeQuality", () => {
+    describe("FindingSeverity.CodeQuality", () => {
         it("should have CodeQuality enum value", () => {
-            assert.strictEqual(FindingType.CodeQuality, "Code Quality");
+            assert.strictEqual(FindingSeverity.CodeQuality, "Code Quality");
         });
 
         it("should be accepted by isEnumValue", () => {
-            assert.strictEqual(isEnumValue(FindingType, "Code Quality"), true);
+            assert.strictEqual(isEnumValue(FindingSeverity, "Code Quality"), true);
         });
 
-        it("should reject invalid finding type values", () => {
-            assert.strictEqual(isEnumValue(FindingType, "Not A Real Type"), false);
+        it("should reject invalid finding severity values", () => {
+            assert.strictEqual(isEnumValue(FindingSeverity, "Not A Real Severity"), false);
         });
 
-        it("should allow creating entry details with CodeQuality type", () => {
+        it("should allow creating entry details with CodeQuality severity", () => {
             const details = createDefaultEntryDetails();
-            details.type = FindingType.CodeQuality;
-            assert.strictEqual(details.type, "Code Quality");
+            details.severity = FindingSeverity.CodeQuality;
+            assert.strictEqual(details.severity, "Code Quality");
         });
     });
 
@@ -655,9 +655,9 @@ describe("types.ts", () => {
                 entryType: EntryType.Finding,
                 author: "testuser",
                 details: {
-                    severity: FindingSeverity.High,
+                    severity: FindingSeverity.CodeQuality,
                     difficulty: FindingDifficulty.Low,
-                    type: FindingType.CodeQuality,
+                    type: FindingType.Undefined,
                     description: "Test description",
                     exploit: "",
                     recommendation: "",

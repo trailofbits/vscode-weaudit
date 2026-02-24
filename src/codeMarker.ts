@@ -1915,7 +1915,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             }
 
             for (const actualEntry of actualEntries) {
-                if (actualEntry.details.type === FindingType.CodeQuality) {
+                if (actualEntry.details.severity === FindingSeverity.CodeQuality) {
                     void this.openCodeQualityComment(actualEntry);
                 } else {
                     void this.openGithubIssue(actualEntry);
@@ -2982,6 +2982,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         // If no CQ issue number is set, prompt the user
         if (wsRoot.codeQualityIssueNumber === undefined) {
             const choice = await vscode.window.showQuickPick(["Enter existing issue number", "Create a new issue"], {
+                ignoreFocusOut: true,
+                title: "Code Quality Issue Setup",
                 placeHolder: "No Code Quality issue configured. How would you like to proceed?",
             });
 
@@ -3061,10 +3063,14 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (!skipConfirmation) {
             // Prompt the user before copying and opening, consistent with the too-long-URL fallback in openGithubIssue
             const action = await vscode.window.showInformationMessage(
-                `Code Quality comment will be copied to clipboard and issue #${wsRoot.codeQualityIssueNumber} will be opened in the browser. ` +
-                    `You can disable this confirmation in Settings → weAudit: Skip Code Quality Confirmation.`,
+                `Code Quality comment will be copied to clipboard and issue #${wsRoot.codeQualityIssueNumber} will be opened in the browser.`,
                 "Copy comment and open issue",
+                "Open Settings",
             );
+            if (action === "Open Settings") {
+                void vscode.commands.executeCommand("workbench.action.openSettings", "weAudit.general.skipCodeQualityConfirmation");
+                return;
+            }
             if (action === undefined) {
                 return;
             }
@@ -3093,6 +3099,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         } else {
             const rootPaths = roots.map((r) => r.rootPath);
             const selected = await vscode.window.showQuickPick(rootPaths, {
+                ignoreFocusOut: true,
+                title: "Select Workspace Root",
                 placeHolder: "Select a workspace root",
             });
             if (selected === undefined) {
@@ -4685,7 +4693,7 @@ export class AuditMarker {
             if (entry === undefined) {
                 return;
             }
-            if (entry.details.type === FindingType.CodeQuality) {
+            if (entry.details.severity === FindingSeverity.CodeQuality) {
                 void treeDataProvider.openCodeQualityComment(entry);
             } else {
                 void treeDataProvider.openGithubIssue(entry);

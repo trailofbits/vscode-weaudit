@@ -462,11 +462,11 @@ describe("validateSerializedData", () => {
         });
     });
 
-    describe("Code Quality finding type", () => {
-        it("accepts entry with FindingType.CodeQuality", () => {
+    describe("Code Quality finding severity", () => {
+        it("accepts entry with FindingSeverity.CodeQuality", () => {
             const data = createDefaultSerializedData();
             const entry = createValidEntry();
-            entry.details.type = FindingType.CodeQuality;
+            entry.details.severity = FindingSeverity.CodeQuality;
             data.treeEntries = [entry];
             expect(validateSerializedData(data)).to.equal(true);
         });
@@ -488,7 +488,7 @@ describe("validateSerializedData", () => {
         it("accepts Code Quality entry in resolvedEntries", () => {
             const data = createDefaultSerializedData();
             const entry = createValidEntry();
-            entry.details.type = FindingType.CodeQuality;
+            entry.details.severity = FindingSeverity.CodeQuality;
             data.resolvedEntries = [entry];
             expect(validateSerializedData(data)).to.equal(true);
         });
