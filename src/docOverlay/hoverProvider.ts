@@ -31,7 +31,14 @@ export class DocOverlayHoverProvider {
 
         const matching = this.getEntries().filter((entry) => {
             const entryPath = resolveEntryPath(entry.path, this.workspaceRoot);
-            return entryPath === filePath && line >= entry.startLine && line <= entry.endLine;
+            if (entryPath !== filePath) {
+                return false;
+            }
+            // File-level entries are pinned to the first line only.
+            if (entry.type === "file") {
+                return line === 0;
+            }
+            return line >= entry.startLine && line <= entry.endLine;
         });
 
         if (matching.length === 0) {

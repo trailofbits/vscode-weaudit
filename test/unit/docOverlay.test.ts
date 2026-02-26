@@ -559,9 +559,17 @@ describe("DocOverlayHoverProvider", () => {
     it('uses "File" as header for file entries without functionName', () => {
         const entry = makeEntry({ path: "src/foo.ts", startLine: 0, endLine: 5, type: "file", functionName: undefined });
         const provider = new DocOverlayHoverProvider(() => [entry], workspaceRoot);
-        const result = provider.provideHover(makeDoc("/workspace/src/foo.ts") as never, makePos(2) as never);
+        const result = provider.provideHover(makeDoc("/workspace/src/foo.ts") as never, makePos(0) as never);
         const md = (result as { contents: { value: string } }).contents;
         assert.ok(md.value.includes("### File"), `Expected "### File" header in hover`);
+    });
+
+    it("file entries only show a hover on line 0", () => {
+        const entry = makeEntry({ path: "src/foo.ts", startLine: 0, endLine: 100, type: "file", functionName: undefined });
+        const provider = new DocOverlayHoverProvider(() => [entry], workspaceRoot);
+        assert.ok(provider.provideHover(makeDoc("/workspace/src/foo.ts") as never, makePos(0) as never) !== undefined, "Expected hover on line 0");
+        assert.strictEqual(provider.provideHover(makeDoc("/workspace/src/foo.ts") as never, makePos(1) as never), undefined, "Expected no hover on line 1");
+        assert.strictEqual(provider.provideHover(makeDoc("/workspace/src/foo.ts") as never, makePos(50) as never), undefined, "Expected no hover on line 50");
     });
 
     it('uses "Region" as header for region entries without functionName', () => {
