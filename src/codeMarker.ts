@@ -3037,25 +3037,25 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 wsRoot.codeQualityIssueNumber = Number(issueNumberStr);
                 void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
                 // Fall through to the clipboard+comment flow for this first finding
+            } else {
+                // "Enter existing issue number"
+                const issueNumberStr = await vscode.window.showInputBox({
+                    prompt: "Enter the Code Quality issue number",
+                    ignoreFocusOut: true,
+                    validateInput: (value) => {
+                        const num = Number(value);
+                        if (!Number.isInteger(num) || num <= 0) {
+                            return "Please enter a valid positive integer";
+                        }
+                        return undefined;
+                    },
+                });
+                if (issueNumberStr === undefined) {
+                    return;
+                }
+                wsRoot.codeQualityIssueNumber = Number(issueNumberStr);
+                void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
             }
-
-            // "Enter existing issue number"
-            const issueNumberStr = await vscode.window.showInputBox({
-                prompt: "Enter the Code Quality issue number",
-                ignoreFocusOut: true,
-                validateInput: (value) => {
-                    const num = Number(value);
-                    if (!Number.isInteger(num) || num <= 0) {
-                        return "Please enter a valid positive integer";
-                    }
-                    return undefined;
-                },
-            });
-            if (issueNumberStr === undefined) {
-                return;
-            }
-            wsRoot.codeQualityIssueNumber = Number(issueNumberStr);
-            void wsRoot.updateSavedData(vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username);
         }
 
         const skipConfirmation: boolean = vscode.workspace.getConfiguration("weAudit").get("general.skipCodeQualityConfirmation", false);
@@ -3077,7 +3077,10 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         await vscode.env.clipboard.writeText(commentBody);
-        const issuePageUrl = `${wsRoot.gitRemote}/issues/${wsRoot.codeQualityIssueNumber}#sr-footer-heading`;
+        const isGitHub = wsRoot.gitRemote.startsWith("https://github.com/") || wsRoot.gitRemote.startsWith("github.com/");
+        const issuePageUrl = isGitHub
+            ? `${wsRoot.gitRemote}/issues/${wsRoot.codeQualityIssueNumber}#sr-footer-heading`
+            : `${wsRoot.gitRemote}/-/issues/${wsRoot.codeQualityIssueNumber}`;
         // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         vscode.env.openExternal(issuePageUrl);
