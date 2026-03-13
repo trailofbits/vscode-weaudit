@@ -3063,7 +3063,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         if (!skipConfirmation) {
             // Prompt the user before copying and opening, consistent with the too-long-URL fallback in openGithubIssue
             const action = await vscode.window.showInformationMessage(
-                `Code Quality comment will be copied to clipboard and issue #${wsRoot.codeQualityIssueNumber} will be opened in the browser.`,
+                `Code Quality comment will be copied to clipboard and issue #${wsRoot.codeQualityIssueNumber} will be opened in the browser. To skip this dialog in the future, you can change the behavior in Settings.`,
                 "Copy comment and open issue",
                 "Open Settings",
             );
