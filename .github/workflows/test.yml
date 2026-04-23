@@ -20,7 +20,7 @@ jobs:
                   persist-credentials: false
 
             - name: Setup Node.js
-              uses: actions/setup-node@v6
+              uses: actions/setup-node@v6.3.0
               with:
                   node-version: 20
                   cache: "npm"
@@ -35,7 +35,7 @@ jobs:
               run: npm run coverage
 
             - name: Upload coverage to Codecov
-              uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
+              uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2 # v6.0.0
               with:
                   files: ./coverage/lcov.info
                   fail_ci_if_error: false
@@ -58,7 +58,7 @@ jobs:
                   persist-credentials: false
 
             - name: Setup Node.js
-              uses: actions/setup-node@v6
+              uses: actions/setup-node@v6.3.0
               with:
                   node-version: 20
                   cache: "npm"
@@ -101,7 +101,7 @@ jobs:
                   persist-credentials: false
 
             - name: Setup Node.js
-              uses: actions/setup-node@v6
+              uses: actions/setup-node@v6.3.0
               with:
                   node-version: 20
                   cache: "npm"
@@ -138,7 +138,7 @@ jobs:
                   persist-credentials: false
 
             - name: Setup Node.js
-              uses: actions/setup-node@v6
+              uses: actions/setup-node@v6.3.0
               with:
                   node-version: 20
                   cache: "npm"
