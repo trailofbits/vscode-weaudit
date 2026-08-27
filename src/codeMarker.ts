@@ -946,44 +946,32 @@ class WARoot {
         );
 
         // Remove the root path for backwards compatibility. It is implicit in the location of the saved file anyway.
-        let reducedEntries = filteredEntries.map(
-            (fullEntry) =>
-                ({
-                    label: fullEntry.label,
-                    entryType: fullEntry.entryType,
-                    author: fullEntry.author,
-                    details: fullEntry.details,
-                    locations: fullEntry.locations.map(
-                        (location) =>
-                            ({
-                                path: location.path,
-                                startLine: location.startLine,
-                                endLine: location.endLine,
-                                label: location.label,
-                                description: location.description,
-                            }),
-                    ),
-                }),
-        );
-        let reducedResolvedEntries = filteredResolvedEntries.map(
-            (fullEntry) =>
-                ({
-                    label: fullEntry.label,
-                    entryType: fullEntry.entryType,
-                    author: fullEntry.author,
-                    details: fullEntry.details,
-                    locations: fullEntry.locations.map(
-                        (location) =>
-                            ({
-                                path: location.path,
-                                startLine: location.startLine,
-                                endLine: location.endLine,
-                                label: location.label,
-                                description: location.description,
-                            }),
-                    ),
-                }),
-        );
+        let reducedEntries = filteredEntries.map((fullEntry) => ({
+            label: fullEntry.label,
+            entryType: fullEntry.entryType,
+            author: fullEntry.author,
+            details: fullEntry.details,
+            locations: fullEntry.locations.map((location) => ({
+                path: location.path,
+                startLine: location.startLine,
+                endLine: location.endLine,
+                label: location.label,
+                description: location.description,
+            })),
+        }));
+        let reducedResolvedEntries = filteredResolvedEntries.map((fullEntry) => ({
+            label: fullEntry.label,
+            entryType: fullEntry.entryType,
+            author: fullEntry.author,
+            details: fullEntry.details,
+            locations: fullEntry.locations.map((location) => ({
+                path: location.path,
+                startLine: location.startLine,
+                endLine: location.endLine,
+                label: location.label,
+                description: location.description,
+            })),
+        }));
 
         if (existsFile) {
             // if we are not seeing the current user's findings, we can't simply overwrite the file
@@ -1193,9 +1181,7 @@ class MultiRootManager {
      * @returns a list of [root path, label] tuples where each label is unique
      */
     private createUniqueLabels(rootPaths: string[]): RootPathAndLabel[] {
-        const rootPathsAndLabels: RootPathAndLabel[] = rootPaths.map(
-            (rootPath) => ({ rootPath: rootPath, rootLabel: path.basename(rootPath) }),
-        );
+        const rootPathsAndLabels: RootPathAndLabel[] = rootPaths.map((rootPath) => ({ rootPath: rootPath, rootLabel: path.basename(rootPath) }));
         const rootLabels = rootPathsAndLabels.map((rootPathAndLabel) => rootPathAndLabel.rootLabel);
 
         if (new Set(rootLabels).size === rootPaths.length) {
@@ -1725,9 +1711,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // Pushes the roots and currently selected configurations to the MultiConfig
         vscode.commands.registerCommand("weAudit.getMultiConfigRoots", () => {
-            const rootPathsAndLabels = this.workspaces
-                .getRoots()
-                .map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }));
+            const rootPathsAndLabels = this.workspaces.getRoots().map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }));
             vscode.commands.executeCommand("weAudit.setMultiConfigRoots", rootPathsAndLabels);
             vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
         });
@@ -1875,27 +1859,24 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 }
 
                 const splitEntries = this.splitLocationsFromEntry(entry);
-                actualEntries = splitEntries.map(
-                    (entry) =>
-                        ({
-                            label: entry.label,
-                            entryType: entry.entryType,
-                            author: entry.author,
-                            details: entry.details,
-                            locations: entry.locations.map((loc) => {
-                                // transform absolute paths to relative paths to the workspace path
-                                const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
-                                return {
-                                    path: relativePath,
-                                    startLine: loc.startLine,
-                                    endLine: loc.endLine,
-                                    label: loc.label,
-                                    description: loc.description,
-                                    rootPath: wsRoot!.rootPath,
-                                };
-                            }),
-                        }),
-                );
+                actualEntries = splitEntries.map((entry) => ({
+                    label: entry.label,
+                    entryType: entry.entryType,
+                    author: entry.author,
+                    details: entry.details,
+                    locations: entry.locations.map((loc) => {
+                        // transform absolute paths to relative paths to the workspace path
+                        const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                        return {
+                            path: relativePath,
+                            startLine: loc.startLine,
+                            endLine: loc.endLine,
+                            label: loc.label,
+                            description: loc.description,
+                            rootPath: wsRoot!.rootPath,
+                        };
+                    }),
+                }));
             } else {
                 // This is the weAudit internal case, entries are either FullEntry or FullLocationEntry
                 const actualEntry = isLocationEntry(entry) ? entry.parentEntry : entry;
@@ -1991,27 +1972,24 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
             results.push(...entriesToPush);
 
-            const fullResults = results.map(
-                (entry) =>
-                    ({
-                        label: entry.label,
-                        entryType: entry.entryType,
-                        author: entry.author,
-                        details: entry.details,
-                        locations: entry.locations.map((loc) => {
-                            // transform absolute paths to relative paths to the workspace path
-                            const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
-                            return {
-                                path: relativePath,
-                                startLine: loc.startLine,
-                                endLine: loc.endLine,
-                                label: loc.label,
-                                description: loc.description,
-                                rootPath: wsRoot!.rootPath,
-                            };
-                        }),
-                    }),
-            );
+            const fullResults = results.map((entry) => ({
+                label: entry.label,
+                entryType: entry.entryType,
+                author: entry.author,
+                details: entry.details,
+                locations: entry.locations.map((loc) => {
+                    // transform absolute paths to relative paths to the workspace path
+                    const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                    return {
+                        path: relativePath,
+                        startLine: loc.startLine,
+                        endLine: loc.endLine,
+                        label: loc.label,
+                        description: loc.description,
+                        rootPath: wsRoot!.rootPath,
+                    };
+                }),
+            }));
 
             this.externallyLoadFindings(fullResults);
         });
@@ -3603,49 +3581,37 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             clientRemote: parsedEntries.clientRemote,
             gitRemote: parsedEntries.gitRemote,
             gitSha: parsedEntries.gitSha,
-            treeEntries: parsedEntries.treeEntries.map(
-                (entry) =>
-                    ({
-                        label: entry.label,
-                        entryType: entry.entryType,
-                        author: entry.author,
-                        details: entry.details,
-                        locations: entry.locations.map(
-                            (loc) =>
-                                ({
-                                    path: loc.path,
-                                    startLine: loc.startLine,
-                                    endLine: loc.endLine,
-                                    label: loc.label,
-                                    description: loc.description,
-                                    rootPath: rootPath,
-                                }),
-                        ),
-                    }),
-            ),
+            treeEntries: parsedEntries.treeEntries.map((entry) => ({
+                label: entry.label,
+                entryType: entry.entryType,
+                author: entry.author,
+                details: entry.details,
+                locations: entry.locations.map((loc) => ({
+                    path: loc.path,
+                    startLine: loc.startLine,
+                    endLine: loc.endLine,
+                    label: loc.label,
+                    description: loc.description,
+                    rootPath: rootPath,
+                })),
+            })),
             auditedFiles: parsedEntries.auditedFiles,
             // older versions do not have partiallyAuditedFiles
             partiallyAuditedFiles: parsedEntries.partiallyAuditedFiles,
-            resolvedEntries: parsedEntries.resolvedEntries.map(
-                (entry) =>
-                    ({
-                        label: entry.label,
-                        entryType: entry.entryType,
-                        author: entry.author,
-                        details: entry.details,
-                        locations: entry.locations.map(
-                            (loc) =>
-                                ({
-                                    path: loc.path,
-                                    startLine: loc.startLine,
-                                    endLine: loc.endLine,
-                                    label: loc.label,
-                                    description: loc.description,
-                                    rootPath: rootPath,
-                                }),
-                        ),
-                    }),
-            ),
+            resolvedEntries: parsedEntries.resolvedEntries.map((entry) => ({
+                label: entry.label,
+                entryType: entry.entryType,
+                author: entry.author,
+                details: entry.details,
+                locations: entry.locations.map((loc) => ({
+                    path: loc.path,
+                    startLine: loc.startLine,
+                    endLine: loc.endLine,
+                    label: loc.label,
+                    description: loc.description,
+                    rootPath: rootPath,
+                })),
+            })),
         } as FullSerializedData;
 
         // Normalize all the paths from loaded files. These can come from different OSes with different path
