@@ -63,7 +63,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
                 continue;
             }
 
-            const rootEntry = { label: rootPathAndLabel.rootLabel } as WorkspaceRootEntry;
+            const rootEntry = { label: rootPathAndLabel.rootLabel };
             this.rootEntries.push(rootEntry);
 
             fs.readdirSync(vscodeFolder).forEach((file) => {

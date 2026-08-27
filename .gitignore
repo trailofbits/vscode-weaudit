@@ -15,3 +15,6 @@ coverage/
 
 # ExTester storage
 .test-extensions/
+
+# weAudit state written into the extension-test fixture workspace
+test/extension/fixtures/sample-workspace/.vscode/

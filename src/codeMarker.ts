@@ -44,7 +44,6 @@ import {
     mergeTwoPartiallyAuditedFileArrays,
     FullSerializedData,
     ConfigurationEntry,
-    WorkspaceRootEntry,
     configEntryEquals,
     RootPathAndLabel,
 } from "./types";
@@ -163,8 +162,8 @@ class WARoot {
                 const configEntry = {
                     path: path.join(vscodeFolder, file),
                     username: parsedPath.name,
-                    root: { label: this.rootLabel } as WorkspaceRootEntry,
-                } as ConfigurationEntry;
+                    root: { label: this.rootLabel },
+                };
                 this.configs.push(configEntry);
                 this.currentlySelectedConfigs.push(configEntry);
             }
@@ -257,7 +256,7 @@ class WARoot {
     persistClientRemote(): void {
         vscode.commands.executeCommand(
             "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            { rootPath: this.rootPath, rootLabel: this.rootLabel },
             this.clientRemote,
             this.gitRemote,
             this.gitSha,
@@ -276,8 +275,8 @@ class WARoot {
             newData = JSON.stringify(dataToSerialize, null, 2);
 
             // We are creating a new config file
-            const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
+            const wsRootEntry = { label: this.rootLabel };
+            const configEntry = { path: filename, username: this.username, root: wsRootEntry };
             this.configs.push(configEntry);
             this.currentlySelectedConfigs.push(configEntry);
         } else {
@@ -295,7 +294,7 @@ class WARoot {
     persistAuditRemote(): void {
         vscode.commands.executeCommand(
             "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            { rootPath: this.rootPath, rootLabel: this.rootLabel },
             this.clientRemote,
             this.gitRemote,
             this.gitSha,
@@ -314,8 +313,8 @@ class WARoot {
             newData = JSON.stringify(dataToSerialize, null, 2);
 
             // We are creating a new config file
-            const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
+            const wsRootEntry = { label: this.rootLabel };
+            const configEntry = { path: filename, username: this.username, root: wsRootEntry };
             this.configs.push(configEntry);
             this.currentlySelectedConfigs.push(configEntry);
         } else {
@@ -333,7 +332,7 @@ class WARoot {
     persistGitHash(): void {
         vscode.commands.executeCommand(
             "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            { rootPath: this.rootPath, rootLabel: this.rootLabel },
             this.clientRemote,
             this.gitRemote,
             this.gitSha,
@@ -352,8 +351,8 @@ class WARoot {
             newData = JSON.stringify(dataToSerialize, null, 2);
 
             // We are creating a new config file
-            const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
+            const wsRootEntry = { label: this.rootLabel };
+            const configEntry = { path: filename, username: this.username, root: wsRootEntry };
             this.configs.push(configEntry);
             this.currentlySelectedConfigs.push(configEntry);
         } else {
@@ -557,9 +556,9 @@ class WARoot {
      * @returns A list of `uri`s to decorate and the relevant username.
      */
     toggleAudited(uri: vscode.Uri, relativePath: string): [vscode.Uri[], string] {
-        let relevantUsername = "";
+        let relevantUsername: string;
 
-        let urisToDecorate: vscode.Uri[] = [];
+        let urisToDecorate: vscode.Uri[];
 
         // check if file is already in list
         const index = this.auditedFiles.findIndex((file) => file.path === relativePath);
@@ -929,7 +928,7 @@ class WARoot {
         }
 
         const fileName = path.join(vscodeFolder, username + SERIALIZED_FILE_EXTENSION);
-        const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
+        const wsRootEntry = { label: this.rootLabel };
         const configEntry = { path: fileName, username: username, root: wsRootEntry };
         if (!fs.existsSync(fileName)) {
             existsFile = false;
@@ -962,9 +961,9 @@ class WARoot {
                                 endLine: location.endLine,
                                 label: location.label,
                                 description: location.description,
-                            }) as Location,
+                            }),
                     ),
-                }) as Entry,
+                }),
         );
         let reducedResolvedEntries = filteredResolvedEntries.map(
             (fullEntry) =>
@@ -981,9 +980,9 @@ class WARoot {
                                 endLine: location.endLine,
                                 label: location.label,
                                 description: location.description,
-                            }) as Location,
+                            }),
                     ),
-                }) as Entry,
+                }),
         );
 
         if (existsFile) {
@@ -1096,7 +1095,7 @@ class MultiRootManager {
         // weAudit.findAndLoadConfigurationFiles is executed by the CodeMarker
         vscode.commands.executeCommand(
             "weAudit.setGitConfigRoots",
-            this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
+            this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() })),
         );
         // Add a listener for changes to the roots
         const listener = async (event: vscode.WorkspaceFoldersChangeEvent): Promise<void> => {
@@ -1138,7 +1137,7 @@ class MultiRootManager {
             // Tell the git Config WebView that there are new roots
             await vscode.commands.executeCommand(
                 "weAudit.setGitConfigRoots",
-                this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
+                this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() })),
             );
         };
         const disposable = vscode.workspace.onDidChangeWorkspaceFolders(listener);
@@ -1195,7 +1194,7 @@ class MultiRootManager {
      */
     private createUniqueLabels(rootPaths: string[]): RootPathAndLabel[] {
         const rootPathsAndLabels: RootPathAndLabel[] = rootPaths.map(
-            (rootPath) => ({ rootPath: rootPath, rootLabel: path.basename(rootPath) }) as RootPathAndLabel,
+            (rootPath) => ({ rootPath: rootPath, rootLabel: path.basename(rootPath) }),
         );
         const rootLabels = rootPathsAndLabels.map((rootPathAndLabel) => rootPathAndLabel.rootLabel);
 
@@ -1575,7 +1574,7 @@ class MultiRootManager {
         for (const root of this.roots) {
             root.markedFilesDayLog.forEach((value, key) => {
                 const currentValue = mergedMarkedFilesDayLog.get(key);
-                const updateValue = value.map((path) => [{ rootPath: root.rootPath, path: path } as FullPath, root.getRootLabel()] as [FullPath, string]);
+                const updateValue = value.map((path) => [{ rootPath: root.rootPath, path: path }, root.getRootLabel()] as [FullPath, string]);
                 if (currentValue === undefined) {
                     mergedMarkedFilesDayLog.set(key, updateValue);
                 } else {
@@ -1689,7 +1688,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 }
                 vscode.commands.executeCommand(
                     "weAudit.setGitConfigView",
-                    { rootPath: wsRoot.rootPath, rootLabel: wsRoot.getRootLabel() } as RootPathAndLabel,
+                    { rootPath: wsRoot.rootPath, rootLabel: wsRoot.getRootLabel() },
                     wsRoot.clientRemote,
                     wsRoot.gitRemote,
                     wsRoot.gitSha,
@@ -1703,7 +1702,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.getGitConfigRoots", () => {
             vscode.commands.executeCommand(
                 "weAudit.setGitConfigRoots",
-                this.workspaces.getRoots().map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
+                this.workspaces.getRoots().map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() })),
             );
         });
 
@@ -1728,7 +1727,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.getMultiConfigRoots", () => {
             const rootPathsAndLabels = this.workspaces
                 .getRoots()
-                .map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel);
+                .map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }));
             vscode.commands.executeCommand("weAudit.setMultiConfigRoots", rootPathsAndLabels);
             vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
         });
@@ -1893,9 +1892,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                     label: loc.label,
                                     description: loc.description,
                                     rootPath: wsRoot!.rootPath,
-                                } as FullLocation;
+                                };
                             }),
-                        }) as FullEntry,
+                        }),
                 );
             } else {
                 // This is the weAudit internal case, entries are either FullEntry or FullLocationEntry
@@ -2009,9 +2008,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                 label: loc.label,
                                 description: loc.description,
                                 rootPath: wsRoot!.rootPath,
-                            } as FullLocation;
+                            };
                         }),
-                    }) as FullEntry,
+                    }),
             );
 
             this.externallyLoadFindings(fullResults);
@@ -2036,7 +2035,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 label: location.label,
                 description: location.description,
                 rootPath: wsRoot.rootPath,
-            } as FullLocation;
+            };
 
             return this.getClientPermalink(fullLocation);
         });
@@ -2199,7 +2198,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     author: entry.author,
                     details: entry.details,
                     locations: newLocations,
-                } as Entry;
+                };
 
                 splitEntries.push(newEntry);
             }
@@ -2477,7 +2476,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 // We get the LOC from that line by finding the first newline from the end.
                 const idx = output.length - " total\n".length;
                 let i = idx;
-                for (i = idx; i >= 0; --i) {
+                for (; i >= 0; --i) {
                     // 10 is the ascii code for newline
                     if (output[i] === 10) {
                         break;
@@ -3620,9 +3619,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                     label: loc.label,
                                     description: loc.description,
                                     rootPath: rootPath,
-                                }) as FullLocation,
+                                }),
                         ),
-                    }) as FullEntry,
+                    }),
             ),
             auditedFiles: parsedEntries.auditedFiles,
             // older versions do not have partiallyAuditedFiles
@@ -3643,9 +3642,9 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                                     label: loc.label,
                                     description: loc.description,
                                     rootPath: rootPath,
-                                }) as FullLocation,
+                                }),
                         ),
-                    }) as FullEntry,
+                    }),
             ),
         } as FullSerializedData;
 
