@@ -1,3 +1,7 @@
+// chai is ESM-only since v5, but these tests compile to CommonJS. Node >=24
+// (see engines.node and .nvmrc) loads ESM through require(), so the emitted
+// require("chai") resolves correctly at runtime.
+// @ts-expect-error TS1479
 import { expect } from "chai";
 import { InputBox, Workbench, EditorView, ActivityBar, TextEditor, VSBrowser } from "vscode-extension-tester";
 import { Key } from "selenium-webdriver";

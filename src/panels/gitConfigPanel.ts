@@ -21,7 +21,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
     private _view?: vscode.WebviewView;
 
     constructor(private readonly _extensionUri: vscode.Uri) {
-        this.currentRootPathAndLabel = { rootPath: "", rootLabel: "" } as RootPathAndLabel;
+        this.currentRootPathAndLabel = { rootPath: "", rootLabel: "" };
         this.dirToPathMap = new Map<string, string>();
 
         vscode.commands.registerCommand(

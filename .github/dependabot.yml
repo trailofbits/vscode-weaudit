@@ -12,6 +12,11 @@ updates:
       versioning-strategy: increase
       cooldown:
           default-days: 7
+      ignore:
+          # @types/vscode must track engines.vscode, i.e. the oldest VS Code we
+          # support, rather than the newest release. Typing against a newer API
+          # than we declare lets us call methods absent on our minimum version.
+          - dependency-name: "@types/vscode"
       groups:
           npm-dependencies:
               patterns:

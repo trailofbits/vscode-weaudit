@@ -44,7 +44,6 @@ import {
     mergeTwoPartiallyAuditedFileArrays,
     FullSerializedData,
     ConfigurationEntry,
-    WorkspaceRootEntry,
     configEntryEquals,
     RootPathAndLabel,
 } from "./types";
@@ -163,8 +162,8 @@ class WARoot {
                 const configEntry = {
                     path: path.join(vscodeFolder, file),
                     username: parsedPath.name,
-                    root: { label: this.rootLabel } as WorkspaceRootEntry,
-                } as ConfigurationEntry;
+                    root: { label: this.rootLabel },
+                };
                 this.configs.push(configEntry);
                 this.currentlySelectedConfigs.push(configEntry);
             }
@@ -257,7 +256,7 @@ class WARoot {
     persistClientRemote(): void {
         vscode.commands.executeCommand(
             "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            { rootPath: this.rootPath, rootLabel: this.rootLabel },
             this.clientRemote,
             this.gitRemote,
             this.gitSha,
@@ -276,8 +275,8 @@ class WARoot {
             newData = JSON.stringify(dataToSerialize, null, 2);
 
             // We are creating a new config file
-            const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
+            const wsRootEntry = { label: this.rootLabel };
+            const configEntry = { path: filename, username: this.username, root: wsRootEntry };
             this.configs.push(configEntry);
             this.currentlySelectedConfigs.push(configEntry);
         } else {
@@ -295,7 +294,7 @@ class WARoot {
     persistAuditRemote(): void {
         vscode.commands.executeCommand(
             "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            { rootPath: this.rootPath, rootLabel: this.rootLabel },
             this.clientRemote,
             this.gitRemote,
             this.gitSha,
@@ -314,8 +313,8 @@ class WARoot {
             newData = JSON.stringify(dataToSerialize, null, 2);
 
             // We are creating a new config file
-            const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
+            const wsRootEntry = { label: this.rootLabel };
+            const configEntry = { path: filename, username: this.username, root: wsRootEntry };
             this.configs.push(configEntry);
             this.currentlySelectedConfigs.push(configEntry);
         } else {
@@ -333,7 +332,7 @@ class WARoot {
     persistGitHash(): void {
         vscode.commands.executeCommand(
             "weAudit.setGitConfigView",
-            { rootPath: this.rootPath, rootLabel: this.rootLabel } as RootPathAndLabel,
+            { rootPath: this.rootPath, rootLabel: this.rootLabel },
             this.clientRemote,
             this.gitRemote,
             this.gitSha,
@@ -352,8 +351,8 @@ class WARoot {
             newData = JSON.stringify(dataToSerialize, null, 2);
 
             // We are creating a new config file
-            const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
-            const configEntry = { path: filename, username: this.username, root: wsRootEntry } as ConfigurationEntry;
+            const wsRootEntry = { label: this.rootLabel };
+            const configEntry = { path: filename, username: this.username, root: wsRootEntry };
             this.configs.push(configEntry);
             this.currentlySelectedConfigs.push(configEntry);
         } else {
@@ -557,9 +556,9 @@ class WARoot {
      * @returns A list of `uri`s to decorate and the relevant username.
      */
     toggleAudited(uri: vscode.Uri, relativePath: string): [vscode.Uri[], string] {
-        let relevantUsername = "";
+        let relevantUsername: string;
 
-        let urisToDecorate: vscode.Uri[] = [];
+        let urisToDecorate: vscode.Uri[];
 
         // check if file is already in list
         const index = this.auditedFiles.findIndex((file) => file.path === relativePath);
@@ -929,7 +928,7 @@ class WARoot {
         }
 
         const fileName = path.join(vscodeFolder, username + SERIALIZED_FILE_EXTENSION);
-        const wsRootEntry = { label: this.rootLabel } as WorkspaceRootEntry;
+        const wsRootEntry = { label: this.rootLabel };
         const configEntry = { path: fileName, username: username, root: wsRootEntry };
         if (!fs.existsSync(fileName)) {
             existsFile = false;
@@ -947,44 +946,32 @@ class WARoot {
         );
 
         // Remove the root path for backwards compatibility. It is implicit in the location of the saved file anyway.
-        let reducedEntries = filteredEntries.map(
-            (fullEntry) =>
-                ({
-                    label: fullEntry.label,
-                    entryType: fullEntry.entryType,
-                    author: fullEntry.author,
-                    details: fullEntry.details,
-                    locations: fullEntry.locations.map(
-                        (location) =>
-                            ({
-                                path: location.path,
-                                startLine: location.startLine,
-                                endLine: location.endLine,
-                                label: location.label,
-                                description: location.description,
-                            }) as Location,
-                    ),
-                }) as Entry,
-        );
-        let reducedResolvedEntries = filteredResolvedEntries.map(
-            (fullEntry) =>
-                ({
-                    label: fullEntry.label,
-                    entryType: fullEntry.entryType,
-                    author: fullEntry.author,
-                    details: fullEntry.details,
-                    locations: fullEntry.locations.map(
-                        (location) =>
-                            ({
-                                path: location.path,
-                                startLine: location.startLine,
-                                endLine: location.endLine,
-                                label: location.label,
-                                description: location.description,
-                            }) as Location,
-                    ),
-                }) as Entry,
-        );
+        let reducedEntries = filteredEntries.map((fullEntry) => ({
+            label: fullEntry.label,
+            entryType: fullEntry.entryType,
+            author: fullEntry.author,
+            details: fullEntry.details,
+            locations: fullEntry.locations.map((location) => ({
+                path: location.path,
+                startLine: location.startLine,
+                endLine: location.endLine,
+                label: location.label,
+                description: location.description,
+            })),
+        }));
+        let reducedResolvedEntries = filteredResolvedEntries.map((fullEntry) => ({
+            label: fullEntry.label,
+            entryType: fullEntry.entryType,
+            author: fullEntry.author,
+            details: fullEntry.details,
+            locations: fullEntry.locations.map((location) => ({
+                path: location.path,
+                startLine: location.startLine,
+                endLine: location.endLine,
+                label: location.label,
+                description: location.description,
+            })),
+        }));
 
         if (existsFile) {
             // if we are not seeing the current user's findings, we can't simply overwrite the file
@@ -1096,7 +1083,7 @@ class MultiRootManager {
         // weAudit.findAndLoadConfigurationFiles is executed by the CodeMarker
         vscode.commands.executeCommand(
             "weAudit.setGitConfigRoots",
-            this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
+            this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() })),
         );
         // Add a listener for changes to the roots
         const listener = async (event: vscode.WorkspaceFoldersChangeEvent): Promise<void> => {
@@ -1138,7 +1125,7 @@ class MultiRootManager {
             // Tell the git Config WebView that there are new roots
             await vscode.commands.executeCommand(
                 "weAudit.setGitConfigRoots",
-                this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
+                this.roots.map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() })),
             );
         };
         const disposable = vscode.workspace.onDidChangeWorkspaceFolders(listener);
@@ -1194,9 +1181,7 @@ class MultiRootManager {
      * @returns a list of [root path, label] tuples where each label is unique
      */
     private createUniqueLabels(rootPaths: string[]): RootPathAndLabel[] {
-        const rootPathsAndLabels: RootPathAndLabel[] = rootPaths.map(
-            (rootPath) => ({ rootPath: rootPath, rootLabel: path.basename(rootPath) }) as RootPathAndLabel,
-        );
+        const rootPathsAndLabels: RootPathAndLabel[] = rootPaths.map((rootPath) => ({ rootPath: rootPath, rootLabel: path.basename(rootPath) }));
         const rootLabels = rootPathsAndLabels.map((rootPathAndLabel) => rootPathAndLabel.rootLabel);
 
         if (new Set(rootLabels).size === rootPaths.length) {
@@ -1575,7 +1560,7 @@ class MultiRootManager {
         for (const root of this.roots) {
             root.markedFilesDayLog.forEach((value, key) => {
                 const currentValue = mergedMarkedFilesDayLog.get(key);
-                const updateValue = value.map((path) => [{ rootPath: root.rootPath, path: path } as FullPath, root.getRootLabel()] as [FullPath, string]);
+                const updateValue = value.map((path) => [{ rootPath: root.rootPath, path: path }, root.getRootLabel()] as [FullPath, string]);
                 if (currentValue === undefined) {
                     mergedMarkedFilesDayLog.set(key, updateValue);
                 } else {
@@ -1689,7 +1674,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 }
                 vscode.commands.executeCommand(
                     "weAudit.setGitConfigView",
-                    { rootPath: wsRoot.rootPath, rootLabel: wsRoot.getRootLabel() } as RootPathAndLabel,
+                    { rootPath: wsRoot.rootPath, rootLabel: wsRoot.getRootLabel() },
                     wsRoot.clientRemote,
                     wsRoot.gitRemote,
                     wsRoot.gitSha,
@@ -1703,7 +1688,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         vscode.commands.registerCommand("weAudit.getGitConfigRoots", () => {
             vscode.commands.executeCommand(
                 "weAudit.setGitConfigRoots",
-                this.workspaces.getRoots().map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel),
+                this.workspaces.getRoots().map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() })),
             );
         });
 
@@ -1726,9 +1711,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // Pushes the roots and currently selected configurations to the MultiConfig
         vscode.commands.registerCommand("weAudit.getMultiConfigRoots", () => {
-            const rootPathsAndLabels = this.workspaces
-                .getRoots()
-                .map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }) as RootPathAndLabel);
+            const rootPathsAndLabels = this.workspaces.getRoots().map((root) => ({ rootPath: root.rootPath, rootLabel: root.getRootLabel() }));
             vscode.commands.executeCommand("weAudit.setMultiConfigRoots", rootPathsAndLabels);
             vscode.commands.executeCommand("weAudit.refreshSavedFindings", this.workspaces.getSelectedConfigurations());
         });
@@ -1876,27 +1859,24 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 }
 
                 const splitEntries = this.splitLocationsFromEntry(entry);
-                actualEntries = splitEntries.map(
-                    (entry) =>
-                        ({
-                            label: entry.label,
-                            entryType: entry.entryType,
-                            author: entry.author,
-                            details: entry.details,
-                            locations: entry.locations.map((loc) => {
-                                // transform absolute paths to relative paths to the workspace path
-                                const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
-                                return {
-                                    path: relativePath,
-                                    startLine: loc.startLine,
-                                    endLine: loc.endLine,
-                                    label: loc.label,
-                                    description: loc.description,
-                                    rootPath: wsRoot!.rootPath,
-                                } as FullLocation;
-                            }),
-                        }) as FullEntry,
-                );
+                actualEntries = splitEntries.map((entry) => ({
+                    label: entry.label,
+                    entryType: entry.entryType,
+                    author: entry.author,
+                    details: entry.details,
+                    locations: entry.locations.map((loc) => {
+                        // transform absolute paths to relative paths to the workspace path
+                        const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                        return {
+                            path: relativePath,
+                            startLine: loc.startLine,
+                            endLine: loc.endLine,
+                            label: loc.label,
+                            description: loc.description,
+                            rootPath: wsRoot!.rootPath,
+                        };
+                    }),
+                }));
             } else {
                 // This is the weAudit internal case, entries are either FullEntry or FullLocationEntry
                 const actualEntry = isLocationEntry(entry) ? entry.parentEntry : entry;
@@ -1992,27 +1972,24 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
             results.push(...entriesToPush);
 
-            const fullResults = results.map(
-                (entry) =>
-                    ({
-                        label: entry.label,
-                        entryType: entry.entryType,
-                        author: entry.author,
-                        details: entry.details,
-                        locations: entry.locations.map((loc) => {
-                            // transform absolute paths to relative paths to the workspace path
-                            const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
-                            return {
-                                path: relativePath,
-                                startLine: loc.startLine,
-                                endLine: loc.endLine,
-                                label: loc.label,
-                                description: loc.description,
-                                rootPath: wsRoot!.rootPath,
-                            } as FullLocation;
-                        }),
-                    }) as FullEntry,
-            );
+            const fullResults = results.map((entry) => ({
+                label: entry.label,
+                entryType: entry.entryType,
+                author: entry.author,
+                details: entry.details,
+                locations: entry.locations.map((loc) => {
+                    // transform absolute paths to relative paths to the workspace path
+                    const [wsRoot, relativePath] = this.workspaces.getCorrespondingRootAndPath(loc.path);
+                    return {
+                        path: relativePath,
+                        startLine: loc.startLine,
+                        endLine: loc.endLine,
+                        label: loc.label,
+                        description: loc.description,
+                        rootPath: wsRoot!.rootPath,
+                    };
+                }),
+            }));
 
             this.externallyLoadFindings(fullResults);
         });
@@ -2036,7 +2013,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 label: location.label,
                 description: location.description,
                 rootPath: wsRoot.rootPath,
-            } as FullLocation;
+            };
 
             return this.getClientPermalink(fullLocation);
         });
@@ -2199,7 +2176,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                     author: entry.author,
                     details: entry.details,
                     locations: newLocations,
-                } as Entry;
+                };
 
                 splitEntries.push(newEntry);
             }
@@ -2477,7 +2454,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
                 // We get the LOC from that line by finding the first newline from the end.
                 const idx = output.length - " total\n".length;
                 let i = idx;
-                for (i = idx; i >= 0; --i) {
+                for (; i >= 0; --i) {
                     // 10 is the ascii code for newline
                     if (output[i] === 10) {
                         break;
@@ -3604,49 +3581,37 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             clientRemote: parsedEntries.clientRemote,
             gitRemote: parsedEntries.gitRemote,
             gitSha: parsedEntries.gitSha,
-            treeEntries: parsedEntries.treeEntries.map(
-                (entry) =>
-                    ({
-                        label: entry.label,
-                        entryType: entry.entryType,
-                        author: entry.author,
-                        details: entry.details,
-                        locations: entry.locations.map(
-                            (loc) =>
-                                ({
-                                    path: loc.path,
-                                    startLine: loc.startLine,
-                                    endLine: loc.endLine,
-                                    label: loc.label,
-                                    description: loc.description,
-                                    rootPath: rootPath,
-                                }) as FullLocation,
-                        ),
-                    }) as FullEntry,
-            ),
+            treeEntries: parsedEntries.treeEntries.map((entry) => ({
+                label: entry.label,
+                entryType: entry.entryType,
+                author: entry.author,
+                details: entry.details,
+                locations: entry.locations.map((loc) => ({
+                    path: loc.path,
+                    startLine: loc.startLine,
+                    endLine: loc.endLine,
+                    label: loc.label,
+                    description: loc.description,
+                    rootPath: rootPath,
+                })),
+            })),
             auditedFiles: parsedEntries.auditedFiles,
             // older versions do not have partiallyAuditedFiles
             partiallyAuditedFiles: parsedEntries.partiallyAuditedFiles,
-            resolvedEntries: parsedEntries.resolvedEntries.map(
-                (entry) =>
-                    ({
-                        label: entry.label,
-                        entryType: entry.entryType,
-                        author: entry.author,
-                        details: entry.details,
-                        locations: entry.locations.map(
-                            (loc) =>
-                                ({
-                                    path: loc.path,
-                                    startLine: loc.startLine,
-                                    endLine: loc.endLine,
-                                    label: loc.label,
-                                    description: loc.description,
-                                    rootPath: rootPath,
-                                }) as FullLocation,
-                        ),
-                    }) as FullEntry,
-            ),
+            resolvedEntries: parsedEntries.resolvedEntries.map((entry) => ({
+                label: entry.label,
+                entryType: entry.entryType,
+                author: entry.author,
+                details: entry.details,
+                locations: entry.locations.map((loc) => ({
+                    path: loc.path,
+                    startLine: loc.startLine,
+                    endLine: loc.endLine,
+                    label: loc.label,
+                    description: loc.description,
+                    rootPath: rootPath,
+                })),
+            })),
         } as FullSerializedData;
 
         // Normalize all the paths from loaded files. These can come from different OSes with different path

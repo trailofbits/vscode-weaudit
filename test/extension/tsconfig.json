@@ -9,7 +9,8 @@
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
+        "types": ["vscode", "node", "mocha"] /* TS 6 no longer auto-includes @types packages */
     },
     "include": ["**/*.ts"],
     "exclude": ["fixtures"]
