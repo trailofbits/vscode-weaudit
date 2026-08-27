@@ -676,7 +676,7 @@
         "@types/chai": "^5.2.3",
         "@types/glob": "^9.0.0",
         "@types/mocha": "^10.0.10",
-        "@types/node": "24.x",
+        "@types/node": "26.x",
         "@types/sinon": "^22.0.0",
         "@types/vscode": "1.120.0",
         "@types/vscode-webview": "^1.57.1",
@@ -692,7 +692,7 @@
         "nyc": "^18.0.0",
         "sinon": "^22.1.0",
         "ts-node": "^10.9.2",
-        "typescript": "^6.0.3",
+        "typescript": "^7.0.2",
         "vscode-extension-tester": "^8.24.0"
     },
     "dependencies": {
