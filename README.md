@@ -247,3 +247,7 @@ npx eslint -c .eslintrc.cjs .
 # run Biome formatter
 npx biome format --write .
 ```
+
+### Releasing
+
+The release process is detailed in [releasing.md](./docs/releasing.md).
