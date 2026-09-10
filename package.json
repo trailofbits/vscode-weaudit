@@ -668,7 +668,7 @@
         "typecheck": "tsc --noEmit"
     },
     "devDependencies": {
-        "@biomejs/biome": "^2.5.11",
+        "@biomejs/biome": "^2.5.12",
         "@eslint/js": "^10.0.1",
         "@microsoft/eslint-formatter-sarif": "^3.1.0",
         "@stylistic/eslint-plugin": "^5.7.0",
@@ -680,7 +680,7 @@
         "@types/sinon": "^22.0.0",
         "@types/vscode": "1.120.0",
         "@types/vscode-webview": "^1.57.1",
-        "@typescript-eslint/eslint-plugin": "^8.68.0",
+        "@typescript-eslint/eslint-plugin": "^8.69.0",
         "@typescript-eslint/parser": "^8.50.0",
         "@vscode/test-cli": "^0.0.15",
         "@vscode/test-electron": "^3.1.0",
@@ -688,12 +688,12 @@
         "esbuild": "^0.28.2",
         "eslint": "^10.9.1",
         "glob": "^13.0.0",
-        "mocha": "^11.3.0",
+        "mocha": "^12.0.0",
         "nyc": "^18.0.0",
         "sinon": "^22.1.0",
         "ts-node": "^10.9.2",
         "typescript": "^6.0.3",
-        "vscode-extension-tester": "^8.24.0"
+        "vscode-extension-tester": "^8.25.0"
     },
     "dependencies": {
         "@vscode/webview-ui-toolkit": "^1.4.0",
