@@ -1,6 +1,6 @@
 import * as assert from "node:assert";
 import * as path from "node:path";
-import { generatePermalink } from "../../src/permalink";
+import { generatePermalink } from "../../src/utilities/generatePermalink";
 
 describe("generatePermalink", () => {
     const sha = "abc123def456789012345678901234567890abcd";

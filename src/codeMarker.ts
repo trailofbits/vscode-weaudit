@@ -48,7 +48,7 @@ import {
     RootPathAndLabel,
 } from "./types";
 import { normalizePathForOS } from "./utilities/normalizePath";
-import { generatePermalink } from "./permalink";
+import { generatePermalink } from "./utilities/generatePermalink";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";

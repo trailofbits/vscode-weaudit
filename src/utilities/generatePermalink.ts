@@ -1,5 +1,5 @@
 import { sep } from "node:path";
-import type { Location } from "./types";
+import type { Location } from "../types";
 
 /** The file path and line range used by a repository permalink. */
 type PermalinkLocation = Pick<Location, "path" | "startLine" | "endLine">;
@@ -17,6 +17,7 @@ type PermalinkLocation = Pick<Location, "path" | "startLine" | "endLine">;
  *     A permalink with encoded path segments and the host-specific line fragment.
  */
 export function generatePermalink(remote: string, sha: string, location: PermalinkLocation, separator = sep): string {
+    // Windows accepts both / and \ as path separators.
     const segments = location.path.split(separator).join("/").split("/");
     const filePath = segments.map(encodeURIComponent).join("/");
     if (URL.parse(remote)?.hostname === "bitbucket.org") {
