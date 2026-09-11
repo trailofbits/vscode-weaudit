@@ -119,8 +119,6 @@ You can resolve a finding by clicking on the corresponding `Resolve` button in t
 
 ### Copy Permalinks
 
-Permalinks use forward slashes on every OS and URL-encode special characters in file names.
-
 Copy the Audit permalink by clicking on the corresponding `Copy Audit Permalink` button in the _List of Findings_ panel.
 
 ![Copy Audit Permalink](media/readme/copy_permalink.png)
