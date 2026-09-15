@@ -48,6 +48,7 @@ import {
     RootPathAndLabel,
 } from "./types";
 import { normalizePathForOS } from "./utilities/normalizePath";
+import { generatePermalink } from "./utilities/generatePermalink";
 
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
@@ -2594,17 +2595,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
             return;
         }
 
-        const remoteHost = URL.parse(gitRemote)?.hostname;
-        let permalink;
-        if (remoteHost === "bitbucket.org") {
-            const issueLocation = `#lines-${location.startLine + 1}:${location.endLine + 1}`;
-            permalink = gitRemote + "/src/" + sha + "/" + location.path + issueLocation;
-        } else {
-            const issueLocation = `#L${location.startLine + 1}-L${location.endLine + 1}`;
-            permalink = gitRemote + "/blob/" + sha + "/" + location.path + issueLocation;
-        }
-
-        return { remote: gitRemote, permalink };
+        return { remote: gitRemote, permalink: generatePermalink(gitRemote, sha, location) };
     }
 
     /**
