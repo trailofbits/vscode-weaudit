@@ -116,7 +116,8 @@ suite("Daily log region reviews", () => {
                 await vscode.commands.executeCommand("weAudit.addPartiallyAudited");
             }
             await vscode.commands.executeCommand("workbench.action.closeAllEditors");
-            fs.rmSync(directory, { recursive: true, force: true });
+            // Windows can retain file handles briefly after editors close.
+            await fs.promises.rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
         }
     });
 
@@ -184,7 +185,8 @@ suite("Daily log region reviews", () => {
                 await waitForNextRoot(existingRoots[0].uri.fsPath);
             }
             await vscode.commands.executeCommand("workbench.action.closeAllEditors");
-            fs.rmSync(temporaryDirectory, { recursive: true, force: true });
+            // Retry transient Windows cleanup errors without blocking pending filesystem work.
+            await fs.promises.rm(temporaryDirectory, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
         }
     });
 });
