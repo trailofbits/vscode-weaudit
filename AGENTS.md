@@ -3,28 +3,32 @@
 Guidelines for autonomous contributors working on this repository.
 
 1. **Understand the extension scope**
-   - This is a VS Code extension that manages audit findings. Read `README.md` and `src/codeMarker.ts` before implementing changes so you respect the existing UX flows (tree view, highlights, saved findings, etc.).
+   - This is a VS Code extension that manages audit findings. Read `README.md` and the relevant implementation before changing behavior so you respect the existing UX flows (tree view, highlights, saved findings, etc.).
 
 2. **Keep edits scoped and explainable**
-   - Prefer incremental, targeted fixes. When touching large files such as `src/codeMarker.ts`, describe the rationale for every change in comments or PR descriptions so human reviewers can follow along.
+   - Prefer incremental, targeted fixes, and simple processes. Briefly describe non-obvious pieces of code.
+   - Follow Hoare's principle: "... to make it so simple that there are obviously no deficiencies."
+   - Prefer straightforward control flow and existing patterns; introduce abstractions only when they simplify the current task.
+   - Keep changes isolated to the task. Do not remove or alter unrelated features or UI behavior.
 
 3. **Document new behavior**
    - If you add or change a feature that affects users, update `README.md` or other relevant docs/screenshots in the same change set.
 
-4. **Always add docstrings for new functions**
-   - Whether it’s TypeScript, shell scripts, or build helpers, any newly introduced function or class must include a concise docstring explaining its role. Update existing docstrings when behavior changes.
+4. **Document intent and contracts**
+   - Add concise docstrings for public APIs and non-obvious functions or classes, including shell scripts and build helpers. Explain intent, assumptions, or constraints rather than restating the code; trivial helpers do not need redundant docstrings. Update existing docstrings when behavior changes.
 
 5. **Tests and validation**
-   - Run any available automated checks relevant to your change (unit tests, linting, packaging). If something can’t be run in the current environment, clearly state what remains unverified.
+   - For bug fixes, add a regression test that fails before the fix when practical. Run checks relevant to your change and report their results. If something can’t be run in the current environment, clearly state what remains unverified.
+   - Available checks include `npm run typecheck`, `npm run lint`, `npm run test:unit`, `npm run test:ext` (VS Code integration tests), `npm run test:ui` (UI tests), and `npm run package` (production build).
 
 6. **Commit messaging**
    - When suggesting or creating commit titles, always follow the [Conventional Commits](https://www.conventionalcommits.org/) format (e.g., `feat: add highlight toggle command`). Include scope when it adds clarity.
 
 7. **Preserve default behavior**
-   - Never change the extension's current default behavior without a clear, justified reason. Existing users rely on established workflows; breaking them requires explicit approval.
+   - Preserve established workflows outside the requested change. The requested behavior change is authorized; seek approval for additional breaking changes outside that scope.
 
-8. **Do not remove or alter unrelated features**
-   - When implementing a new feature, do not remove existing features or change other parts of the UI that are not directly related to the task at hand. Keep changes isolated to the feature being worked on.
+8. **Protect existing work**
+   - Preserve unrelated working-tree changes; do not revert or overwrite them.
 
 9. **Consider cross-tool compatibility**
    - Any change involving external commands (callable by other extensions), the GitHub export, finding severity, or finding difficulty must account for the broader tooling ecosystem. These interfaces are consumed by other tools (e.g., audit reporting pipelines), so changes must maintain compatibility and be coordinated with those dependencies.
