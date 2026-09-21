@@ -129,7 +129,7 @@ Copy a permalink to any code region by right clicking and selecting one of the `
 
 ### Daily Log
 
-You can view a daily log of all the marked files and LOC per day by clicking on the `Daily Log` button in the _List of Findings_ panel.
+You can view a daily log of reviewed files, reviewed regions, and LOC per day by clicking on the `Daily Log` button in the _List of Findings_ panel.
 
 ![Daily Log](media/readme/daily_log.png)
 
