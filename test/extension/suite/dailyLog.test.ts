@@ -126,7 +126,8 @@ suite("Daily log region reviews", () => {
         const existingRoots = vscode.workspace.workspaceFolders!;
         const lastExistingRoot = existingRoots[existingRoots.length - 1].uri.fsPath;
         const temporaryDirectory = fs.realpathSync(fs.mkdtempSync(path.join(tmpdir(), "weaudit-daylog-")));
-        const roots = [path.join(temporaryDirectory, "project-a"), path.join(temporaryDirectory, "project-b")];
+        // Use VS Code's drive-letter normalization for both root polling and cleanup comparisons.
+        const roots = ["project-a", "project-b"].map((name) => vscode.Uri.file(path.join(temporaryDirectory, name)).fsPath);
         const relativePath = path.join("src", "shared.ts");
         for (const root of roots) {
             fs.mkdirSync(path.join(root, "src"), { recursive: true });
