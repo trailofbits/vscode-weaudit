@@ -3,7 +3,6 @@ import * as path from "path";
 import * as fs from "fs";
 import { FromLocationResponse } from "./externalTypes";
 import { userInfo } from "os";
-import { spawnSync } from "child_process";
 import { plot } from "asciichart";
 
 import { ResolvedEntries } from "./resolvedFindings";
@@ -50,6 +49,8 @@ import {
 import { normalizePathForOS } from "./utilities/normalizePath";
 import { generatePermalink } from "./utilities/generatePermalink";
 
+import { DayLogEntry, ReviewedRegion, updateRegionLog, updateFileLog, countReviewedLines } from "./utilities/dayLog";
+
 export const SERIALIZED_FILE_EXTENSION = ".weaudit";
 const DAY_LOG_FILENAME = ".weauditdaylog";
 
@@ -72,8 +73,8 @@ class WARoot {
     private configs: ConfigurationEntry[];
     private currentlySelectedConfigs: ConfigurationEntry[];
 
-    // markedFilesDayLog contains a map associating a string representing a date to a file path.
-    public markedFilesDayLog: Map<string, string[]>;
+    // Each date maps to whole-file paths and zero-based, inclusive reviewed regions.
+    public markedFilesDayLog: Map<string, DayLogEntry[]>;
 
     /** The GitHub issue number designated for Code Quality comments in this workspace root. */
     public codeQualityIssueNumber: number | undefined;
@@ -97,7 +98,7 @@ class WARoot {
         this.gitRemote = "";
         this.gitSha = "";
 
-        this.markedFilesDayLog = new Map<string, string[]>();
+        this.markedFilesDayLog = new Map<string, DayLogEntry[]>();
         this.loadDayLogFromFile();
 
         this.username = vscode.workspace.getConfiguration("weAudit").get("general.username") || userInfo().username;
@@ -141,7 +142,7 @@ class WARoot {
         }
 
         const dayLogPath = path.join(vscodeFolder, DAY_LOG_FILENAME);
-        const data = JSON.parse(fs.readFileSync(dayLogPath, "utf8")) as Iterable<readonly [string, string[]]>;
+        const data = JSON.parse(fs.readFileSync(dayLogPath, "utf8")) as Iterable<readonly [string, DayLogEntry[]]>;
         this.markedFilesDayLog = new Map(data);
     }
 
@@ -684,26 +685,14 @@ class WARoot {
 
     /**
      * Updates the daily log with the marked/unmarked file
-     * for today's date.
+     * for today's date, replacing any partial entries for the same file.
      * @param relativePath the relative path of the file
      * @param add whether to add or remove the file from the list
      */
     updateDayLog(relativePath: string, add: boolean): void {
         const today = new Date();
         const todayString = today.toDateString();
-        const todayFiles = this.markedFilesDayLog.get(todayString);
-        if (todayFiles === undefined) {
-            this.markedFilesDayLog.set(todayString, [relativePath]);
-        } else {
-            // check if file is already in list
-            const index = todayFiles.findIndex((file) => file === relativePath);
-            if (index > -1 && !add) {
-                // if it exists, remove it
-                todayFiles.splice(index, 1);
-            } else if (index === -1 && add) {
-                todayFiles.push(relativePath);
-            }
-        }
+        this.markedFilesDayLog.set(todayString, updateFileLog(this.markedFilesDayLog.get(todayString) ?? [], relativePath, add));
         this.persistDayLog();
     }
 
@@ -720,7 +709,7 @@ class WARoot {
     }
 
     /**
-     * Adds a file in this workspace root to the array of PartiallyAuditedFiles.
+     * Toggles selected regions in this workspace root and records the changes in today's log.
      * @param relativePath The relative path of the file to the folder of this root
      */
     addPartiallyAudited(relativePath: string): void {
@@ -733,11 +722,17 @@ class WARoot {
 
         const locations = this.getActiveSelectionLocation();
 
+        const today = new Date().toDateString();
+        let dayEntries = this.markedFilesDayLog.get(today) ?? [];
+
         // Process each selection/location separately
         for (const location of locations) {
             const alreadyMarked = this.partiallyAuditedFiles.findIndex(
                 (file) => file.path === relativePath && file.startLine <= location.startLine && file.endLine >= location.endLine,
             );
+
+            // Record the same toggle in today's log so region reviews contribute to LOC.
+            dayEntries = updateRegionLog(dayEntries, { path: relativePath, startLine: location.startLine, endLine: location.endLine }, alreadyMarked === -1);
 
             // this section is already marked. Remove it then
             if (alreadyMarked > -1) {
@@ -785,6 +780,8 @@ class WARoot {
         }
 
         this.mergePartialAudits();
+        this.markedFilesDayLog.set(today, dayEntries);
+        this.persistDayLog();
     }
 
     /**
@@ -1553,15 +1550,22 @@ class MultiRootManager {
     }
 
     /**
-     * Gives the merged marked files by daily log for all roots.
+     * Gives the merged reviewed files and regions by daily log for all roots.
      * The paths are all extended to full.
      */
-    getMarkedFilesDayLog(): Map<string, [FullPath, string][]> {
-        const mergedMarkedFilesDayLog: Map<string, [FullPath, string][]> = new Map<string, [FullPath, string][]>();
+    getMarkedFilesDayLog(): Map<string, [FullPath, string, ReviewedRegion?][]> {
+        const mergedMarkedFilesDayLog: Map<string, [FullPath, string, ReviewedRegion?][]> = new Map<string, [FullPath, string, ReviewedRegion?][]>();
         for (const root of this.roots) {
             root.markedFilesDayLog.forEach((value, key) => {
                 const currentValue = mergedMarkedFilesDayLog.get(key);
-                const updateValue = value.map((path) => [{ rootPath: root.rootPath, path: path }, root.getRootLabel()] as [FullPath, string]);
+                const updateValue = value.map(
+                    (entry) =>
+                        [
+                            { rootPath: root.rootPath, path: typeof entry === "string" ? entry : entry.path },
+                            root.getRootLabel(),
+                            typeof entry === "string" ? undefined : entry,
+                        ] as [FullPath, string, ReviewedRegion?],
+                );
                 if (currentValue === undefined) {
                     mergedMarkedFilesDayLog.set(key, updateValue);
                 } else {
@@ -2427,7 +2431,8 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
     /**
      * Creates and shows a representation of
-     * the marked files by daily log, in markdown format.
+     * the reviewed files, regions, and LOC by daily log, in markdown format.
+     * Unreadable files are listed as excluded, and affected counts are marked incomplete.
      */
     showMarkedFilesDayLog(): void {
         // Since audited files are maintained separately for each workspace root, use the MultiRootManager
@@ -2435,35 +2440,39 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
 
         // sort the keys of the map by date
         const sortedDates = new Map(Array.from(markedFilesDayLog).sort(([a], [b]) => Date.parse(a) - Date.parse(b)));
-        const asciiArrayData = new Array(sortedDates.keys.length);
+        const asciiArrayData: number[] = [];
         let idxDataArray = 0;
 
         let logString = "";
         let totalLOC = 0;
+        let totalIncomplete = false;
 
         for (const [date, files] of sortedDates) {
             if (files && files.length > 0) {
                 let filesString = `## ${date}\n - `;
-                filesString += files.map(([fullPath, rootLabel]) => path.join(rootLabel, fullPath.path)).join("\n - ");
+                filesString += files
+                    .map(
+                        ([fullPath, rootLabel, region]) =>
+                            path.join(rootLabel, fullPath.path) + (region ? ` (lines ${region.startLine + 1}–${region.endLine + 1})` : ""),
+                    )
+                    .join("\n - ");
                 logString += `${filesString}\n\n`;
 
                 // count the LOC per day
-                const fullPaths = files.map(([fullPath]) => path.join(fullPath.rootPath, fullPath.path));
-                const wcProc = spawnSync("wc", ["-l", ...fullPaths]);
-                const output = wcProc.output[1]!;
-                // wc outputs a final total line.
-                // We get the LOC from that line by finding the first newline from the end.
-                const idx = output.length - " total\n".length;
-                let i = idx;
-                for (; i >= 0; --i) {
-                    // 10 is the ascii code for newline
-                    if (output[i] === 10) {
-                        break;
+                let loc = 0;
+                let dailyIncomplete = false;
+                for (const [fullPath, rootLabel, region] of files) {
+                    try {
+                        loc += countReviewedLines(region ?? fullPath.path, (filePath) => fs.readFileSync(path.join(fullPath.rootPath, filePath), "utf8"));
+                    } catch {
+                        // A stale file path must not hide the remaining review history.
+                        dailyIncomplete = true;
+                        logString += `> Unable to read ${path.join(rootLabel, fullPath.path)}; excluded from LOC counts.\n\n`;
                     }
                 }
-                const loc = parseInt(output.slice(i + 1, idx).toString());
                 totalLOC += loc;
-                logString += `Daily LOC: ${loc}\n\n`;
+                totalIncomplete ||= dailyIncomplete;
+                logString += `Daily LOC: ${loc}${dailyIncomplete ? " (incomplete)" : ""}\n\n`;
 
                 // add a separator
                 logString += "---\n\n";
@@ -2482,7 +2491,7 @@ export class CodeMarker implements vscode.TreeDataProvider<TreeEntry> {
         }
 
         // add the total LOC to the log
-        logString += `Total LOC: ${totalLOC}\n\n`;
+        logString += `Total LOC: ${totalLOC}${totalIncomplete ? " (incomplete)" : ""}\n\n`;
 
         logString += plot(asciiArrayData, { height: 8 });
         vscode.workspace
