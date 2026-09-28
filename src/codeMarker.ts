@@ -1003,7 +1003,8 @@ class WARoot {
         if (toCreateData) {
             // create .vscode folder if it doesn't exist
             if (!existsFolder) {
-                fs.mkdirSync(vscodeFolder);
+                // Another author's save may have created it while we awaited the entries.
+                fs.mkdirSync(vscodeFolder, { recursive: true });
             }
 
             // create a new config file if it doesn't exist

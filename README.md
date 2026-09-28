@@ -5,7 +5,6 @@
 </picture>
 
 [![Tests](https://github.com/trailofbits/vscode-weaudit/actions/workflows/test.yml/badge.svg)](https://github.com/trailofbits/vscode-weaudit/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/trailofbits/vscode-weaudit/branch/main/graph/badge.svg)](https://codecov.io/gh/trailofbits/vscode-weaudit)
 
 # weAudit - A collaborative code review tool for VSCode
 
@@ -235,6 +234,18 @@ To build and install a new vsix file run the following script:
 npm install
 ./install.sh
 ```
+
+### Tests and coverage
+
+```bash
+npm run test:unit       # Unit and webview message tests
+npm run test:ext        # Integration tests in a VS Code extension host
+npm run test:ui         # UI tests
+npm run coverage:unit  # Unit coverage (also available as npm run coverage)
+npm run coverage:ext   # Extension-host coverage
+```
+
+Open `coverage/unit/index.html` or `coverage/extension/index.html` to inspect covered lines and branches. Each directory also contains `lcov.info` and `coverage-summary.json` for comparisons. CI generates both reports; no Codecov account or token is needed.
 
 ### Linting and Formatting
 
