@@ -6,12 +6,20 @@ import { WebviewMessage, UpdateRepositoryMessage, SetWorkspaceRootsMessage } fro
 import { RootPathAndLabel } from "../types";
 import htmlBody from "./gitConfig.html";
 
+/**
+ * Registers the Git Config webview view provider and its associated navigation commands.
+ * @param context The extension context for managing subscriptions.
+ */
 export function activateGitConfigWebview(context: vscode.ExtensionContext): void {
     const provider = new GitConfigProvider(context.extensionUri);
 
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(GitConfigProvider.viewType, provider));
 }
 
+/**
+ * Webview provider for the Git Config sidebar panel, which displays
+ * and edits client/audit repository URLs and commit hashes per workspace root.
+ */
 class GitConfigProvider implements vscode.WebviewViewProvider {
     public static readonly viewType = "gitConfig";
     private _disposables: vscode.Disposable[] = [];
@@ -78,6 +86,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
         });
     }
 
+    /** Initializes the webview with HTML, scripts, and message listeners when the view becomes visible. */
     public resolveWebviewView(webviewView: vscode.WebviewView, _context: vscode.WebviewViewResolveContext, _token: vscode.CancellationToken): void {
         this._view = webviewView;
 
@@ -100,6 +109,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
         });
     }
 
+    /** Generates the HTML content for the Git Config webview, including CSP and script references. */
     private _getHtmlForWebview(webview: vscode.Webview): string {
         // Get the local path to main script run in the webview, then convert it to a uri we can use in the webview.
         const styleUri = getUri(webview, this._extensionUri, ["media", "style.css"]);
@@ -128,6 +138,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
         `;
     }
 
+    /** Listens for messages from the webview and dispatches them to the appropriate extension commands. */
     private _setWebviewMessageListener(webview: vscode.Webview): void {
         webview.onDidReceiveMessage(
             (message: WebviewMessage) => {
@@ -167,6 +178,7 @@ class GitConfigProvider implements vscode.WebviewViewProvider {
     }
 }
 
+/** Generates a cryptographic nonce for the webview Content Security Policy. */
 function getNonce(): string {
     return crypto.randomBytes(16).toString("base64");
 }

@@ -71,12 +71,17 @@ function getSeverityColor(severity: FindingSeverity | undefined): vscode.ThemeCo
     }
 }
 
+/**
+ * Tree data provider for displaying resolved findings and notes,
+ * showing their resolution status with badges and severity-tinted icons.
+ */
 export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
     private resolvedEntries: FullEntry[];
 
     private _onDidChangeTreeDataEmitter = new vscode.EventEmitter<FullEntry | undefined | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeDataEmitter.event;
 
+    /** Fires the tree data change event to refresh the tree view. */
     refresh(): void {
         this._onDidChangeTreeDataEmitter.fire();
     }
@@ -85,12 +90,13 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
         this.resolvedEntries = resolvedEntries;
     }
 
+    /** Replaces the resolved entries list and refreshes the tree view. */
     setResolvedEntries(entries: FullEntry[]): void {
         this.resolvedEntries = entries;
         this.refresh();
     }
 
-    // tree data provider
+    /** Returns the resolved entries as children at the root level; entries have no children. */
     getChildren(element?: FullEntry): FullEntry[] {
         if (element === undefined) {
             return this.resolvedEntries;
@@ -98,10 +104,12 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
         return [];
     }
 
+    /** Resolved entries are always at the root level, so there is no parent. */
     getParent(_element: FullEntry): undefined {
         return undefined;
     }
 
+    /** Converts a resolved entry into a VS Code TreeItem with resolution badge and icon. */
     getTreeItem(entry: FullEntry): vscode.TreeItem {
         const resolutionEmoji = getResolutionEmoji(entry);
         const label = resolutionEmoji ? `${resolutionEmoji} ${entry.label}` : entry.label;
@@ -131,6 +139,10 @@ export class ResolvedEntriesTree implements vscode.TreeDataProvider<FullEntry> {
     }
 }
 
+/**
+ * Manages the "Resolved Findings" tree view, wrapping the tree data provider
+ * and handling view registration and lifecycle.
+ */
 export class ResolvedEntries {
     private treeDataProvider: ResolvedEntriesTree;
 
@@ -143,10 +155,12 @@ export class ResolvedEntries {
         context.subscriptions.push(treeView);
     }
 
+    /** Refreshes the resolved findings tree view. */
     public refresh(): void {
         this.treeDataProvider.refresh();
     }
 
+    /** Replaces the resolved entries and refreshes the tree view. */
     public setResolvedEntries(entries: FullEntry[]): void {
         this.treeDataProvider.setResolvedEntries(entries);
         this.refresh();

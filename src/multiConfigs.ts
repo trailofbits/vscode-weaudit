@@ -15,6 +15,10 @@ import {
 let lightEyePath: vscode.Uri;
 let darkEyePath: vscode.Uri;
 
+/**
+ * Tree data provider that discovers and lists saved weAudit configuration files
+ * across workspace roots, allowing users to toggle visibility of other users' findings.
+ */
 export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<ConfigTreeEntry> {
     private configurationEntries: ConfigurationEntry[];
     private rootEntries: WorkspaceRootEntry[];
@@ -24,6 +28,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
     private _onDidChangeTreeDataEmitter = new vscode.EventEmitter<ConfigTreeEntry | undefined | void>();
     readonly onDidChangeTreeData = this._onDidChangeTreeDataEmitter.event;
 
+    /** Fires the tree data change event to refresh the tree view. */
     refresh(): void {
         this._onDidChangeTreeDataEmitter.fire();
     }
@@ -54,6 +59,10 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         });
     }
 
+    /**
+     * Scans all workspace root .vscode directories for weAudit configuration files
+     * and populates the tree entries.
+     */
     findAndLoadConfigurationFiles(): void {
         this.configurationEntries = [];
         this.rootEntries = [];
@@ -76,7 +85,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         }
     }
 
-    // tree data provider
+    /** Returns child elements for the tree view. Root-level returns workspace roots or config entries. */
     getChildren(element?: ConfigTreeEntry): ConfigTreeEntry[] {
         if (this.rootPathsAndLabels.length > 1) {
             // For multiple roots, the tree root entries are the basenames of the workspace roots
@@ -94,6 +103,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         return [];
     }
 
+    /** Returns the parent element for a config tree entry, or undefined for root entries. */
     getParent(element: ConfigTreeEntry): ConfigTreeEntry | undefined {
         if (this.rootPathsAndLabels.length > 1 && isConfigurationEntry(element)) {
             // For multiple roots, the parent of a configuration file is its root entry
@@ -103,6 +113,7 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
         return undefined;
     }
 
+    /** Converts a config tree entry into a VS Code TreeItem for display. */
     getTreeItem(element: ConfigTreeEntry): vscode.TreeItem {
         if (isWorkspaceRootEntry(element)) {
             // Workspace root entries are collapsible but have no command
@@ -128,6 +139,10 @@ export class MultipleSavedFindingsTree implements vscode.TreeDataProvider<Config
     }
 }
 
+/**
+ * Registers the "Saved Findings" tree view and its data provider,
+ * enabling users to browse and toggle saved finding configurations.
+ */
 export class MultipleSavedFindings {
     constructor(context: vscode.ExtensionContext) {
         // icons

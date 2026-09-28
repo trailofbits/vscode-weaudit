@@ -26,6 +26,10 @@ export class DecorationManager {
         this.auditedFileDecorationType = this.loadAuditedDecorationConfiguration();
     }
 
+    /**
+     * Creates a text editor decoration type with the given background color,
+     * gutter icon, and overview ruler highlight.
+     */
     private createDecorationTypeWithString(color: string): vscode.TextEditorDecorationType {
         const overviewColor = this.withLessTransparentAlpha(color);
         return vscode.window.createTextEditorDecorationType({
@@ -61,26 +65,31 @@ export class DecorationManager {
         return color;
     }
 
+    /** Loads the decoration type for the current user's findings from configuration. */
     private loadOwnDecorationConfiguration(): vscode.TextEditorDecorationType {
         const color: string = vscode.workspace.getConfiguration("weAudit").get("ownFindingColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
+    /** Loads the decoration type for other users' findings from configuration. */
     private loadOtherDecorationConfiguration(): vscode.TextEditorDecorationType {
         const color: string = vscode.workspace.getConfiguration("weAudit").get("otherFindingColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
+    /** Loads the decoration type for the current user's notes from configuration. */
     private loadOwnNoteDecorationConfiguration(): vscode.TextEditorDecorationType {
         const color: string = vscode.workspace.getConfiguration("weAudit").get("ownNoteColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
+    /** Loads the decoration type for other users' notes from configuration. */
     private loadOtherNoteDecorationConfiguration(): vscode.TextEditorDecorationType {
         const color: string = vscode.workspace.getConfiguration("weAudit").get("otherNoteColor")!;
         return this.createDecorationTypeWithString(color);
     }
 
+    /** Loads the decoration type for audited file regions from configuration. */
     private loadAuditedDecorationConfiguration(): vscode.TextEditorDecorationType {
         const color: string | undefined = vscode.workspace.getConfiguration("weAudit").get("auditedColor");
         return vscode.window.createTextEditorDecorationType({
